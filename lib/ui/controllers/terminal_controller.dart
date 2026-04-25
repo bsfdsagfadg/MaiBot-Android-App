@@ -131,7 +131,7 @@ class HomeController extends GetxController {
       }
 
       // 检查是否包含 MaiBot 全部系统初始化完成的标志
-      if (event.contains('全部系统初始化完成，麦麦 已成功唤醒')) {
+      if (event.contains('全部系统初始化完成')) {
         _isLocalhostDetected = true;
         bumpProgress();
 
