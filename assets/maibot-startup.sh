@@ -186,20 +186,21 @@ install_napcat(){
   "network": {
     "httpServers": [],
     "httpClients": [],
-    "websocketServers": [],
-    "websocketClients": [
+    "websocketServers": [
       {
-        "name": "WsClient",
+        "name": "WsServer",
         "enable": true,
-        "url": "ws://localhost:8095/ws",
-        "messagePostFormat": "array",
+        "host": "127.0.0.1",
+        "port": 8095,
         "reportSelfMessage": false,
-        "reconnectInterval": 5000,
+        "enableForcePushEvent": true,
+        "messagePostFormat": "array",
         "token": "kasdkfljsadhlskdjhasdlkfshdlafksjdhf",
         "debug": false,
         "heartInterval": 30000
       }
-    ]
+    ],
+    "websocketClients": []
   },
   "musicSignUrl": "",
   "enableLocalFile2Url": false,
@@ -275,6 +276,8 @@ install_maibot(){
       echo "适配器插件克隆失败"
       exit 1
     fi
+    # 刚克隆下来删掉默认配置
+    rm -f "$ADAPTER_DIR/config.toml"
   fi
 
   progress_echo "MaiBot 初始化中"
@@ -359,11 +362,12 @@ install_maibot(){
   # 启动 MaiBot Core (自动处理配置生成)
   progress_echo "MaiBot Core 配置中"
   
-  # 拷贝适配器插件配置
-  mkdir -p "$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter"
-  if [ -f "/root/config.toml" ]; then
+  # 拷贝适配器插件配置 (判断文件不存在才复制)
+  local TARGET_CONFIG="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter/config.toml"
+  if [ -f "/root/config.toml" ] && [ ! -f "$TARGET_CONFIG" ]; then
     echo "正在拷贝适配器插件配置..."
-    cp /root/config.toml "$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter/config.toml"
+    mkdir -p "$(dirname "$TARGET_CONFIG")"
+    cp /root/config.toml "$TARGET_CONFIG"
   fi
 
   cd "$INSTALL_DIR"

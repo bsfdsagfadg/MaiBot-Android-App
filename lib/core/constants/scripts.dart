@@ -527,7 +527,8 @@ copy_files(){
 
     # 复制新启动脚本
     cp ~/maibot-startup.sh "\$UBUNTU_PATH/root/maibot-startup.sh"
-
+    #复制配置文件
+    cp ~/config.toml "\$UBUNTU_PATH/root/config.toml"
     # 如果旧脚本有自定义 Git Clone 配置(非空值),则替换新脚本中的默认值
     if [ -n "\$OLD_GIT_CLONE_LINE" ] && ! echo "\$OLD_GIT_CLONE_LINE" | grep -q '=""\$'; then
       # 直接替换整行,保持用户原始配置
