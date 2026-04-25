@@ -1,0 +1,60 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main  # 当推送到 main 分支时触发
+  workflow_dispatch: # 允许手动触发构建
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # 如果你有子模块，递归检出
+
+      # 2. 设置 Java 环境 (Flutter Android 构建需要 Java 17)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # 3. 设置 Flutter 环境
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # 4. 获取依赖
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 5. (可选) 检查代码格式
+      # - name: Check formatting
+      #   run: flutter format --set-exit-if-changed .
+
+      # 6. 构建 APK
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 7. 重命名 APK (方便识别)
+      - name: Rename APK
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/MaiBot-Android-release.apk
+
+      # 8. 上传构建产物到 GitHub Actions 页面的 Artifacts
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MaiBot-Android-APK
+          path: build/app/outputs/flutter-apk/MaiBot-Android-release.apk
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
