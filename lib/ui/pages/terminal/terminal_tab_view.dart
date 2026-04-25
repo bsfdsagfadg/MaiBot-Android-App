@@ -176,11 +176,13 @@ class _TerminalTabViewState extends State<TerminalTabView> {
   /// 构建终端内容
   Widget _buildTerminalContent(TerminalTab tab) {
     return ClipRect(
-      child: TerminalView(
-        tab.terminal,
-        readOnly: tab.type == TerminalTabType.fixed, // 固定终端只读
-        backgroundOpacity: 1,
-        theme: ManjaroTerminalTheme(),
+      child: RepaintBoundary(
+        child: TerminalView(
+          tab.terminal,
+          readOnly: tab.type == TerminalTabType.fixed, // 固定终端只读
+          backgroundOpacity: 1,
+          theme: ManjaroTerminalTheme(),
+        ),
       ),
     );
   }

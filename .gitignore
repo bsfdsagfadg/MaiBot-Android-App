@@ -187,3 +187,6 @@ key.properties
 
 /.trae/
 /.claude/
+*.code-workspace
+.metadata
+/dev/ 

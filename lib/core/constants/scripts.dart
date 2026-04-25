@@ -512,8 +512,8 @@ copy_files(){
   EXISTING_VERSION=""
 
   # 检查旧脚本是否存在并提取版本
-  if [ -f "\$UBUNTU_PATH/root/astrbot-startup.sh" ]; then
-    EXISTING_VERSION=\$(grep '^ASTRBOT_APP_VERSION=' "\$UBUNTU_PATH/root/astrbot-startup.sh" 2>/dev/null | cut -d'"' -f2)
+  if [ -f "\$UBUNTU_PATH/root/maibot-startup.sh" ]; then
+    EXISTING_VERSION=\$(grep '^MAIBOT_APP_VERSION=' "\$UBUNTU_PATH/root/maibot-startup.sh" 2>/dev/null | cut -d'"' -f2)
   fi
 
   # 判断是否需要复制
@@ -523,15 +523,15 @@ copy_files(){
 
   if [ "\$SHOULD_COPY" -eq 1 ]; then
     # 提取旧脚本的完整 CUSTOM_GIT_CLONE 行(保留原始格式)
-    OLD_GIT_CLONE_LINE=\$(grep '^CUSTOM_GIT_CLONE=' "\$UBUNTU_PATH/root/astrbot-startup.sh" 2>/dev/null)
+    OLD_GIT_CLONE_LINE=\$(grep '^CUSTOM_GIT_CLONE=' "\$UBUNTU_PATH/root/maibot-startup.sh" 2>/dev/null)
 
     # 复制新启动脚本
-    cp ~/astrbot-startup.sh "\$UBUNTU_PATH/root/astrbot-startup.sh"
+    cp ~/maibot-startup.sh "\$UBUNTU_PATH/root/maibot-startup.sh"
 
     # 如果旧脚本有自定义 Git Clone 配置(非空值),则替换新脚本中的默认值
     if [ -n "\$OLD_GIT_CLONE_LINE" ] && ! echo "\$OLD_GIT_CLONE_LINE" | grep -q '=""\$'; then
       # 直接替换整行,保持用户原始配置
-      sed -i "s|^CUSTOM_GIT_CLONE=.*|\$OLD_GIT_CLONE_LINE|" "\$UBUNTU_PATH/root/astrbot-startup.sh"
+      sed -i "s|^CUSTOM_GIT_CLONE=.*|\$OLD_GIT_CLONE_LINE|" "\$UBUNTU_PATH/root/maibot-startup.sh"
       echo "启动脚本版本不一致(现有: \$EXISTING_VERSION, 当前: \$CURRENT_VERSION)，已更新启动脚本"
       echo "✓ 已保留自定义 Git Clone 配置"
     else
@@ -540,9 +540,6 @@ copy_files(){
   else
     echo -e "\\033[32m启动脚本版本一致(\$CURRENT_VERSION)，无需更新\\033[0m"
   fi
-
-  # cmd_config.json 每次都复制（保持原有逻辑）
-  cp ~/cmd_config.json "\$UBUNTU_PATH/root/cmd_config.json"
 }
 ''';
 }
@@ -558,14 +555,14 @@ $setupFakeSysdata
 $loginUbuntu
 ${getCopyFilesScript(currentVersion)}
 clear_lines
-start_astrbot(){
+start_maibot(){
   bump_progress
   install_ubuntu
   sleep 1
   bump_progress
 
   copy_files
-  login_ubuntu "export TMPDIR='${RuntimeEnvir.tmpPath}'; export L_NOT_INSTALLED='${S.current.uninstalled}'; export L_INSTALLING='${S.current.installing}'; export L_INSTALLED='${S.current.installed}'; chmod +x /root/astrbot-startup.sh; bash /root/astrbot-startup.sh"
+  login_ubuntu "export TMPDIR='${RuntimeEnvir.tmpPath}'; export L_NOT_INSTALLED='${S.current.uninstalled}'; export L_INSTALLING='${S.current.installing}'; export L_INSTALLED='${S.current.installed}'; chmod +x /root/maibot-startup.sh; bash /root/maibot-startup.sh"
 }
 ''';
 }

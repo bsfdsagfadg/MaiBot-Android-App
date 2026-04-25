@@ -13,7 +13,7 @@ if (hasKeystoreFile) {
     logger.lifecycle('Warning: key.properties not found, fallback to debug keystore.')
 }
 android {
-    namespace 'com.astrbot.astrbot_android'
+    namespace 'com.maibot.maibot_android'
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -37,7 +37,7 @@ android {
     }
 
     defaultConfig {
-        applicationId 'com.astrbot.astrbot_android'
+        applicationId 'com.maibot.maibot_android'
         minSdk = 24
         targetSdk = 35
         versionCode = flutter.versionCode
@@ -51,8 +51,8 @@ android {
     buildTypes {
         release {
             signingConfig hasKeystoreFile ? signingConfigs.release : signingConfigs.debug
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             // 禁用对特定原生库的strip操作，避免处理错误
             packagingOptions {
                 doNotStrip '**/libsudo.so'

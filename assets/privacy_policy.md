@@ -6,13 +6,13 @@
 ## 重要告知
 ⚠️ **本应用为完全免费开源软件** ⚠️
 
-- 本应用（AstrBot-Android-App）是完全免费的开源项目，**从未授权任何个人或平台进行收费分发**
+- 本应用（MaiBot-Android-App）是完全免费的开源项目，**从未授权任何个人或平台进行收费分发**
 - 如您通过付费渠道获取本应用，请立即向相关平台举报并联系我们
-- 官方获取渠道：[GitHub项目页面](https://github.com/zz6zz666/AstrBot-Android-App)
+- 官方获取渠道：[GitHub项目页面](https://github.com/MaiM-with-u/MaiBot-Android-App)
 
 ## 导言
 
-_AstrBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我们"）合作开发的开源产品。本《隐私政策》旨在向您说明我们如何收集、使用、存储、共享与保护您的信息，以及您如何行使相关权利。请您在使用前仔细阅读并充分理解本政策的全部内容。
+_MaiBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我们"）合作开发,由「bsfdsagfadg」二次修改的开源产品，并由相关开发者进行了二次衍生。本《隐私政策》旨在向您说明我们如何收集、使用、存储、共享与保护您的信息，以及您如何行使相关权利。请您在使用前仔细阅读并充分理解本政策的全部内容。
 
 您使用或继续使用我们的服务，即表示您已阅读并同意本《隐私政策》。如对本政策有任何疑问，您可通过以下方式与我们联系：
 - 邮箱：**zz6zz666@qq.com**
@@ -20,7 +20,7 @@ _AstrBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我
 
 ## 1. 适用范围
 
-本政策适用于您在使用 _AstrBot-Android-App_ 移动应用过程中的个人信息处理活动（包括后续版本、功能模块更新或扩展）。本应用基于AstrBot聊天机器人框架、NapCatQQ消息适配器与Code LFA的Ubuntu容器环境打造，您在使用第三方框架及适配器时，还应遵守其相应的隐私政策。
+本政策适用于您在使用 _MaiBot-Android-App_ 移动应用过程中的个人信息处理活动（包括后续版本、功能模块更新或扩展）。本应用基于MaiBot聊天机器人核心、NapCatQQ消息适配器与Code LFA的Ubuntu容器环境打造，您在使用第三方框架及适配器时，还应遵守其相应的隐私政策。
 
 ## 2. 我们收集的信息
 
@@ -28,7 +28,7 @@ _AstrBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我
 
 - 您主动提供的信息：在反馈、问题咨询或与我们联系时，您可能会主动提供的邮箱、问题描述、截图等。若您不主动提供，我们不会获取此类信息。
 - 应用版本信息：仅在您主动检查更新时，应用会读取本地应用版本号，并通过网络请求 GitHub API 获取最新版本信息，用于版本比对和更新提示。
-- 本地存储与缓存：为提升加载速度与离线可用性，我们可能在本地缓存必要的配置或资源文件（包括但不限于 AstrBot 框架配置、容器环境设置等），不用于识别您的个人身份。
+- 本地存储与缓存：为提升加载速度与离线可用性，我们可能在本地缓存必要的配置或资源文件（包括但不限于 MaiBot 框架配置、容器环境设置等），不用于识别您的个人身份。
 
 说明：
 - 我们**不收集**设备信息（如设备型号、操作系统版本、设备标识等）。
@@ -41,10 +41,10 @@ _AstrBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我
 
 为实现特定功能，我们仅在您使用相关功能或获得您授权时，申请相应系统权限：
 
-- **网络权限**（INTERNET, ACCESS_NETWORK_STATE）：用于连接 AstrBot 服务、访问 WebView 仪表盘、检查应用更新（必要）。
-- **存储/媒体访问权限**（MANAGE_EXTERNAL_STORAGE, READ/WRITE_EXTERNAL_STORAGE, READ_MEDIA_*）：用于读写 Ubuntu 容器环境文件、AstrBot 框架资源、配置文件及数据备份功能（在功能需要时申请）。
+- **网络权限**（INTERNET, ACCESS_NETWORK_STATE）：用于连接 MaiBot 服务、访问 WebView 仪表盘、检查应用更新（必要）。
+- **存储/媒体访问权限**（MANAGE_EXTERNAL_STORAGE, READ/WRITE_EXTERNAL_STORAGE, READ_MEDIA_*）：用于读写 Ubuntu 容器环境文件、MaiBot 框架资源、配置文件及数据备份功能（在功能需要时申请）。
 - **通知权限**（POST_NOTIFICATIONS）：用于向您推送必要的服务提醒（如容器启动状态、机器人运行通知等，可自主选择开启）。
-- **前台服务权限**（FOREGROUND_SERVICE, FOREGROUND_SERVICE_DATA_SYNC）：用于在后台保持 AstrBot 和 NapCat 服务运行（必要）。
+- **前台服务权限**（FOREGROUND_SERVICE, FOREGROUND_SERVICE_DATA_SYNC）：用于在后台保持 MaiBot 和 NapCat 服务运行（必要）。
 - **电池优化豁免**（REQUEST_IGNORE_BATTERY_OPTIMIZATIONS）：用于请求系统不对应用进行电池优化，以确保后台服务稳定运行（可选，需用户主动授权）。
 
 您可在设备系统设置中随时管理或撤回权限授权，撤回后可能影响相关功能的正常使用，但不影响不依赖该权限的其他功能。
@@ -55,7 +55,7 @@ _AstrBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我
 
 我们将收集的信息用于以下目的：
 
-- 提供与维护 AstrBot 服务、Ubuntu 容器环境及应用核心功能；
+- 提供与维护 MaiBot 服务、Ubuntu 容器环境及应用核心功能；
 - 在您主动检查更新时，通过 GitHub API 获取最新版本信息并提供下载链接；
 - 在获得您授权或遵循法律要求的情况下，开展必要的产品通知与用户支持。
 
@@ -75,7 +75,7 @@ _AstrBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我
 
 本应用集成了以下开源项目和框架，其信息处理活动遵循各自的隐私政策：
 
-- **AstrBot 框架**：详情请参考其官方隐私说明（https://docs.astrbot.app/）
+- **MaiBot 框架**：详情请参考其官方文档（https://github.com/MaiM-with-u/MaiBot）
 - **NapCatQQ 消息适配器**：详情请参考其官方隐私说明（https://napneko.github.io/guide/napcat）
 - **Code LFA 容器环境**：详情请参考其官方隐私说明（https://github.com/nightmare-space/code_lfa）
 
@@ -83,7 +83,7 @@ _AstrBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我
 
 ## 7. 信息的存储与跨境传输
 
-- **存储地点**：所有应用数据、配置文件和 AstrBot 相关数据均存储在您的设备本地，不会上传到任何服务器。
+- **存储地点**：所有应用数据、配置文件和 MaiBot 相关数据均存储在您的设备本地，不会上传到任何服务器。
 - **存储期限**：数据将一直保存在您的设备上，直到您主动删除应用或清除应用数据。
 - **跨境传输**：本应用不进行任何个人信息的跨境传输。唯一的网络请求是在您主动检查更新时访问 GitHub API，该请求不包含任何个人信息。
 
@@ -147,7 +147,7 @@ _AstrBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我
 
 ### 网络请求说明
 - **检查更新**：访问 GitHub API (api.github.com) 及镜像源，仅传输应用版本号，不包含任何个人信息
-- **WebView 访问**：访问本地服务 (127.0.0.1)，用于 AstrBot 和 NapCat 管理界面
+- **WebView 访问**：访问本地服务 (127.0.0.1)，用于 MaiBot 和 NapCat 管理界面
 
 ### 数据收集清单
 本应用**不收集**以下信息：
@@ -162,5 +162,5 @@ _AstrBot-Android-App_ 是由「zz6zz666」与「AAswordman」（以下简称"我
 
 本应用仅在本地处理：
 - ✅ 应用配置（存储在应用私有目录）
-- ✅ AstrBot 数据（存储在 Ubuntu 容器）
+- ✅ MaiBot 数据（存储在 Ubuntu 容器）
 - ✅ 用户主动创建的备份文件（存储在下载目录）

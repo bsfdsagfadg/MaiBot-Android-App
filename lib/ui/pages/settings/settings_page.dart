@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,13 +15,13 @@ import '../../../core/services/password_manager.dart';
 import '../../../core/config/app_config.dart';
 
 class SettingsPage extends StatefulWidget {
-  final WebViewController astrBotController;
+  final WebViewController maiBotController;
   final WebViewController napCatController;
   final Function(int) onNavigate;
 
   const SettingsPage({
     super.key,
-    required this.astrBotController,
+    required this.maiBotController,
     required this.napCatController,
     required this.onNavigate,
   });
@@ -62,7 +62,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _isBatteryOptimizationIgnored = status.isGranted;
       });
     } catch (e) {
-      Log.e('检查电池优化豁免状态失败: $e', tag: 'AstrBot');
+      Log.e('检查电池优化豁免状态失败: $e', tag: 'MaiBot');
     }
   }
 
@@ -108,7 +108,7 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       }
     } catch (e) {
-      Log.e('请求电池优化豁免失败: $e', tag: 'AstrBot');
+      Log.e('请求电池优化豁免失败: $e', tag: 'MaiBot');
       Get.snackbar(
         '请求失败',
         '请求电池优化豁免时发生错误: $e',
@@ -157,7 +157,7 @@ class _SettingsPageState extends State<SettingsPage> {
             break;
           }
         } catch (e) {
-          Log.w('镜像源 $mirror 请求失败: $e', tag: 'AstrBot');
+          Log.w('镜像源 $mirror 请求失败: $e', tag: 'MaiBot');
           continue;
         }
       }
@@ -194,7 +194,7 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     } catch (e) {
       Get.back(); // 关闭加载提示
-      Log.e('检查更新失败: $e', tag: 'AstrBot');
+      Log.e('检查更新失败: $e', tag: 'MaiBot');
       Get.snackbar(
         '检查失败',
         '检查更新时发生错误: $e',
@@ -629,22 +629,22 @@ class _SettingsPageState extends State<SettingsPage> {
           '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
 
       // 备份文件路径（保存到下载文件夹）
-      final backupDir = Directory('/storage/emulated/0/Download/AstrBot');
+      final backupDir = Directory('/storage/emulated/0/Download/MaiBot');
       if (!await backupDir.exists()) {
         await backupDir.create(recursive: true);
       }
 
-      final backupFileName = 'AstrBot-backup-$timestamp.tar.gz';
+      final backupFileName = 'MaiBot-backup-$timestamp.tar.gz';
       final backupPath = '${backupDir.path}/$backupFileName';
 
       // 使用 tar 命令压缩 data 目录
-      final dataPath = '${scripts.ubuntuPath}/root/AstrBot/data';
+      final dataPath = '${scripts.ubuntuPath}/root/MaiBot/data';
       final dataDir = Directory(dataPath);
 
       if (!await dataDir.exists()) {
         Get.snackbar(
           '备份失败',
-          'AstrBot 数据目录不存在',
+          'MaiBot 数据目录不存在',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red,
           colorText: Colors.white,
@@ -658,7 +658,7 @@ class _SettingsPageState extends State<SettingsPage> {
         '-czf',
         backupPath,
         '-C',
-        '${scripts.ubuntuPath}/root/AstrBot',
+        '${scripts.ubuntuPath}/root/MaiBot',
         'data',
       ]);
 
@@ -677,7 +677,7 @@ class _SettingsPageState extends State<SettingsPage> {
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 3),
         );
-        Log.i('备份成功: $backupPath (${fileSizeMB}MB)', tag: 'AstrBot');
+        Log.i('备份成功: $backupPath (${fileSizeMB}MB)', tag: 'MaiBot');
         return true;
       } else {
         if (showLoadingDialog) {
@@ -691,7 +691,7 @@ class _SettingsPageState extends State<SettingsPage> {
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
-        Log.e('备份失败: ${result.stderr}', tag: 'AstrBot');
+        Log.e('备份失败: ${result.stderr}', tag: 'MaiBot');
         return false;
       }
     } catch (e) {
@@ -706,7 +706,7 @@ class _SettingsPageState extends State<SettingsPage> {
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-      Log.e('备份异常: $e', tag: 'AstrBot');
+      Log.e('备份异常: $e', tag: 'MaiBot');
       return false;
     }
   }
@@ -814,7 +814,7 @@ class _SettingsPageState extends State<SettingsPage> {
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
         );
-        Log.i('自动登录QQ号已更新: $newQQ', tag: 'AstrBot');
+        Log.i('自动登录QQ号已更新: $newQQ', tag: 'MaiBot');
       } catch (e) {
         Get.snackbar(
           '保存失败',
@@ -824,7 +824,7 @@ class _SettingsPageState extends State<SettingsPage> {
           colorText: Colors.white,
           duration: const Duration(seconds: 3),
         );
-        Log.e('保存自动登录QQ号失败: $e', tag: 'AstrBot');
+        Log.e('保存自动登录QQ号失败: $e', tag: 'MaiBot');
       }
     }
 
@@ -833,7 +833,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // 显示自定义 Git Clone 对话框
   void _showCustomGitCloneDialog() async {
-    final scriptPath = '${scripts.ubuntuPath}/root/astrbot-startup.sh';
+    final scriptPath = '${scripts.ubuntuPath}/root/maibot-startup.sh';
     final scriptFile = File(scriptPath);
 
     // 检查脚本文件是否存在
@@ -880,12 +880,12 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '自定义克隆命令，以使用 fork 的 AstrBot 仓库；目标目录固定为 AstrBot，不可自定义。\n留空则使用默认逻辑（从镜像源获取官方最新 tag）。',
+                '自定义克隆命令，以使用 fork 的 MaiBot 仓库；目标目录固定为 MaiBot，不可自定义。\n留空则使用默认逻辑（从镜像源获取官方最新 tag）。',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 8),
               const Text(
-                '示例：\ngit clone https://github.com/AstrBotDevs/AstrBot.git',
+                '示例：\ngit clone https://github.com/MaiM-with-u/MaiBot.git',
                 style: TextStyle(fontSize: 11, color: Colors.grey),
               ),
               const SizedBox(height: 16),
@@ -928,7 +928,7 @@ class _SettingsPageState extends State<SettingsPage> {
         );
 
         await scriptFile.writeAsString(content);
-        Log.i('已更新自定义 Git Clone 命令: $newCommand', tag: 'AstrBot');
+        Log.i('已更新自定义 Git Clone 命令: $newCommand', tag: 'MaiBot');
 
         Get.snackbar(
           '保存成功',
@@ -945,21 +945,21 @@ class _SettingsPageState extends State<SettingsPage> {
           colorText: Colors.white,
           duration: const Duration(seconds: 3),
         );
-        Log.e('保存自定义 Git Clone 命令失败: $e', tag: 'AstrBot');
+        Log.e('保存自定义 Git Clone 命令失败: $e', tag: 'MaiBot');
       }
     }
 
     commandController.dispose();
   }
 
-  // 打开文件管理器并导航到 AstrBot Ubuntu 文件系统位置
+  // 打开文件管理器并导航到 MaiBot Ubuntu 文件系统位置
   Future<void> _openFileManager() async {
     try {
       // 使用 DocumentsProvider 的 content URI 打开文件管理器
-      // authority: com.astrbot.astrbot_android.documents
+      // authority: com.maibot.maibot_android.documents
       // rootId: ubuntu_root
       final contentUri = Uri.parse(
-        'content://com.astrbot.astrbot_android.documents/root/ubuntu_root',
+        'content://com.maibot.maibot_android.documents/root/ubuntu_root',
       );
 
       if (await canLaunchUrl(contentUri)) {
@@ -970,7 +970,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
         Get.snackbar(
           '已打开',
-          '已在文件管理器中打开 AstrBot Ubuntu 文件系统',
+          '已在文件管理器中打开 MaiBot Ubuntu 文件系统',
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
         );
@@ -989,7 +989,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'AstrBot Ubuntu',
+                  'MaiBot Ubuntu',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -998,7 +998,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  '你可以手动打开系统"文件"应用，在侧栏中找到"AstrBot Ubuntu"来访问。',
+                  '你可以手动打开系统"文件"应用，在侧栏中找到"MaiBot Ubuntu"来访问。',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 8),
@@ -1041,7 +1041,7 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       }
     } catch (e) {
-      Log.e('打开文件管理器失败: $e', tag: 'AstrBot');
+      Log.e('打开文件管理器失败: $e', tag: 'MaiBot');
       Get.snackbar(
         '打开失败',
         '无法打开文件管理器: $e',
@@ -1074,20 +1074,20 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         ListTile(
           leading: const Icon(Icons.home),
-          title: const Text('回到 AstrBot 主页'),
-          subtitle: const Text('重置并刷新 AstrBot 页面'),
+          title: const Text('回到 MaiBot 主页'),
+          subtitle: const Text('重置并刷新 MaiBot 页面'),
           onTap: () {
-            // 重置 AstrBot WebView URL 并刷新
-            widget.astrBotController.loadRequest(
-              Uri.parse('http://127.0.0.1:6185'),
+            // 重置 MaiBot WebView URL 并刷新
+            widget.maiBotController.loadRequest(
+              Uri.parse('http://127.0.0.1:8001'),
             );
 
-            // 跳转到 AstrBot 标签页（索引 0）
+            // 跳转到 MaiBot 标签页（索引 0）
             widget.onNavigate(0);
 
             Get.snackbar(
               '已跳转',
-              'AstrBot 页面已重置并刷新',
+              'MaiBot 页面已重置并刷新',
               snackPosition: SnackPosition.BOTTOM,
               duration: const Duration(seconds: 2),
             );
@@ -1095,14 +1095,14 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         ListTile(
           leading: const Icon(Icons.restart_alt),
-          title: const Text('更新或重装 AstrBot'),
-          subtitle: const Text('清除 AstrBot 组件并重新安装最新版本'),
+          title: const Text('更新或重装 MaiBot'),
+          subtitle: const Text('清除 MaiBot 组件并重新安装最新版本'),
           onTap: () async {
             // 首先询问是否需要备份
             final backupChoice = await Get.dialog<String>(
               AlertDialog(
-                title: const Text('重新安装 AstrBot'),
-                content: const Text('重新安装将删除所有 AstrBot 数据，\n是否需要先备份当前数据？'),
+                title: const Text('重新安装 MaiBot'),
+                content: const Text('重新安装将删除所有 MaiBot 数据，\n是否需要先备份当前数据？'),
                 actions: [
                   TextButton(
                     onPressed: () => Get.back(result: 'cancel'),
@@ -1167,7 +1167,7 @@ class _SettingsPageState extends State<SettingsPage> {
             final finalConfirm = await Get.dialog<bool>(
               AlertDialog(
                 title: const Text('确认重新安装'),
-                content: const Text('确定要删除所有 AstrBot 数据并重新安装吗？\n此操作不可恢复！'),
+                content: const Text('确定要删除所有 MaiBot 数据并重新安装吗？\n此操作不可恢复！'),
                 actions: [
                   TextButton(
                     onPressed: () => Get.back(result: false),
@@ -1186,12 +1186,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
             if (finalConfirm == true) {
               try {
-                // 删除 AstrBot 目录（~/AstrBot）
-                final astrBotPath = '${scripts.ubuntuPath}/root/AstrBot';
-                final astrBotDir = Directory(astrBotPath);
-                if (await astrBotDir.exists()) {
-                  await astrBotDir.delete(recursive: true);
-                  Log.i('已删除 AstrBot 目录: $astrBotPath', tag: 'AstrBot');
+                // 删除 MaiBot 目录（~/MaiBot）
+                final maiBotPath = '${scripts.ubuntuPath}/root/MaiBot';
+                final maiBotDir = Directory(maiBotPath);
+                if (await maiBotDir.exists()) {
+                  await maiBotDir.delete(recursive: true);
+                  Log.i('已删除 MaiBot 目录: $maiBotPath', tag: 'MaiBot');
                 }
 
                 if (context.mounted) {
@@ -1208,7 +1208,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   });
                 }
               } catch (e) {
-                Log.e('重新安装 AstrBot 失败: $e', tag: 'AstrBot');
+                Log.e('重新安装 MaiBot 失败: $e', tag: 'MaiBot');
                 if (context.mounted) {
                   Get.snackbar(
                     '重新安装失败',
@@ -1255,7 +1255,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 final launcherFile = File(launcherPath);
                 if (await launcherFile.exists()) {
                   await launcherFile.delete();
-                  Log.i('已删除 launcher.sh: $launcherPath', tag: 'AstrBot');
+                  Log.i('已删除 launcher.sh: $launcherPath', tag: 'MaiBot');
                 }
 
                 if (context.mounted) {
@@ -1272,7 +1272,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   });
                 }
               } catch (e) {
-                Log.e('重新安装 NapcatQQ 失败: $e', tag: 'AstrBot');
+                Log.e('重新安装 NapcatQQ 失败: $e', tag: 'MaiBot');
                 if (context.mounted) {
                   Get.snackbar(
                     '重新安装失败',
@@ -1293,7 +1293,7 @@ class _SettingsPageState extends State<SettingsPage> {
           onTap: () async {
             try {
               final scriptPath =
-                  '${scripts.ubuntuPath}/root/astrbot-startup.sh';
+                  '${scripts.ubuntuPath}/root/maibot-startup.sh';
               final scriptFile = File(scriptPath);
 
               if (await scriptFile.exists()) {
@@ -1306,7 +1306,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
 
                 await scriptFile.writeAsString(content);
-                Log.i('已设置插件依赖重装标记', tag: 'AstrBot');
+                Log.i('已设置插件依赖重装标记', tag: 'MaiBot');
 
                 Get.snackbar(
                   '设置成功',
@@ -1323,7 +1323,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
               }
             } catch (e) {
-              Log.e('设置重装标记失败: $e', tag: 'AstrBot');
+              Log.e('设置重装标记失败: $e', tag: 'MaiBot');
               Get.snackbar(
                 '操作失败',
                 '设置重装标记失败: $e',
@@ -1335,23 +1335,23 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         ListTile(
           leading: const Icon(Icons.backup),
-          title: const Text('备份 AstrBot 数据'),
-          subtitle: const Text('备份 AstrBot 配置和数据到手机存储'),
+          title: const Text('备份 MaiBot 数据'),
+          subtitle: const Text('备份 MaiBot 配置和数据到手机存储'),
           onTap: () async {
             await _performBackup(showLoadingDialog: true);
           },
         ),
         ListTile(
           leading: const Icon(Icons.delete),
-          title: const Text('清除 AstrBot 数据'),
-          subtitle: const Text('清除 AstrBot 配置和数据，\n重启时自动从备份恢复或重新初始化'),
+          title: const Text('清除 MaiBot 数据'),
+          subtitle: const Text('清除 MaiBot 配置和数据，\n重启时自动从备份恢复或重新初始化'),
           onTap: () async {
             // 显示确认对话框
             final confirmed = await Get.dialog<bool>(
               AlertDialog(
                 title: const Text('确认清除数据'),
                 content: const Text(
-                  '此操作将删除所有 AstrBot 数据和配置，\n'
+                  '此操作将删除所有 MaiBot 数据和配置，\n'
                   '重启后将自动从备份恢复或重新初始化。\n\n'
                   '是否继续？',
                 ),
@@ -1373,16 +1373,16 @@ class _SettingsPageState extends State<SettingsPage> {
 
             if (confirmed == true) {
               try {
-                final dataPath = '${scripts.ubuntuPath}/root/AstrBot/data';
+                final dataPath = '${scripts.ubuntuPath}/root/MaiBot/data';
                 final dataDir = Directory(dataPath);
 
                 if (await dataDir.exists()) {
                   await dataDir.delete(recursive: true);
-                  Log.i('已清除 AstrBot 数据目录: $dataPath', tag: 'AstrBot');
+                  Log.i('已清除 MaiBot 数据目录: $dataPath', tag: 'MaiBot');
 
                   Get.snackbar(
                     '清除成功',
-                    'AstrBot 数据已清除，应用即将退出',
+                    'MaiBot 数据已清除，应用即将退出',
                     snackPosition: SnackPosition.BOTTOM,
                     duration: const Duration(seconds: 2),
                   );
@@ -1399,7 +1399,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   );
                 }
               } catch (e) {
-                Log.e('清除 AstrBot 数据失败: $e', tag: 'AstrBot');
+                Log.e('清除 MaiBot 数据失败: $e', tag: 'MaiBot');
                 Get.snackbar(
                   '操作失败',
                   '清除数据失败: $e',
@@ -1441,12 +1441,12 @@ class _SettingsPageState extends State<SettingsPage> {
             );
             if (confirmed == true) {
               try {
-                final venvPath = '${scripts.ubuntuPath}/root/AstrBot/.venv';
+                final venvPath = '${scripts.ubuntuPath}/root/MaiBot/.venv';
                 final venvDir = Directory(venvPath);
 
                 if (await venvDir.exists()) {
                   await venvDir.delete(recursive: true);
-                  Log.i('已删除 Python 虚拟环境: $venvPath', tag: 'AstrBot');
+                  Log.i('已删除 Python 虚拟环境: $venvPath', tag: 'MaiBot');
 
                   Get.snackbar(
                     '重置成功',
@@ -1467,7 +1467,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   );
                 }
               } catch (e) {
-                Log.e('删除 Python 虚拟环境失败: $e', tag: 'AstrBot');
+                Log.e('删除 Python 虚拟环境失败: $e', tag: 'MaiBot');
                 Get.snackbar(
                   '操作失败',
                   '删除虚拟环境失败: $e',
@@ -1602,11 +1602,29 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: token.isEmpty
                 ? null
                 : () async {
-                    final fullUrl = 'http://localhost:6099/webui?token=$token';
-                    await Clipboard.setData(ClipboardData(text: fullUrl));
+                    await Clipboard.setData(ClipboardData(text: token));
                     Get.snackbar(
                       '已复制',
-                      '完整登录链接已复制到剪贴板',
+                      'NapCat Token 已复制到剪贴板',
+                      snackPosition: SnackPosition.BOTTOM,
+                      duration: const Duration(seconds: 2),
+                    );
+                  },
+          );
+        }),
+        Obx(() {
+          final token = homeController.maiBotWebUiToken.value;
+          return ListTile(
+            leading: const Icon(Icons.key),
+            title: const Text('MaiBot 登录 token'),
+            subtitle: Text(token.isEmpty ? '暂未获取到token' : token),
+            onTap: token.isEmpty
+                ? null
+                : () async {
+                    await Clipboard.setData(ClipboardData(text: token));
+                    Get.snackbar(
+                      '已复制',
+                      'MaiBot Token 已复制到剪贴板',
                       snackPosition: SnackPosition.BOTTOM,
                       duration: const Duration(seconds: 2),
                     );
@@ -1616,27 +1634,8 @@ class _SettingsPageState extends State<SettingsPage> {
         ListTile(
           leading: const Icon(Icons.code),
           title: const Text('自定义 Git Clone 命令'),
-          subtitle: const Text('自定义 AstrBot 的获取方式'),
+          subtitle: const Text('自定义 MaiBot 的获取方式'),
           onTap: () => _showCustomGitCloneDialog(),
-        ),
-        ListTile(
-          leading: const Icon(Icons.text_fields),
-          title: const Text('显示终端白色文本日志'),
-          subtitle: const Text('是否在终端显示 AstrBot 白色文本日志（默认隐藏）'),
-          trailing: Obx(() => Switch(
-                value: homeController.showTerminalWhiteTextRx.value,
-                onChanged: (bool value) {
-                  // 使用新的方法来同步更新响应式变量
-                  homeController.setShowTerminalWhiteText(value);
-
-                  Get.snackbar(
-                    value ? '已启用白色文本显示' : '已禁用白色文本显示',
-                    value ? '终端将显示所有日志输出' : '终端将仅显示彩色日志输出',
-                    snackPosition: SnackPosition.BOTTOM,
-                    duration: const Duration(seconds: 2),
-                  );
-                },
-              )),
         ),
         ListTile(
           leading: const Icon(Icons.folder),
@@ -1652,7 +1651,7 @@ class _SettingsPageState extends State<SettingsPage> {
           subtitle: const Text('清理所有 WebView 缓存和密码'),
           onTap: () async {
             try {
-              await widget.astrBotController.clearCache();
+              await widget.maiBotController.clearCache();
               await widget.napCatController.clearCache();
               await PasswordManager.clearAllPasswords();
               if (context.mounted) {
@@ -1757,7 +1756,7 @@ class _SettingsPageState extends State<SettingsPage> {
             '退出应用',
             style: TextStyle(color: Colors.red),
           ),
-          subtitle: const Text('退出 AstrBot 应用'),
+          subtitle: const Text('退出 MaiBot 应用'),
           onTap: () async {
             // 显示确认对话框
             final confirm = await Get.dialog<bool>(

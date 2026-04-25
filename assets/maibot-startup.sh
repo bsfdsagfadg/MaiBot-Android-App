@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ASTRBOT_APP_VERSION="{{VERSION}}"
+MAIBOT_APP_VERSION="{{VERSION}}"
 
 # 自定义 Git Clone 命令（为空时使用默认逻辑）
 CUSTOM_GIT_CLONE=""
@@ -38,16 +38,13 @@ bump_progress(){
 }
 
 install_sudo_curl_git(){
-  curl_path=`which curl`
-  if [ -z "$curl_path" ]; then
-    progress_echo "curl $L_NOT_INSTALLED, $L_INSTALLING..."
+  if ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v sudo >/dev/null 2>&1; then
+    progress_echo "正在安装基础组件..."
     apt-get update
     apt --fix-broken install -y
-    apt-get install -y sudo
-    sudo apt-get install -y git
-    sudo apt-get install -y curl
+    apt-get install -y sudo wget git curl
   else
-    progress_echo "curl $L_INSTALLED"
+    progress_echo "基础组件已安装"
   fi
 }
 
@@ -165,7 +162,8 @@ install_napcat(){
     rm -rf $HOME/napcat
     cd $HOME
     echo "Napcat $L_NOT_INSTALLED，$L_INSTALLING..."
-    curl -o napcat.sh https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh
+    network_test
+    curl -o napcat.sh ${target_proxy:+${target_proxy}/}https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh
     if ! chmod +x napcat.sh; then
       echo "设置 napcat.sh 执行权限失败"
       exit 1
@@ -180,7 +178,7 @@ install_napcat(){
       rm -rf "$HOME/napcat_config_backup"
     fi
     
-  # 只在配置文件不存在时写入默认配置
+  # 写入 onebot11.json 默认配置文件
   if [ ! -f "$HOME/napcat/config/onebot11.json" ]; then
     echo "写入 onebot11.json 默认配置文件"
     cat > "$HOME/napcat/config/onebot11.json" <<'EOF'
@@ -193,7 +191,7 @@ install_napcat(){
       {
         "name": "WsClient",
         "enable": true,
-        "url": "ws://localhost:6199/ws",
+        "url": "ws://localhost:8095/ws",
         "messagePostFormat": "array",
         "reportSelfMessage": false,
         "reconnectInterval": 5000,
@@ -213,10 +211,9 @@ fi
   progress_echo "Napcat $L_INSTALLED"
 }
 
-install_astrbot(){
-  local INSTALL_DIR="$HOME/AstrBot"
-  local CLONE_TEMP_DIR="$HOME/AstrBot_tmp"
-  local BACKUP_DIR="/sdcard/Download/AstrBot"
+install_maibot(){
+  local INSTALL_DIR="$HOME/MaiBot"
+  local CLONE_TEMP_DIR="$HOME/MaiBot_tmp"
 
   rm -rf "$CLONE_TEMP_DIR"
 
@@ -225,10 +222,10 @@ install_astrbot(){
   # 检查是否已安装
   if [ ! -d "$INSTALL_DIR" ]; then
     cd $HOME
-    progress_echo "AstrBot $L_NOT_INSTALLED，$L_INSTALLING..."
+    progress_echo "MaiBot $L_NOT_INSTALLED，$L_INSTALLING..."
 
     # 克隆仓库（失败直接退出）
-    echo "正在获取 AstrBot 最新版本..."
+    echo "正在获取 MaiBot 最新版本..."
 
     # 判断是否使用自定义 git clone 命令
     if [ -n "$CUSTOM_GIT_CLONE" ]; then
@@ -239,31 +236,23 @@ install_astrbot(){
         echo "自定义 Git Clone 命令执行失败"
         exit 1
       fi
-      # 查找克隆后的目录（通常是 AstrBot）
-      if [ -d "AstrBot" ]; then
-        mv "AstrBot" "$CLONE_TEMP_DIR"
+      # 查找克隆后的目录（通常是 MaiBot）
+      if [ -d "MaiBot" ]; then
+        mv "MaiBot" "$CLONE_TEMP_DIR"
       else
-        echo "错误: 自定义 git clone 后未找到 AstrBot 目录"
+        echo "错误: 自定义 git clone 后未找到 MaiBot 目录"
         exit 1
       fi
     else
       network_test
       
-      # 使用默认逻辑：获取最新的 tag
-      LATEST_TAG=$(git ls-remote --tags --sort='-v:refname' ${target_proxy:+${target_proxy}/}https://github.com/AstrBotDevs/AstrBot.git | head -n 1 | awk -F'/' '{print $3}')
-
-      if [ -z "$LATEST_TAG" ]; then
-        echo "警告: 无法获取最新 tag，使用 master 分支"
-        CLONE_BRANCH="master"
-      else
-        echo "最新版本: $LATEST_TAG"
-        CLONE_BRANCH="$LATEST_TAG"
-      fi
+      # 强制使用 main 分支克隆 MaiBot
+      CLONE_BRANCH="main"
 
       # 克隆到临时目录
-      echo "正在克隆 AstrBot 仓库，分支/标签: $CLONE_BRANCH..."
-      if ! git clone --depth=1 --branch "$CLONE_BRANCH" ${target_proxy:+${target_proxy}/}https://github.com/AstrBotDevs/AstrBot.git "$CLONE_TEMP_DIR"; then
-        echo "克隆 AstrBot 仓库失败"
+      echo "正在克隆 MaiBot 仓库，分支: $CLONE_BRANCH..."
+      if ! git clone --depth=1 --branch "$CLONE_BRANCH" ${target_proxy:+${target_proxy}/}https://github.com/Mai-with-u/MaiBot.git "$CLONE_TEMP_DIR"; then
+        echo "克隆 MaiBot 仓库失败"
         rm -rf "$CLONE_TEMP_DIR"  # 清理失败的临时目录
         exit 1
       fi
@@ -273,58 +262,62 @@ install_astrbot(){
     mv "$CLONE_TEMP_DIR" "$INSTALL_DIR"
 
   else
-    progress_echo "AstrBot $L_INSTALLED"
+    progress_echo "MaiBot $L_INSTALLED"
   fi
 
-  progress_echo "AstrBot 初始化中"
+  # 适配器作为插件安装
+  local ADAPTER_DIR="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter"
+  if [ ! -d "$ADAPTER_DIR" ]; then
+    progress_echo "安装适配器插件..."
+    mkdir -p "$INSTALL_DIR/plugins"
+    network_test
+    if ! git clone --depth=1 --branch plugin ${target_proxy:+${target_proxy}/}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git "$ADAPTER_DIR"; then
+      echo "适配器插件克隆失败"
+      exit 1
+    fi
+  fi
+
+  progress_echo "MaiBot 初始化中"
   cd "$INSTALL_DIR"
 
-  if [ ! -d "$INSTALL_DIR/data" ]; then
+  local BACKUP_DIR="/sdcard/Download/MaiBot"
 
+  if [ ! -d "$INSTALL_DIR/data" ]; then
     echo "检测到 data 目录不存在，初始化数据目录..."
     mkdir "$INSTALL_DIR/data"
     
     # 检查并恢复最新备份
     if [ -d "$BACKUP_DIR" ]; then
       echo "扫描备份目录: $BACKUP_DIR"
-      LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/AstrBot-backup-*.tar.gz 2>/dev/null | head -n 1)
+      LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/MaiBot-backup-*.tar.gz 2>/dev/null | head -n 1)
       
       if [ -n "$LATEST_BACKUP" ]; then
         echo "找到备份文件: $LATEST_BACKUP"
-        echo "恢复 AstrBot 数据备份..."
+        echo "恢复 MaiBot 数据备份..."
         
-        # 解压备份到 data 目录
+        # 解压备份到 data 目录 (由于备份是 -C root/MaiBot data 打包的，解压到 INSTALL_DIR)
         if tar -xzf "$LATEST_BACKUP" -C "$INSTALL_DIR"; then
           echo "备份恢复成功"
-          echo "AstrBot 数据已从备份恢复"
+          echo "MaiBot 数据已从备份恢复"
           REINSTALL_PLUGINS_FLAG=1  # 备份恢复成功，需要重装插件依赖
-
         else
-          echo "备份恢复失败，使用默认配置"
-          cp "$HOME/cmd_config.json" "$INSTALL_DIR/data"
-          chmod +w "$INSTALL_DIR/data/cmd_config.json"
+          echo "备份恢复失败"
         fi
       else
-        echo "未找到备份文件，使用默认配置"
-        cp "$HOME/cmd_config.json" "$INSTALL_DIR/data"
-        chmod +w "$INSTALL_DIR/data/cmd_config.json"
-        echo "拷贝 cmd_config.json 默认配置文件"
+        echo "未找到备份文件"
       fi
     else
-      echo "备份目录不存在，使用默认配置"
-      cp "$HOME/cmd_config.json" "$INSTALL_DIR/data"
-      chmod +w "$INSTALL_DIR/data/cmd_config.json"
-      echo "拷贝 cmd_config.json 默认配置文件"
+      echo "备份目录不存在"
     fi
     
     rm -rf "$INSTALL_DIR/.venv"
-
   fi
 
   if [ ! -d "$INSTALL_DIR/.venv" ]; then
 
     # 使用 uv sync 同步依赖
-    echo "同步 AstrBot 依赖..."
+    echo "同步 MaiBot 依赖..."
+    cd "$INSTALL_DIR"
     if ! $HOME/.local/bin/uv sync; then
       echo "依赖同步失败"
       exit 1
@@ -338,12 +331,12 @@ install_astrbot(){
 
     echo "检测到重装插件依赖标记，开始重装..."
     # 清除标记（将脚本中的标记重置为0）
-    sed -i 's/^REINSTALL_PLUGINS_FLAG=1$/REINSTALL_PLUGINS_FLAG=0/' /root/astrbot-startup.sh
+    sed -i 's/^REINSTALL_PLUGINS_FLAG=1$/REINSTALL_PLUGINS_FLAG=0/' /root/maibot-startup.sh
 
     # 扫描所有插件的 requirements.txt 并安装到 venv
     echo "扫描插件依赖..."
-    if [ -d "$INSTALL_DIR/data/plugins" ]; then
-      for plugin_dir in "$INSTALL_DIR/data/plugins"/*; do
+    if [ -d "$INSTALL_DIR/plugins" ]; then
+      for plugin_dir in "$INSTALL_DIR/plugins"/*; do
         if [ -d "$plugin_dir" ] && [ -f "$plugin_dir/requirements.txt" ]; then
           echo "发现插件依赖: $plugin_dir/requirements.txt"
           if [ -f "$HOME/.local/bin/uv" ]; then
@@ -356,30 +349,41 @@ install_astrbot(){
     fi
   fi
 
-  # 启动 AstrBot（失败直接退出）
+  # 启动 MaiBot（失败直接退出）
   cd "$INSTALL_DIR"
   if [ ! -f "$HOME/.local/bin/uv" ]; then
     echo "uv 未找到"
     exit 1
   fi
 
-  # 使用 uv run --no-sync main.py 启动（跳过依赖同步）
-  progress_echo "AstrBot 配置中"
-
-  if ! $HOME/.local/bin/uv run --no-sync main.py; then
-    echo "AstrBot 启动失败"
-    exit 1
+  # 启动 MaiBot Core (自动处理配置生成)
+  progress_echo "MaiBot Core 配置中"
+  
+  # 拷贝适配器插件配置
+  mkdir -p "$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter"
+  if [ -f "/root/config.toml" ]; then
+    echo "正在拷贝适配器插件配置..."
+    cp /root/config.toml "$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter/config.toml"
   fi
 
+  cd "$INSTALL_DIR"
+  export EULA_AGREE="1b662741904d7155d1ce1c00b3530d0d"
+  export PRIVACY_AGREE="9943b855e72199d0f5016ea39052f1b6"
+  
+  # 循环保活模式启动 bot.py
+  echo "正在启动 MaiBot 并进入保活模式..."
+  while true; do
+    echo "MaiBot 正在启动..."
+    $HOME/.local/bin/uv run bot.py 2>&1
+    echo "MaiBot 进程意外退出，3秒后尝试重启..."
+    sleep 3
+  done
 }
 
 install_sudo_curl_git
-bump_progress
 bump_progress
 install_uv
 bump_progress
 install_napcat
 bump_progress
-bump_progress
-bump_progress
-install_astrbot
+install_maibot

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_pty/flutter_pty.dart';
@@ -26,9 +26,9 @@ class HomeController extends GetxController {
   Pty? napcatTerminal;
 
   final RxString napCatWebUiToken = ''.obs; // 存储 NapCat WebUI Token
+  final RxString maiBotWebUiToken = ''.obs; // 存储 MaiBot WebUI Token
   final RxBool _isQrcodeShowing = false.obs;
   final RxBool napCatWebUiEnabledRx = false.obs; // GetX 响应式变量用于导航栏更新
-  final RxBool showTerminalWhiteTextRx = false.obs; // GetX 响应式变量用于设置页更新
   final RxList<Map<String, String>> customWebViews =
       <Map<String, String>>[].obs; // 自定义 WebView 列表
   Dialog? _qrcodeDialog;
@@ -36,7 +36,7 @@ class HomeController extends GetxController {
   StreamSubscription? _webviewSubscription; // 添加webview监听订阅
 
   late Terminal terminal = Terminal(
-    maxLines: 10000,
+    maxLines: 5000,
     onResize: (width, height, pixelWidth, pixelHeight) {
       pseudoTerminal?.resize(height, width);
     },
@@ -48,8 +48,6 @@ class HomeController extends GetxController {
   bool _isLocalhostDetected = false; // localhost:6185 检测标志
   bool _isQrcodeProcessed = false; // 二维码处理完成标志
   bool _isAppInForeground = true; // 应用是否在前台
-  bool _isAstrBotConfiguring = false; // AstrBot 配置中标志，用于控制终端输出过滤
-  String _pendingOutput = ''; // 待处理的输出缓冲
 
   File progressFile = File('${RuntimeEnvir.tmpPath}/progress');
   File progressDesFile = File('${RuntimeEnvir.tmpPath}/progress_des');
@@ -74,7 +72,8 @@ class HomeController extends GetxController {
     } catch (e) {
       progressFile.writeAsStringSync('1');
     }
-    update();
+    // 使用 microtask 延迟更新，减少渲染压力
+    Future.microtask(() => update());
   }
 
   // 使用 login_ubuntu 函数，传入要执行的命令
@@ -83,160 +82,6 @@ class HomeController extends GetxController {
     return 'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash /root/launcher.sh"\n';
   }
 
-  // 检测文本是否包含彩色 ANSI 代码(非白色/默认色)
-  // Check if text contains colored ANSI codes (non-white/default)
-  bool _hasColoredAnsiCode(String text) {
-    // ANSI 彩色代码正则: \x1b[...m 或 \033[...m
-    // 匹配所有颜色代码，排除白色(37)和重置代码(0)
-    final ansiColorRegex = RegExp(
-      r'\x1b\[([0-9;]+)m|\033\[([0-9;]+)m',
-      multiLine: true,
-    );
-
-    final matches = ansiColorRegex.allMatches(text);
-    for (var match in matches) {
-      final code = match.group(1) ?? match.group(2) ?? '';
-      // 检查是否包含颜色代码
-      // 30-37: 前景色, 40-47: 背景色, 90-97: 高亮前景色, 100-107: 高亮背景色
-      // 排除: 0(重置), 37(白色), 97(高亮白色)
-      final codes = code.split(';');
-      for (var c in codes) {
-        final colorCode = int.tryParse(c.trim());
-        if (colorCode != null) {
-          // 有效的颜色代码(非白色且非重置)
-          if ((colorCode >= 30 && colorCode <= 36) || // 前景色(黑到青)
-              (colorCode >= 40 && colorCode <= 47) || // 背景色
-              (colorCode >= 90 && colorCode <= 96) || // 高亮前景色(非白)
-              (colorCode >= 100 && colorCode <= 107)) {
-            // 高亮背景色
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  // 检测文本是否为纯彩色输出(不含白色文本)
-  // Check if text is purely colored output (no white/default text)
-  bool _isPurelyColoredOutput(String text) {
-    // 移除所有 ANSI 代码后，检查是否还有可见文本
-    final ansiRegex = RegExp(r'\x1b\[[0-9;]*m|\033\[[0-9;]*m');
-    final cleanText = text.replaceAll(ansiRegex, '').trim();
-
-    // 如果移除 ANSI 代码后没有可见文本，说明是纯 ANSI 控制序列
-    if (cleanText.isEmpty) {
-      return _hasColoredAnsiCode(text);
-    }
-
-    // 如果有可见文本但没有任何彩色代码，说明是纯白色文本
-    if (!_hasColoredAnsiCode(text)) {
-      return false;
-    }
-
-    // 关键判断：检查文本中是否所有可见内容都被彩色 ANSI 代码包裹
-    // 策略：分段检查每个 ANSI 颜色代码后面的文本，直到遇到重置代码或下一个颜色代码
-    final ansiColorRegex = RegExp(
-      r'\x1b\[([0-9;]+)m|\033\[([0-9;]+)m',
-      multiLine: true,
-    );
-
-    int lastIndex = 0;
-    bool inColoredSection = false;
-    bool hasUncoloredText = false;
-
-    final matches = ansiColorRegex.allMatches(text).toList();
-
-    for (int i = 0; i < matches.length; i++) {
-      final match = matches[i];
-
-      // 检查当前 ANSI 代码之前的文本
-      if (match.start > lastIndex) {
-        final textBefore = text.substring(lastIndex, match.start).trim();
-        // 如果之前有文本且不在彩色段中，说明有未着色的白色文本
-        if (textBefore.isNotEmpty && !inColoredSection) {
-          hasUncoloredText = true;
-          break;
-        }
-      }
-
-      final code = match.group(1) ?? match.group(2) ?? '';
-      final codes = code.split(';');
-
-      // 检查这个 ANSI 代码是否是颜色代码(非白色)
-      bool isColorCode = false;
-      bool isResetCode = false;
-
-      for (var c in codes) {
-        final colorCode = int.tryParse(c.trim());
-        if (colorCode != null) {
-          if (colorCode == 0) {
-            isResetCode = true;
-          } else if ((colorCode >= 30 && colorCode <= 36) ||
-              (colorCode >= 40 && colorCode <= 47) ||
-              (colorCode >= 90 && colorCode <= 96) ||
-              (colorCode >= 100 && colorCode <= 107)) {
-            isColorCode = true;
-          }
-        }
-      }
-
-      if (isColorCode) {
-        inColoredSection = true;
-      } else if (isResetCode) {
-        inColoredSection = false;
-      }
-
-      lastIndex = match.end;
-    }
-
-    // 检查最后一个 ANSI 代码之后的文本
-    if (lastIndex < text.length) {
-      final textAfter = text.substring(lastIndex).trim();
-      if (textAfter.isNotEmpty && !inColoredSection) {
-        hasUncoloredText = true;
-      }
-    }
-
-    // 如果存在未着色的文本，说明不是纯彩色输出
-    return !hasUncoloredText;
-  }
-
-  // 检测文本是否包含 ANSI 重置代码
-  // Check if text contains ANSI reset code
-  bool _hasResetCode(String text) {
-    // 匹配重置代码: \x1b[0m 或 \033[0m
-    final resetRegex = RegExp(r'\x1b\[0m|\033\[0m');
-    return resetRegex.hasMatch(text);
-  }
-
-  // 处理彩色输出过滤逻辑
-  // Handle colored output filtering logic
-  void _processColoredOutput(String event) {
-    _pendingOutput += event;
-
-    // 检查设置：如果允许显示白色文本，则显示所有内容
-    if (showTerminalWhiteText.get() == true) {
-      terminal.write(event);
-      return;
-    }
-
-    // 检查是否包含彩色代码和重置代码
-    final isPurelyColored = _isPurelyColoredOutput(_pendingOutput);
-    final hasReset = _hasResetCode(_pendingOutput);
-
-    // 检查是否有完整的行(以换行符结尾)或者包含重置代码
-    if (_pendingOutput.endsWith('\n') ||
-        _pendingOutput.endsWith('\r\n') ||
-        hasReset) {
-      // 只有当输出是纯彩色的（不包含白色文本）时才输出
-      if (isPurelyColored) {
-        terminal.write(_pendingOutput);
-      }
-      // 清空缓冲
-      _pendingOutput = '';
-    }
-  }
 
   // 检查两个条件是否都满足，如果满足则触发跳转
   void _checkAndNavigateToWebview() {
@@ -268,13 +113,25 @@ class HomeController extends GetxController {
         final lines = event.split('\n');
         for (var line in lines) {
           if (line.trim().isNotEmpty) {
-            Log.i(line, tag: 'AstrBot');
+            Log.i(line, tag: 'MaiBot');
           }
         }
       }
 
-      // 检查是否包含 localhost:6185
-      if (event.contains('http://localhost:6185')) {
+      // 捕获 MaiBot WebUI Token
+      if (event.contains('WebUI Access Token:')) {
+        final match = RegExp(r'WebUI Access Token:\s+([a-f0-9]+)').firstMatch(event);
+        if (match != null) {
+          final token = match.group(1);
+          if (token != null) {
+            maiBotWebUiToken.value = token;
+            Log.i('捕获到 MaiBot Token: $token', tag: 'MaiBot');
+          }
+        }
+      }
+
+      // 检查是否包含 MaiBot 全部系统初始化完成的标志
+      if (event.contains('全部系统初始化完成，麦麦 已成功唤醒')) {
         _isLocalhostDetected = true;
         bumpProgress();
 
@@ -288,15 +145,8 @@ class HomeController extends GetxController {
         // 不取消订阅，继续监听以便终端日志持续更新
       }
 
-      // 只在 AstrBot 配置阶段才过滤非彩色输出
-      // Only filter non-colored output after AstrBot configuration starts
-      if (_isAstrBotConfiguring) {
-        // 使用新的彩色输出处理逻辑,支持多行彩色输出
-        _processColoredOutput(event);
-      } else {
-        // 配置前显示所有输出
-        terminal.write(event);
-      }
+      // 显示所有输出，不再过滤
+      terminal.write(event);
     });
   }
 
@@ -317,7 +167,7 @@ class HomeController extends GetxController {
         final lines = event.split('\n');
         for (var line in lines) {
           if (line.trim().isNotEmpty) {
-            Log.i(line, tag: 'AstrBot-Napcat');
+            Log.i(line, tag: 'MaiBot-Napcat');
           }
         }
       }
@@ -329,7 +179,7 @@ class HomeController extends GetxController {
           final token = match.group(1);
           if (token != null) {
             napCatWebUiToken.value = token;
-            Log.i('捕获到 NapCat Token: $token', tag: 'AstrBot');
+            Log.i('捕获到 NapCat Token: $token', tag: 'MaiBot');
           }
         }
       }
@@ -381,7 +231,7 @@ class HomeController extends GetxController {
         }
       }
 
-      // 检测指令2关闭二维码并取消监听
+      // 检测指令2关闭二维码
       if (event.contains('配置加载') && _isQrcodeShowing.value) {
         // 关闭对话框
         if (_qrcodeDialog != null) {
@@ -396,9 +246,9 @@ class HomeController extends GetxController {
         // 检查是否两个条件都满足
         _checkAndNavigateToWebview();
 
-        // 取消订阅，后续不再监听任何指令
-        await _qrcodeSubscription?.cancel();
-        _qrcodeSubscription = null; // 置空标记已取消
+        // 不再在此处取消订阅，让输出流继续流向日志记录器，防止缓冲区满导致进程卡死
+        // We no longer cancel subscription here to keep the output flow going to the logger,
+        // preventing process hang due to full buffer.
       }
 
       // 检测指令3处理登录错误
@@ -467,7 +317,11 @@ class HomeController extends GetxController {
       }
       Link link = Link(filePath);
       if (link.existsSync()) {
-        link.deleteSync();
+        try {
+          link.deleteSync();
+        } catch (e) {
+          Log.e('delete link error -> $e');
+        }
       }
       try {
         Log.i('create link -> $fileName ${link.path}');
@@ -476,6 +330,9 @@ class HomeController extends GetxController {
         Log.e('installAdbToEnvir error -> $e');
       }
     }
+
+    // 处理 busybox 相关的符号链接，确保 proot 依赖的命令可用
+    createBusyboxLink();
   }
 
   // 同步当前进度
@@ -500,22 +357,22 @@ class HomeController extends GetxController {
     progressDesFile.watch(events: FileSystemEvent.all).listen((event) async {
       if (event.type == FileSystemEvent.modify) {
         String content = await progressDesFile.readAsString();
+        if (currentProgress == content) return;
         currentProgress = content;
 
         // 当进度到达 "Napcat 已安装" 时，启动 NapCat 终端
         if (content.contains('Napcat ${S.current.installed}')) {
           napcatTerminal?.writeString('$command\n');
           bumpProgress();
-          Log.i('检测到 Napcat 已安装，启动 NapCat 终端', tag: 'AstrBot');
+          Log.i('检测到 Napcat 已安装，启动 NapCat 终端', tag: 'MaiBot');
         }
 
-        // 当进度到达 "AstrBot 配置中" 时，开始过滤非彩色输出并清除终端
-        if (content.trim() == 'AstrBot 配置中') {
-          _isAstrBotConfiguring = true;
+        // 当进度到达 "MaiBot Core 配置中" 时，清除终端
+        if (content.trim().contains('MaiBot Core 配置中')) {
           // 清除终端先前显示的所有文本
           terminal.buffer.clear();
           terminal.buffer.setCursor(0, 0);
-          Log.i('检测到 AstrBot 配置中，清除终端内容并开始过滤非彩色终端输出', tag: 'AstrBot');
+          Log.i('检测到 MaiBot Core 配置中，清除终端内容', tag: 'MaiBot');
         }
 
         update();
@@ -565,13 +422,36 @@ class HomeController extends GetxController {
       ];
 
       for (String linkName in links) {
-        Link link = Link('${RuntimeEnvir.binPath}/$linkName');
-        if (!link.existsSync()) {
+        String linkPath = '${RuntimeEnvir.binPath}/$linkName';
+        Link link = Link(linkPath);
+        if (link.existsSync()) {
+          try {
+            link.deleteSync();
+          } catch (e) {
+            Log.e('delete busybox link error -> $e');
+          }
+        }
+        try {
           link.createSync('${RuntimeEnvir.binPath}/busybox');
+        } catch (e) {
+          Log.e('create busybox link error -> $e');
         }
       }
-      Link link = Link('${RuntimeEnvir.binPath}/file');
-      link.createSync('/system/bin/file');
+      
+      String fileLinkPath = '${RuntimeEnvir.binPath}/file';
+      Link fileLink = Link(fileLinkPath);
+      if (fileLink.existsSync()) {
+        try {
+          fileLink.deleteSync();
+        } catch (e) {
+          Log.e('delete file link error -> $e');
+        }
+      }
+      try {
+        fileLink.createSync('/system/bin/file');
+      } catch (e) {
+        Log.e('create file link error -> $e');
+      }
     } catch (e) {
       Log.e('Create link failed -> $e');
     }
@@ -582,7 +462,7 @@ class HomeController extends GetxController {
     terminal.writeProgress(currentProgress);
   }
 
-  Future<void> loadAstrBot() async {
+  Future<void> loadMaiBot() async {
     syncProgress();
 
     // 创建相关文件夹
@@ -598,21 +478,20 @@ class HomeController extends GetxController {
         createPTY(rows: terminal.viewHeight, columns: terminal.viewWidth);
     napcatTerminal = createPTY();
 
-    // 复制必要的文件
     setProgress('复制 Ubuntu 系统镜像...');
     await AssetsUtils.copyAssetToPath('assets/${Config.ubuntuFileName}',
         '${RuntimeEnvir.homePath}/${Config.ubuntuFileName}');
-    await AssetsUtils.copyAssetToPath('assets/astrbot-startup.sh',
-        '${RuntimeEnvir.homePath}/astrbot-startup.sh');
-    await AssetsUtils.copyAssetToPath(
-        'assets/cmd_config.json', '${RuntimeEnvir.homePath}/cmd_config.json');
+    await AssetsUtils.copyAssetToPath('assets/maibot-startup.sh',
+        '${RuntimeEnvir.homePath}/maibot-startup.sh');
+    await AssetsUtils.copyAssetToPath('assets/config.toml',
+        '${RuntimeEnvir.homePath}/config.toml');
     bumpProgress();
 
     // 获取当前应用版本号
     final appVersion = await getAppVersion();
 
-    // 替换 astrbot-startup.sh 中的版本号占位符
-    final startupScriptFile = File('${RuntimeEnvir.homePath}/astrbot-startup.sh');
+    // 替换 maibot-startup.sh 中的版本号占位符
+    final startupScriptFile = File('${RuntimeEnvir.homePath}/maibot-startup.sh');
     if (await startupScriptFile.exists()) {
       String scriptContent = await startupScriptFile.readAsString();
       scriptContent = scriptContent.replaceAll('{{VERSION}}', appVersion);
@@ -628,13 +507,13 @@ class HomeController extends GetxController {
 
     initQrcodeListener();
 
-    startAstrBot(pseudoTerminal!);
+    startMaiBot(pseudoTerminal!);
   }
 
-  Future<void> startAstrBot(Pty pseudoTerminal) async {
-    setProgress('开始安装 AstrBot...');
+  Future<void> startMaiBot(Pty pseudoTerminal) async {
+    setProgress('开始安装 MaiBot...');
     pseudoTerminal.writeString(
-        'source ${RuntimeEnvir.homePath}/common.sh\nstart_astrbot\n');
+        'source ${RuntimeEnvir.homePath}/common.sh\nstart_maibot\n');
   }
 
   @override
@@ -646,9 +525,6 @@ class HomeController extends GetxController {
 
     // 初始化 NapCat WebUI 启用状态
     napCatWebUiEnabledRx.value = napCatWebUiEnabled.get() ?? false;
-
-    // 初始化显示终端白色文本状态
-    showTerminalWhiteTextRx.value = showTerminalWhiteText.get() ?? false;
 
     // 从持久化存储加载自定义 WebView 列表
     _loadCustomWebViews();
@@ -665,8 +541,8 @@ class HomeController extends GetxController {
         ));
       }
 
-      // 加载并启动 AstrBot
-      loadAstrBot();
+      // 加载并启动 MaiBot
+      loadMaiBot();
 
       // 在终端创建完成后初始化固定标签页
       // 等待terminal创建完成
@@ -744,12 +620,6 @@ class HomeController extends GetxController {
     napCatWebUiEnabledRx.value = value;
   }
 
-  // 更新显示终端白色文本状态（用于同步响应式变量）
-  void setShowTerminalWhiteText(bool value) {
-    showTerminalWhiteText.set(value);
-    showTerminalWhiteTextRx.value = value;
-  }
-
   @override
   void onClose() {
     // 清理订阅，避免内存泄漏
@@ -761,17 +631,17 @@ class HomeController extends GetxController {
     // 杀死所有终端进程，释放端口
     try {
       if (pseudoTerminal != null) {
-        Log.i('正在关闭主终端进程...', tag: 'AstrBot');
+        Log.i('正在关闭主终端进程...', tag: 'MaiBot');
         pseudoTerminal?.kill();
         pseudoTerminal = null;
       }
       if (napcatTerminal != null) {
-        Log.i('正在关闭 NapCat 终端进程...', tag: 'AstrBot-Napcat');
+        Log.i('正在关闭 NapCat 终端进程...', tag: 'MaiBot-Napcat');
         napcatTerminal?.kill();
         napcatTerminal = null;
       }
     } catch (e) {
-      Log.e('关闭终端进程时出错: $e', tag: 'AstrBot');
+      Log.e('关闭终端进程时出错: $e', tag: 'MaiBot');
     }
 
     // 移除生命周期观察者

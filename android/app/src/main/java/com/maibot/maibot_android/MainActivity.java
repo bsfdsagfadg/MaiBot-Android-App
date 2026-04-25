@@ -1,4 +1,4 @@
-package com.astrbot.astrbot_android;
+package com.maibot.maibot_android;
 
 import android.app.Activity;
 import android.content.Context;
@@ -41,12 +41,12 @@ public class MainActivity extends FragmentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mContext = this;
-        setContentView(com.astrbot.astrbot_android.R.layout.my_activity_layout);
+        setContentView(com.maibot.maibot_android.R.layout.my_activity_layout);
 
         flutterFragment = (FlutterFragment) fragmentManager.findFragmentByTag(TAG_FLUTTER_FRAGMENT);
         FlutterEngine flutterEngine = new FlutterEngine(this, null, false);
         flutterEngine.getDartExecutor().executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault());
-        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "astrbot_channel").setMethodCallHandler((call, result) -> {
+        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "maibot_channel").setMethodCallHandler((call, result) -> {
             if ("lib_path".equals(call.method)) {
                 result.success(mContext.getApplicationContext().getApplicationInfo().nativeLibraryDir);
             } else {
@@ -60,7 +60,7 @@ public class MainActivity extends FragmentActivity {
         }
         fragmentManager
                 .beginTransaction()
-                .add(com.astrbot.astrbot_android.R.id.fl_container, flutterFragment, TAG_FLUTTER_FRAGMENT)
+                .add(com.maibot.maibot_android.R.id.fl_container, flutterFragment, TAG_FLUTTER_FRAGMENT)
                 .commit();
     }
 

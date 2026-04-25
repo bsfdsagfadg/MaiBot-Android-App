@@ -38,20 +38,19 @@ Future<void> main() async {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
   ));
-  RuntimeEnvir.initEnvirWithPackageName('com.astrbot.astrbot_android');
+  RuntimeEnvir.initEnvirWithPackageName('com.maibot.maibot_android');
   await initSettingStore(RuntimeEnvir.configPath);
-  runApp(const AstrBot());
-
+  runApp(const MaiBot());
 }
 
-class AstrBot extends StatefulWidget {
-  const AstrBot({super.key});
+class MaiBot extends StatefulWidget {
+  const MaiBot({super.key});
 
   @override
-  State<AstrBot> createState() => _AstrBotState();
+  State<MaiBot> createState() => _MaiBotState();
 }
 
-class _AstrBotState extends State<AstrBot> with WidgetsBindingObserver {
+class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
   Timer? _serviceMonitorTimer;
 
   @override
@@ -73,12 +72,12 @@ class _AstrBotState extends State<AstrBot> with WidgetsBindingObserver {
       // 只有在服务未运行且用户没有点击停止按钮的情况下才重启
       // 这样即使用户从通知栏划掉通知，服务也会被重建
       if (!isRunning && !userClickedStop) {
-        Log.w('主应用检测到服务未运行，尝试重启...', tag: 'AstrBot');
+        Log.w('主应用检测到服务未运行，尝试重启...', tag: 'MaiBot');
         try {
           await ForegroundServiceManager.startService();
-          Log.i('服务重启成功', tag: 'AstrBot');
+          Log.i('服务重启成功', tag: 'MaiBot');
         } catch (e) {
-          Log.e('服务重启失败: $e', tag: 'AstrBot');
+          Log.e('服务重启失败: $e', tag: 'MaiBot');
         }
       }
     });
@@ -97,14 +96,14 @@ class _AstrBotState extends State<AstrBot> with WidgetsBindingObserver {
     
     // 当应用完全退出时，确保清理所有资源
     if (state == AppLifecycleState.detached) {
-      Log.i('应用正在退出，清理所有资源...', tag: 'AstrBot');
+      Log.i('应用正在退出，清理所有资源...', tag: 'MaiBot');
       try {
         // 尝试获取并清理 HomeController
         if (Get.isRegistered<dynamic>()) {
           Get.delete<dynamic>(force: true);
         }
       } catch (e) {
-        Log.e('清理资源时出错: $e', tag: 'AstrBot');
+        Log.e('清理资源时出错: $e', tag: 'MaiBot');
       }
     }
   }
@@ -113,7 +112,7 @@ class _AstrBotState extends State<AstrBot> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'AstrBot Android',
+      title: 'MaiBot Android',
       theme: ThemeData(
         colorSchemeSeed: Colors.primaries[3],
       ),
