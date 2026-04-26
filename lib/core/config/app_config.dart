@@ -5,7 +5,7 @@ class Config {
   static const String ubuntuFileName = 'ubuntu-noble-aarch64-pd-v4.18.0.tar.xz';
 
   // GitHub 仓库信息
-  static const String githubOwner = 'MaiM-with-u';
+  static const String githubOwner = 'bsfdsagfadg';
   static const String githubRepo = 'MaiBot-Android-App';
   static const String githubReleasesPath =
       '/repos/$githubOwner/$githubRepo/releases/latest';
