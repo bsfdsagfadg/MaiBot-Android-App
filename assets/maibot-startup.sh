@@ -292,7 +292,23 @@ install_maibot(){
     # 检查并恢复最新备份
     if [ -d "$BACKUP_DIR" ]; then
       echo "扫描备份目录: $BACKUP_DIR"
-      LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/MaiBot-backup-*.tar.gz 2>/dev/null | head -n 1)
+      
+      # 优先查找全系统备份
+      LATEST_FULL_BACKUP=$(ls -t "$BACKUP_DIR"/MaiBot-FullSystem-backup-*.tar.gz 2>/dev/null | head -n 1)
+      if [ -n "$LATEST_FULL_BACKUP" ]; then
+        echo "找到全系统备份: $LATEST_FULL_BACKUP"
+        echo "正在执行全系统恢复..."
+        # 全系统备份解压到 UBUNTU_PATH (注意：此脚本运行在 proot 内，/ 表示 UBUNTU_PATH)
+        if tar -xzf "$LATEST_FULL_BACKUP" -C /; then
+           echo "全系统备份恢复成功"
+           REINSTALL_PLUGINS_FLAG=1
+           # 恢复后直接跳过后续 data 恢复
+           LATEST_BACKUP="" 
+        fi
+      else
+        # 查找普通数据备份
+        LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/MaiBot-backup-*.tar.gz 2>/dev/null | head -n 1)
+      fi
       
       if [ -n "$LATEST_BACKUP" ]; then
         echo "找到备份文件: $LATEST_BACKUP"

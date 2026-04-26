@@ -589,7 +589,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // 执行备份操作
-  Future<bool> _performBackup({bool showLoadingDialog = false}) async {
+  Future<bool> _performBackup(
+      {bool showLoadingDialog = false, bool fullSystem = false}) async {
     try {
       // 检查并请求存储权限
       var status = await Permission.manageExternalStorage.status;
@@ -634,33 +635,53 @@ class _SettingsPageState extends State<SettingsPage> {
         await backupDir.create(recursive: true);
       }
 
-      final backupFileName = 'MaiBot-backup-$timestamp.tar.gz';
+      final backupFileName = fullSystem
+          ? 'MaiBot-FullSystem-backup-$timestamp.tar.gz'
+          : 'MaiBot-backup-$timestamp.tar.gz';
       final backupPath = '${backupDir.path}/$backupFileName';
 
-      // 使用 tar 命令压缩 data 目录
-      final dataPath = '${scripts.ubuntuPath}/root/MaiBot/data';
-      final dataDir = Directory(dataPath);
+      ProcessResult result;
+      if (fullSystem) {
+        // 全系统备份
+        result = await Process.run('${RuntimeEnvir.binPath}/busybox', [
+          'tar',
+          '-czf',
+          backupPath,
+          '--exclude=proc/*',
+          '--exclude=sys/*',
+          '--exclude=dev/*',
+          '--exclude=tmp/*',
+          '--exclude=run/*',
+          '-C',
+          scripts.ubuntuPath,
+          '.',
+        ]);
+      } else {
+        // 仅数据备份
+        final dataPath = '${scripts.ubuntuPath}/root/MaiBot/data';
+        final dataDir = Directory(dataPath);
 
-      if (!await dataDir.exists()) {
-        Get.snackbar(
-          '备份失败',
-          'MaiBot 数据目录不存在',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return false;
+        if (!await dataDir.exists()) {
+          Get.snackbar(
+            '备份失败',
+            'MaiBot 数据目录不存在',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+          return false;
+        }
+
+        // 执行备份命令
+        result = await Process.run('${RuntimeEnvir.binPath}/busybox', [
+          'tar',
+          '-czf',
+          backupPath,
+          '-C',
+          '${scripts.ubuntuPath}/root/MaiBot',
+          'data',
+        ]);
       }
-
-      // 执行备份命令
-      final result = await Process.run('${RuntimeEnvir.binPath}/busybox', [
-        'tar',
-        '-czf',
-        backupPath,
-        '-C',
-        '${scripts.ubuntuPath}/root/MaiBot',
-        'data',
-      ]);
 
       if (result.exitCode == 0) {
         final backupFile = File(backupPath);
@@ -1338,7 +1359,29 @@ class _SettingsPageState extends State<SettingsPage> {
           title: const Text('备份 MaiBot 数据'),
           subtitle: const Text('备份 MaiBot 配置和数据到手机存储'),
           onTap: () async {
-            await _performBackup(showLoadingDialog: true);
+            // 询问备份类型
+            final choice = await Get.dialog<String>(
+              AlertDialog(
+                title: const Text('选择备份类型'),
+                content: const Text('您可以选择仅备份 MaiBot 数据，或完整备份整个 Ubuntu 系统。'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Get.back(result: 'data'),
+                    child: const Text('仅数据'),
+                  ),
+                  TextButton(
+                    onPressed: () => Get.back(result: 'full'),
+                    child: const Text('完整系统'),
+                  ),
+                ],
+              ),
+            );
+
+            if (choice == 'data') {
+              await _performBackup(showLoadingDialog: true, fullSystem: false);
+            } else if (choice == 'full') {
+              await _performBackup(showLoadingDialog: true, fullSystem: true);
+            }
           },
         ),
         ListTile(

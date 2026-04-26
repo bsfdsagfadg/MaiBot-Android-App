@@ -30,7 +30,10 @@ android {
             release {
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
-                storeFile file(keystoreProperties['storeFile'])
+                def storeFileValue = keystoreProperties['storeFile']
+                if (storeFileValue != null) {
+                    storeFile file(storeFileValue)
+                }
                 storePassword keystoreProperties['storePassword']
             }
         }

@@ -182,6 +182,8 @@ public
 .pnp.*
 
 key.properties
+repomix-output.txt
+*.base64
 
 .fvm
 

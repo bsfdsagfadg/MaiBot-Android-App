@@ -36,7 +36,7 @@ class HomeController extends GetxController {
   StreamSubscription? _webviewSubscription; // 添加webview监听订阅
 
   late Terminal terminal = Terminal(
-    maxLines: 5000,
+    maxLines: 50000, // Increase max lines to prevent terminal from stopping output after 5000 lines
     onResize: (width, height, pixelWidth, pixelHeight) {
       pseudoTerminal?.resize(height, width);
     },
@@ -82,7 +82,6 @@ class HomeController extends GetxController {
     return 'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash /root/launcher.sh"\n';
   }
 
-
   // 检查两个条件是否都满足，如果满足则触发跳转
   void _checkAndNavigateToWebview() {
     // 只有当两个条件都满足且应用在前台时才跳转
@@ -120,7 +119,8 @@ class HomeController extends GetxController {
 
       // 捕获 MaiBot WebUI Token
       if (event.contains('WebUI Access Token:')) {
-        final match = RegExp(r'WebUI Access Token:\s+([a-f0-9]+)').firstMatch(event);
+        final match =
+            RegExp(r'WebUI Access Token:\s+([a-f0-9]+)').firstMatch(event);
         if (match != null) {
           final token = match.group(1);
           if (token != null) {
@@ -243,6 +243,9 @@ class HomeController extends GetxController {
         // 标记二维码处理完成
         _isQrcodeProcessed = true;
 
+        // 扫码登录成功后，检测是否有新的 napcat_<QQ>.json 配置文件
+        _checkAndPromptSaveQQ();
+
         // 检查是否两个条件都满足
         _checkAndNavigateToWebview();
 
@@ -362,7 +365,9 @@ class HomeController extends GetxController {
 
         // 当进度到达 "Napcat 已安装" 时，启动 NapCat 终端
         if (content.contains('Napcat ${S.current.installed}')) {
-          napcatTerminal?.writeString('$command\n');
+          // 检查快速登录
+          _checkQuickLogin();
+
           bumpProgress();
           Log.i('检测到 Napcat 已安装，启动 NapCat 终端', tag: 'MaiBot');
         }
@@ -437,7 +442,7 @@ class HomeController extends GetxController {
           Log.e('create busybox link error -> $e');
         }
       }
-      
+
       String fileLinkPath = '${RuntimeEnvir.binPath}/file';
       Link fileLink = Link(fileLinkPath);
       if (fileLink.existsSync()) {
@@ -618,6 +623,118 @@ class HomeController extends GetxController {
   void setNapCatWebUiEnabled(bool value) {
     napCatWebUiEnabled.set(value);
     napCatWebUiEnabledRx.value = value;
+  }
+
+  // 检查并提示保存 QQ 号
+  Future<void> _checkAndPromptSaveQQ() async {
+    final configDir = Directory('$ubuntuPath/root/napcat/config');
+    if (!await configDir.exists()) return;
+
+    final files = await configDir.list().toList();
+    final List<String> qqs = [];
+    for (var file in files) {
+      if (file is File) {
+        final fileName = file.path.split('/').last;
+        final match = RegExp(r'napcat_(\d+)\.json').firstMatch(fileName);
+        if (match != null) {
+          qqs.add(match.group(1)!);
+        }
+      }
+    }
+
+    if (qqs.isNotEmpty) {
+      // 获取已保存的快速登录 QQ
+      final savedQQsRaw = 'quick_login_qqs'.setting.get() ?? <dynamic>[];
+      final savedQQs = List<String>.from(savedQQsRaw.map((e) => e.toString()));
+
+      // 找出未保存的 QQ
+      final newQQs = qqs.where((qq) => !savedQQs.contains(qq)).toList();
+
+      if (newQQs.isNotEmpty) {
+        _showSaveQQDialog(newQQs.first, savedQQs);
+      }
+    }
+  }
+
+  void _showSaveQQDialog(String qq, List<String> savedQQs) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('登录成功'),
+        content: Text('检测到 QQ 号 $qq，是否保存到快速登录？'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              savedQQs.add(qq);
+              'quick_login_qqs'.setting.set(savedQQs);
+              Get.back();
+              Get.snackbar('保存成功', 'QQ 号 $qq 已保存到快速登录');
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 检查是否有可用的快速登录配置
+  Future<void> _checkQuickLogin() async {
+    final savedQQsRaw = 'quick_login_qqs'.setting.get() ?? <dynamic>[];
+    if (savedQQsRaw.isEmpty) {
+      napcatTerminal?.writeString('$command\n');
+      return;
+    }
+
+    final savedQQs = List<String>.from(savedQQsRaw.map((e) => e.toString()));
+
+    // 检查这些 QQ 的配置文件是否真的存在
+    final List<String> availableQQs = [];
+    for (var qq in savedQQs) {
+      if (await File('$ubuntuPath/root/napcat/config/napcat_$qq.json')
+          .exists()) {
+        availableQQs.add(qq);
+      }
+    }
+
+    if (availableQQs.isNotEmpty) {
+      Get.dialog(
+        AlertDialog(
+          title: const Text('快速登录'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('检测到以下已保存的账号，是否直接登录？'),
+              const SizedBox(height: 10),
+              ...availableQQs.map((qq) => ListTile(
+                    title: Text(qq),
+                    onTap: () {
+                      Get.back();
+                      // 启动 NapCat 并在启动命令中加入 QQ 参数
+                      napcatTerminal?.writeString(
+                          'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash /root/launcher.sh -q $qq"\n');
+                      Log.i('使用快速登录: $qq', tag: 'MaiBot');
+                    },
+                  )),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Get.back();
+                napcatTerminal?.writeString('$command\n');
+              },
+              child: const Text('扫码登录'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      napcatTerminal?.writeString('$command\n');
+    }
   }
 
   @override
