@@ -23,21 +23,21 @@ class _WebViewPageState extends State<WebViewPage> {
   int _currentIndex = 0;
   int _previousNavItemCount = 0; // 记录上一次导航栏项目数量
 
-  late final WebViewController _astrBotController;
+  late final WebViewController _maiBotController;
   late final WebViewController _napCatController;
   final Map<String, WebViewController> _customControllers = {}; // 存储自定义 WebView 控制器，使用 URL 作为 key
 
   final HomeController homeController = Get.find<HomeController>();
 
-  // 标记 AstrBot WebView 是否初始化
-  // Flag for AstrBot WebView initialization
-  bool _astrBotInitialized = false;
+  // 标记 MaiBot WebView 是否初始化
+  // Flag for MaiBot WebView initialization
+  bool _maiBotInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _initSystemUI();
-    _initAstrBotController();
+    _initMaiBotController();
     _initNapCatController();
 
     // 监听自定义 WebView 列表变化,清理已删除的控制器
@@ -132,8 +132,8 @@ class _WebViewPageState extends State<WebViewPage> {
     }
   }
 
-  void _initAstrBotController() {
-    _astrBotController = WebViewController()
+  void _initMaiBotController() {
+    _maiBotController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(
@@ -148,20 +148,20 @@ class _WebViewPageState extends State<WebViewPage> {
             return NavigationDecision.navigate;
           },
           onPageFinished: (String url) {
-            _injectClipboardScript(_astrBotController);
-            _disableZoom(_astrBotController);
-            _injectPasswordScript(_astrBotController, url);
+            _injectClipboardScript(_maiBotController);
+            _disableZoom(_maiBotController);
+            _injectPasswordScript(_maiBotController, url);
           },
           onWebResourceError: (WebResourceError error) {
-            debugPrint('AstrBot WebView error: ${error.description}');
+            debugPrint('MaiBot WebView error: ${error.description}');
           },
         ),
       )
-      ..loadRequest(Uri.parse('http://127.0.0.1:6185'));
+      ..loadRequest(Uri.parse('http://127.0.0.1:8001'));
 
-    if (_astrBotController.platform is AndroidWebViewController) {
+    if (_maiBotController.platform is AndroidWebViewController) {
       AndroidWebViewController.enableDebugging(true);
-      final androidController = _astrBotController.platform as AndroidWebViewController;
+      final androidController = _maiBotController.platform as AndroidWebViewController;
       androidController
           .setMediaPlaybackRequiresUserGesture(false);
       // 设置混合内容模式以提高兼容性（Android 9+ 需要）
@@ -173,11 +173,11 @@ class _WebViewPageState extends State<WebViewPage> {
       androidController.setOnShowFileSelector(_handleFileSelection);
     }
 
-    _astrBotController.addJavaScriptChannel(
+    _maiBotController.addJavaScriptChannel(
       'Android',
       onMessageReceived: (JavaScriptMessage message) {
         if (message.message == 'getClipboardData') {
-          _getClipboardData(_astrBotController);
+          _getClipboardData(_maiBotController);
         } else if (message.message.startsWith('savePassword:')) {
           _handlePasswordSave(message.message);
         }
@@ -185,7 +185,7 @@ class _WebViewPageState extends State<WebViewPage> {
     );
 
     setState(() {
-      _astrBotInitialized = true;
+      _maiBotInitialized = true;
     });
   }
 
@@ -612,7 +612,7 @@ class _WebViewPageState extends State<WebViewPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_astrBotInitialized) {
+    if (!_maiBotInitialized) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -623,8 +623,8 @@ class _WebViewPageState extends State<WebViewPage> {
 
       // 动态构建页面列表
       final List<Widget> pages = [
-        // 1. AstrBot 配置页面
-        WebViewWidget(controller: _astrBotController),
+        // 1. MaiBot 配置页面
+        WebViewWidget(controller: _maiBotController),
 
         // 2. NapCat 配置页面（仅在启用时添加）
         if (napCatEnabled) WebViewWidget(controller: _napCatController),
@@ -682,7 +682,7 @@ class _WebViewPageState extends State<WebViewPage> {
 
                 // 5. 软件设置页面
                 SettingsPage(
-                  astrBotController: _astrBotController,
+                  maiBotController: _maiBotController,
                   napCatController: _napCatController,
                   onNavigate: (index) {
                     setState(() {

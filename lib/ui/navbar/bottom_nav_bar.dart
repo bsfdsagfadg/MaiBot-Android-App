@@ -28,7 +28,7 @@ class WebViewBottomNavBar extends StatelessWidget {
       final List<BottomNavigationBarItem> navItems = [
         const BottomNavigationBarItem(
           icon: Icon(Icons.smart_toy),
-          label: 'AstrBot',
+          label: 'MaiBot',
         ),
         if (napCatEnabled)
           const BottomNavigationBarItem(

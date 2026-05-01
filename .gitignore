@@ -182,8 +182,13 @@ public
 .pnp.*
 
 key.properties
+repomix-output.txt
+*.base64
 
 .fvm
 
 /.trae/
 /.claude/
+*.code-workspace
+.metadata
+/dev/ 
