@@ -11,7 +11,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../controllers/terminal_controller.dart';
 import '../../../core/constants/scripts.dart' as scripts;
-import '../../../core/services/password_manager.dart';
 import '../../../core/config/app_config.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -660,6 +659,7 @@ class _SettingsPageState extends State<SettingsPage> {
         '-C',
         '${scripts.ubuntuPath}/root/MaiBot',
         'data',
+        'config',
       ]);
 
       if (result.exitCode == 0) {
@@ -1592,6 +1592,18 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
         ),
+        ListTile(
+          leading: const Icon(Icons.visibility_off),
+          title: const Text('从最近活动中隐藏自身'),
+          subtitle: const Text('开启后应用将不会出现在系统的最近任务列表中'),
+          trailing: Switch(
+            value: homeController.hideFromRecents.get() ?? false,
+            onChanged: (bool value) {
+              homeController.setHideFromRecents(value);
+              setState(() {});
+            },
+          ),
+        ),
         Obx(() {
           final token = homeController.napCatWebUiToken.value;
           return ListTile(
@@ -1647,16 +1659,15 @@ class _SettingsPageState extends State<SettingsPage> {
         ListTile(
           leading: const Icon(Icons.delete_outline),
           title: const Text('清空 WebView 缓存'),
-          subtitle: const Text('清理所有 WebView 缓存和密码'),
+          subtitle: const Text('清理所有 WebView 缓存'),
           onTap: () async {
             try {
               await widget.maiBotController.clearCache();
               await widget.napCatController.clearCache();
-              await PasswordManager.clearAllPasswords();
               if (context.mounted) {
                 Get.snackbar(
                   '成功',
-                  'WebView 缓存和密码已清理',
+                  'WebView 缓存已清理',
                   snackPosition: SnackPosition.BOTTOM,
                 );
               }

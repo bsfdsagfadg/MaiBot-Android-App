@@ -49,6 +49,26 @@ public class MainActivity extends FragmentActivity {
         new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "maibot_channel").setMethodCallHandler((call, result) -> {
             if ("lib_path".equals(call.method)) {
                 result.success(mContext.getApplicationContext().getApplicationInfo().nativeLibraryDir);
+            } else if ("hide_from_recents".equals(call.method)) {
+                boolean hide = call.argument("hide");
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    android.app.ActivityManager.AppTask task = null;
+                    android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                    for (android.app.ActivityManager.AppTask t : am.getAppTasks()) {
+                        if (t.getTaskInfo().id == getTaskId()) {
+                            task = t;
+                            break;
+                        }
+                    }
+                    if (task != null) {
+                        task.setExcludeFromRecents(hide);
+                        result.success(true);
+                    } else {
+                        result.error("ERROR", "Task not found", null);
+                    }
+                } else {
+                    result.error("UNSUPPORTED", "API level < 21", null);
+                }
             } else {
                 result.notImplemented();
             }

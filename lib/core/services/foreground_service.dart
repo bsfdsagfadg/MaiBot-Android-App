@@ -49,6 +49,10 @@ class ForegroundServiceManager {
         notificationIcon: null,
         notificationButtons: [
           const NotificationButton(
+            id: 'btn_open',
+            text: '打开界面',
+          ),
+          const NotificationButton(
             id: 'btn_stop',
             text: '停止运行',
           ),
@@ -186,7 +190,10 @@ class KeepAliveTaskHandler extends TaskHandler {
   @override
   void onNotificationButtonPressed(String id) {
     // 通知按钮点击时调用
-    if (id == 'btn_stop') {
+    if (id == 'btn_open') {
+      Log.i('用户点击打开界面按钮', tag: 'KeepAliveTaskHandler');
+      FlutterForegroundTask.launchApp('/');
+    } else if (id == 'btn_stop') {
       Log.i('用户点击停止按钮', tag: 'KeepAliveTaskHandler');
       // 用户点击停止运行按钮，先标记为手动停止，然后退出应用
       ForegroundServiceManager.stopService().then((_) {

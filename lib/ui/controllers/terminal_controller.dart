@@ -7,6 +7,7 @@ import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
 import 'package:xterm/xterm.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/config/app_config.dart';
 import '../../generated/l10n.dart';
@@ -22,6 +23,7 @@ class HomeController extends GetxController {
   SettingNode privacySetting = 'privacy'.setting;
   SettingNode napCatWebUiEnabled = 'napcat_webui_enabled'.setting;
   SettingNode showTerminalWhiteText = 'show_terminal_white_text'.setting;
+  SettingNode hideFromRecents = 'hide_from_recents'.setting;
   Pty? pseudoTerminal;
   Pty? napcatTerminal;
 
@@ -36,7 +38,7 @@ class HomeController extends GetxController {
   StreamSubscription? _webviewSubscription; // 添加webview监听订阅
 
   late Terminal terminal = Terminal(
-    maxLines: 50000, // Increase max lines to prevent terminal from stopping output after 5000 lines
+    maxLines: 5000,
     onResize: (width, height, pixelWidth, pixelHeight) {
       pseudoTerminal?.resize(height, width);
     },
@@ -147,6 +149,12 @@ class HomeController extends GetxController {
 
       // 显示所有输出，不再过滤
       terminal.write(event);
+
+      // 如果缓冲区满了，清屏
+      if (terminal.buffer.lines.length >= 5000) {
+        terminal.buffer.clear();
+        terminal.buffer.setCursor(0, 0);
+      }
     });
   }
 
@@ -245,6 +253,9 @@ class HomeController extends GetxController {
 
         // 检查是否两个条件都满足
         _checkAndNavigateToWebview();
+
+        // 检测登录并询问是否保存QQ
+        _checkAndPromptSaveQQ();
 
         // 不再在此处取消订阅，让输出流继续流向日志记录器，防止缓冲区满导致进程卡死
         // We no longer cancel subscription here to keep the output flow going to the logger,
@@ -526,6 +537,11 @@ class HomeController extends GetxController {
     // 初始化 NapCat WebUI 启用状态
     napCatWebUiEnabledRx.value = napCatWebUiEnabled.get() ?? false;
 
+    // 初始化隐藏最近活动状态
+    if (hideFromRecents.get() == true) {
+      setHideFromRecents(true);
+    }
+
     // 从持久化存储加载自定义 WebView 列表
     _loadCustomWebViews();
 
@@ -614,10 +630,101 @@ class HomeController extends GetxController {
     }
   }
 
+  // 检测登录并询问是否保存QQ
+  void _checkAndPromptSaveQQ() async {
+    try {
+      final String configPath = '$ubuntuPath/root/napcat/config';
+      final Directory configDir = Directory(configPath);
+      if (!configDir.existsSync()) return;
+
+      // 扫描 onebot11_QQ.json 文件
+      final List<FileSystemEntity> files = configDir.listSync();
+      String? loggedInQQ;
+
+      for (var file in files) {
+        final String fileName = file.path.split(Platform.pathSeparator).last;
+        if (fileName.startsWith('onebot11_') && fileName.endsWith('.json')) {
+          loggedInQQ = fileName.substring('onebot11_'.length, fileName.length - '.json'.length);
+          // 确保是纯数字QQ号
+          if (RegExp(r'^\d+$').hasMatch(loggedInQQ)) {
+            break;
+          } else {
+            loggedInQQ = null;
+          }
+        }
+      }
+
+      if (loggedInQQ == null || loggedInQQ.isEmpty) return;
+
+      // 读取 webui.json
+      final File webuiFile = File('$configPath/webui.json');
+      if (!webuiFile.existsSync()) return;
+
+      final Map<String, dynamic> webuiConfig = jsonDecode(await webuiFile.readAsString());
+      final String currentQQ = webuiConfig['autoLoginAccount']?.toString() ?? '';
+
+      if (currentQQ.isEmpty) {
+        // 弹出对话框询问
+        Get.dialog(
+          AlertDialog(
+            title: const Text('快速登录设置'),
+            content: Text('检测到您已登录 QQ: $loggedInQQ\n是否将其保存为快速登录账号？\n设置后下次启动将免扫码自动登录。'),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  webuiConfig['autoLoginAccount'] = loggedInQQ;
+                  await webuiFile.writeAsString(
+                    const JsonEncoder.withIndent('    ').convert(webuiConfig),
+                  );
+                  Get.back();
+                  Get.snackbar('保存成功', '已将 $loggedInQQ 设置为快速登录账号',
+                      snackPosition: SnackPosition.BOTTOM);
+                },
+                child: const Text('保存'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      Log.e('检测登录账号失败: $e', tag: 'MaiBot');
+    }
+  }
+
   // 更新 NapCat WebUI 启用状态（用于同步响应式变量）
   void setNapCatWebUiEnabled(bool value) {
     napCatWebUiEnabled.set(value);
     napCatWebUiEnabledRx.value = value;
+  }
+
+  // 彻底清理可能的残留进程
+  void _cleanupZombieProcesses() {
+    Log.i('清理残留进程...', tag: 'MaiBot');
+    try {
+      // 杀死所有 proot、node 和 python 进程
+      // 这里的 busybox killall 是针对 Android 环境的
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'proot']);
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node']);
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'python']);
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'python3']);
+    } catch (e) {
+      // 忽略错误
+    }
+  }
+
+  // 设置是否从最近活动中隐藏自身
+  Future<void> setHideFromRecents(bool value) async {
+    hideFromRecents.set(value);
+    try {
+      const channel = MethodChannel('maibot_channel');
+      await channel.invokeMethod('hide_from_recents', {'hide': value});
+    } catch (e) {
+      Log.e('设置从最近活动隐藏失败: $e', tag: 'MaiBot');
+    }
   }
 
   @override
@@ -640,6 +747,8 @@ class HomeController extends GetxController {
         napcatTerminal?.kill();
         napcatTerminal = null;
       }
+      // 彻底清理可能的残留进程
+      _cleanupZombieProcesses();
     } catch (e) {
       Log.e('关闭终端进程时出错: $e', tag: 'MaiBot');
     }
