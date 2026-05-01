@@ -1338,6 +1338,7 @@ class _SettingsPageState extends State<SettingsPage> {
           title: const Text('备份 MaiBot 数据'),
           subtitle: const Text('备份 MaiBot 配置和数据到手机存储'),
           onTap: () async {
+              await _performBackup(showLoadingDialog: true);
           },
         ),
         ListTile(
