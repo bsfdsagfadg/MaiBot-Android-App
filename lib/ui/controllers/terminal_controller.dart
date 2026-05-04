@@ -173,11 +173,7 @@ class HomeController extends GetxController {
       'liblibtalloc.so.2.so',
       'libloader.so',
       'libproot.so',
-      'libsudo.so',
-      'libproroot.so',
-      'libproroot-runtime.so',
-      'libproroot-bridge.so',
-      'libproroot-linker.so',
+      'libsudo.so'
     ];
     String libPath = await getLibPath();
     Log.i('libPath -> $libPath');

@@ -8,14 +8,6 @@ CUSTOM_GIT_CLONE=""
 # 重装插件依赖标记（1表示需要重装，执行后自动清除）
 REINSTALL_PLUGINS_FLAG=0
 
-# proroot 兼容性设置
-export UV_LINK_MODE=copy
-export UV_DEFAULT_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"
-export UV_PYTHON_INSTALL_MIRROR="https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download"
-
-# 禁用 proroot 在子进程中继承 LD_PRELOAD 避免污染 host
-unset LD_PRELOAD
-
 if [ -z "$TMPDIR" ]; then
   echo "错误：未检测到 TMPDIR，请在挂载共享目录时传入 TMPDIR"
   exit 1

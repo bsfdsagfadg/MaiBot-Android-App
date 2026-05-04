@@ -26,13 +26,8 @@ export UBUNTU_NAME=$ubuntuName
 export L_NOT_INSTALLED=${S.current.uninstalled}
 export L_INSTALLING=${S.current.installing}
 export L_INSTALLED=${S.current.installed}
-# proroot 需要的环境变量
-# Environment variables required by proroot
-export PROROOT_LIB_PATH=${RuntimeEnvir.binPath}/proroot-runtime
-export PROROOT_TRAMPOLINE_PATH=${RuntimeEnvir.binPath}/proroot-bridge
-export PROROOT_LINKER_PATH=${RuntimeEnvir.binPath}/proroot-linker
-export PROROOT_TMP_DIR=${RuntimeEnvir.tmpPath}
-# proot 兼容性环境变量
+# proot 需要的环境变量
+# Environment variables required by proot
 export PROOT_LOADER=${RuntimeEnvir.binPath}/loader
 export LD_LIBRARY_PATH=${RuntimeEnvir.binPath}
 export PROOT_TMP_DIR=${RuntimeEnvir.tmpPath}
@@ -457,10 +452,10 @@ login_ubuntu(){
     BIND_ARGS="$BIND_ARGS -b $UBUNTU_PATH/proc/.sysctl_inotify_max_user_watches:/proc/sys/fs/inotify/max_user_watches"
   fi
 
-  # 使用 proroot 直接进入解压的 Ubuntu 根文件系统。
+  # 使用 proot 直接进入解压的 Ubuntu 根文件系统。
   # - 清理并设置 PATH，避免继承宿主 PATH 造成命令找不到或混用 busybox。
   # - 绑定常见伪文件系统与外部存储，保障交互和软件包管理工作正常。
-  # 在 proroot 环境中创建 /storage/emulated 目录
+  # 在 proot 环境中创建 /storage/emulated 目录
   mkdir -p "$UBUNTU_PATH/storage/emulated" 2>/dev/null
   # 获取Android系统的时区设置
   ANDROID_TZ=$(getprop persist.sys.timezone 2>/dev/null)
@@ -473,9 +468,9 @@ login_ubuntu(){
     ANDROID_TZ="UTC"
   fi
 
-  exec $BIN/proroot \
-    -r "$UBUNTU_PATH" \
+  exec $BIN/proot \
     -0 \
+    -r "$UBUNTU_PATH" \
     --link2symlink \
     -b /dev \
     -b /proc \

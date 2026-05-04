@@ -88,15 +88,10 @@ Pty createPTY({
 }) {
   Map<String, String> envir = Map.from(Platform.environment);
   envir['HOME'] = RuntimeEnvir.homePath;
-  // proroot environment setup
+  // proot environment setup
   envir['TERMUX_PREFIX'] = RuntimeEnvir.usrPath;
   envir['TERM'] = 'xterm-256color';
   envir['PATH'] = RuntimeEnvir.path;
-  // proroot deps
-  envir['PROROOT_LIB_PATH'] = '${RuntimeEnvir.binPath}/proroot-runtime';
-  envir['PROROOT_TRAMPOLINE_PATH'] = '${RuntimeEnvir.binPath}/proroot-bridge';
-  envir['PROROOT_LINKER_PATH'] = '${RuntimeEnvir.binPath}/proroot-linker';
-  envir['PROROOT_TMP_DIR'] = RuntimeEnvir.tmpPath;
   // proot deps
   envir['PROOT_LOADER'] = '${RuntimeEnvir.binPath}/loader';
   envir['LD_LIBRARY_PATH'] = RuntimeEnvir.binPath;
