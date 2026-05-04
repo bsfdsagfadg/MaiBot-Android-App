@@ -9,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:shizuku_api/shizuku_api.dart';
 import '../../controllers/terminal_controller.dart';
 import '../../../core/constants/scripts.dart' as scripts;
 import '../../../core/config/app_config.dart';
@@ -111,6 +112,75 @@ class _SettingsPageState extends State<SettingsPage> {
       Get.snackbar(
         '请求失败',
         '请求电池优化豁免时发生错误: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  // 解除幻影进程限制 (通过 Shizuku)
+  Future<void> _disablePhantomProcessKiller() async {
+    try {
+      final shizukuApi = ShizukuApi();
+      bool isBinderRunning = await shizukuApi.pingBinder() ?? false;
+      
+      if (!isBinderRunning) {
+        Get.snackbar(
+          '未检测到 Shizuku',
+          '请先安装并启动 Shizuku 软件',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+
+      bool hasPermission = await shizukuApi.checkPermission() ?? false;
+      if (!hasPermission) {
+        // 请求权限
+        hasPermission = await shizukuApi.requestPermission() ?? false;
+      }
+
+      if (hasPermission) {
+        Get.dialog(
+          const Center(child: CircularProgressIndicator()),
+          barrierDismissible: false,
+        );
+
+        Log.i('Shizuku 已授权，正在执行解除幻影进程限制指令...', 'MaiBot');
+        // 增大限制阈值
+        await shizukuApi.runCommand('device_config put activity_manager max_phantom_processes 2147483647');
+        // 关闭监控
+        await shizukuApi.runCommand('settings put global settings_enable_monitor_phantom_procs false');
+        
+        Get.back(); // 关闭加载提示
+        Log.i('解除幻影进程限制指令执行完毕', 'MaiBot');
+        
+        Get.snackbar(
+          '解除成功',
+          '幻影进程限制已被解除，可提高应用稳定性',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
+      } else {
+        Get.snackbar(
+          '授权失败',
+          '需要 Shizuku 授权才能执行解除指令',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+      }
+    } catch (e) {
+      if (Get.isDialogOpen ?? false) Get.back(); // 如果有弹窗则关闭
+      Log.e('使用 Shizuku 解除幻影进程限制失败: $e', 'MaiBot');
+      Get.snackbar(
+        '执行失败',
+        '遇到错误: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -1573,6 +1643,13 @@ class _SettingsPageState extends State<SettingsPage> {
               ? const Icon(Icons.check_circle, color: Colors.green)
               : const Icon(Icons.warning, color: Colors.orange),
           onTap: () => _requestBatteryOptimization(),
+        ),
+        ListTile(
+          leading: const Icon(Icons.flash_off),
+          title: const Text('解除幻影进程限制'),
+          subtitle: const Text('通过 Shizuku 解除系统对进程的严格限制'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _disablePhantomProcessKiller(),
         ),
         ListTile(
           leading: const Icon(Icons.web),

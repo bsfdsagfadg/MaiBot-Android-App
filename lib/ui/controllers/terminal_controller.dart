@@ -304,7 +304,11 @@ class HomeController extends GetxController {
       'liblibtalloc.so.2.so',
       'libloader.so',
       'libproot.so',
-      'libsudo.so'
+      'libsudo.so',
+      'libproroot.so',
+      'libproroot-runtime.so',
+      'libproroot-bridge.so',
+      'libproroot-linker.so',
     ];
     String libPath = await getLibPath();
     Log.i('libPath -> $libPath');
@@ -705,12 +709,13 @@ class HomeController extends GetxController {
   void _cleanupZombieProcesses() {
     Log.i('清理残留进程...',  'MaiBot');
     try {
-      // 杀死所有 proot、node 和 python 进程
-      // 这里的 busybox killall 是针对 Android 环境的
-      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'proot']);
-      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node']);
-      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'python']);
-      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'python3']);
+      // 通过 pkill -P 杀死应用启动的所有子进程，避免 killall 误杀其他应用（如 Termux）的进程
+      // 获取当前应用进程 ID
+      final myPid = pid;
+      
+      // 使用 busybox pkill 杀死当前进程的所有子进程和进程组
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['pkill', '-P', myPid.toString()]);
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['pkill', '-g', myPid.toString()]);
     } catch (e) {
       // 忽略错误
     }
