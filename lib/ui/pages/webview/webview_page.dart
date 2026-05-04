@@ -329,17 +329,17 @@ class _WebViewPageState extends State<WebViewPage> {
         );
 
         if (isImageOnly) {
-          result = await FilePicker.platform.pickFiles(
+          result = await FilePicker.pickFiles(
             type: FileType.image,
             allowMultiple: allowMultiple,
           );
         } else if (isVideoOnly) {
-          result = await FilePicker.platform.pickFiles(
+          result = await FilePicker.pickFiles(
             type: FileType.video,
             allowMultiple: allowMultiple,
           );
         } else if (isAudioOnly) {
-          result = await FilePicker.platform.pickFiles(
+          result = await FilePicker.pickFiles(
             type: FileType.audio,
             allowMultiple: allowMultiple,
           );
@@ -358,13 +358,13 @@ class _WebViewPageState extends State<WebViewPage> {
           }
 
           if (allowedExtensions.isNotEmpty) {
-            result = await FilePicker.platform.pickFiles(
+            result = await FilePicker.pickFiles(
               type: FileType.custom,
               allowedExtensions: allowedExtensions,
               allowMultiple: allowMultiple,
             );
           } else {
-            result = await FilePicker.platform.pickFiles(
+            result = await FilePicker.pickFiles(
               type: FileType.any,
               allowMultiple: allowMultiple,
             );
@@ -372,7 +372,7 @@ class _WebViewPageState extends State<WebViewPage> {
         }
       } else {
         // 没有指定类型，允许选择任何文件
-        result = await FilePicker.platform.pickFiles(
+        result = await FilePicker.pickFiles(
           type: FileType.any,
           allowMultiple: allowMultiple,
         );

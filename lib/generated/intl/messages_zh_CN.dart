@@ -20,10 +20,10 @@ typedef String MessageIfAbsent(String messageStr, List<dynamic> args);
 class MessageLookup extends MessageLookupByLibrary {
   String get localeName => 'zh_CN';
 
-  static String m0(param) => "拷贝 code-server${param} 到数据目录";
+  static String m0(Object param) => "拷贝 code-server${param} 到数据目录";
 
-  final messages = _notInlinedMessages(_notInlinedMessages);
-  static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
+  final Map<String, Function> messages = _notInlinedMessages(_notInlinedMessages);
+  static Map<String, Function> _notInlinedMessages(Object _) => <String, Function>{
         "copy_code_server": m0,
         "copy_proot_distro": MessageLookupByLibrary.simpleMessage(
           "拷贝 proot-distro 到数据目录",

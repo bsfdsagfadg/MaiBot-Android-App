@@ -20,10 +20,10 @@ class HomeController extends GetxController {
   // 终端标签页管理器
   late final TerminalTabManager terminalTabManager;
   // bool vsCodeStaring = false;
-  SettingNode privacySetting = 'privacy'.setting;
-  SettingNode napCatWebUiEnabled = 'napcat_webui_enabled'.setting;
-  SettingNode showTerminalWhiteText = 'show_terminal_white_text'.setting;
-  SettingNode hideFromRecents = 'hide_from_recents'.setting;
+  Setting privacySetting = 'privacy'.setting;
+  Setting napCatWebUiEnabled = 'napcat_webui_enabled'.setting;
+  Setting showTerminalWhiteText = 'show_terminal_white_text'.setting;
+  Setting hideFromRecents = 'hide_from_recents'.setting;
   Pty? pseudoTerminal;
   Pty? napcatTerminal;
 
@@ -114,7 +114,7 @@ class HomeController extends GetxController {
         final lines = event.split('\n');
         for (var line in lines) {
           if (line.trim().isNotEmpty) {
-            Log.i(line, tag: 'MaiBot');
+            Log.i(line,  'MaiBot');
           }
         }
       }
@@ -127,7 +127,7 @@ class HomeController extends GetxController {
           final token = match.group(1);
           if (token != null) {
             maiBotWebUiToken.value = token;
-            Log.i('捕获到 MaiBot Token: $token', tag: 'MaiBot');
+            Log.i('捕获到 MaiBot Token: $token',  'MaiBot');
           }
         }
       }
@@ -175,7 +175,7 @@ class HomeController extends GetxController {
         final lines = event.split('\n');
         for (var line in lines) {
           if (line.trim().isNotEmpty) {
-            Log.i(line, tag: 'MaiBot-Napcat');
+            Log.i(line,  'MaiBot-Napcat');
           }
         }
       }
@@ -187,7 +187,7 @@ class HomeController extends GetxController {
           final token = match.group(1);
           if (token != null) {
             napCatWebUiToken.value = token;
-            Log.i('捕获到 NapCat Token: $token', tag: 'MaiBot');
+            Log.i('捕获到 NapCat Token: $token',  'MaiBot');
           }
         }
       }
@@ -375,7 +375,7 @@ class HomeController extends GetxController {
         if (content.contains('Napcat ${S.current.installed}')) {
           napcatTerminal?.writeString('$command\n');
           bumpProgress();
-          Log.i('检测到 Napcat 已安装，启动 NapCat 终端', tag: 'MaiBot');
+          Log.i('检测到 Napcat 已安装，启动 NapCat 终端',  'MaiBot');
         }
 
         // 当进度到达 "MaiBot Core 配置中" 时，清除终端
@@ -383,7 +383,7 @@ class HomeController extends GetxController {
           // 清除终端先前显示的所有文本
           terminal.buffer.clear();
           terminal.buffer.setCursor(0, 0);
-          Log.i('检测到 MaiBot Core 配置中，清除终端内容', tag: 'MaiBot');
+          Log.i('检测到 MaiBot Core 配置中，清除终端内容',  'MaiBot');
         }
 
         update();
@@ -691,7 +691,7 @@ class HomeController extends GetxController {
         );
       }
     } catch (e) {
-      Log.e('检测登录账号失败: $e', tag: 'MaiBot');
+      Log.e('检测登录账号失败: $e',  'MaiBot');
     }
   }
 
@@ -703,7 +703,7 @@ class HomeController extends GetxController {
 
   // 彻底清理可能的残留进程
   void _cleanupZombieProcesses() {
-    Log.i('清理残留进程...', tag: 'MaiBot');
+    Log.i('清理残留进程...',  'MaiBot');
     try {
       // 杀死所有 proot、node 和 python 进程
       // 这里的 busybox killall 是针对 Android 环境的
@@ -723,7 +723,7 @@ class HomeController extends GetxController {
       const channel = MethodChannel('maibot_channel');
       await channel.invokeMethod('hide_from_recents', {'hide': value});
     } catch (e) {
-      Log.e('设置从最近活动隐藏失败: $e', tag: 'MaiBot');
+      Log.e('设置从最近活动隐藏失败: $e',  'MaiBot');
     }
   }
 
@@ -738,19 +738,19 @@ class HomeController extends GetxController {
     // 杀死所有终端进程，释放端口
     try {
       if (pseudoTerminal != null) {
-        Log.i('正在关闭主终端进程...', tag: 'MaiBot');
+        Log.i('正在关闭主终端进程...',  'MaiBot');
         pseudoTerminal?.kill();
         pseudoTerminal = null;
       }
       if (napcatTerminal != null) {
-        Log.i('正在关闭 NapCat 终端进程...', tag: 'MaiBot-Napcat');
+        Log.i('正在关闭 NapCat 终端进程...',  'MaiBot-Napcat');
         napcatTerminal?.kill();
         napcatTerminal = null;
       }
       // 彻底清理可能的残留进程
       _cleanupZombieProcesses();
     } catch (e) {
-      Log.e('关闭终端进程时出错: $e', tag: 'MaiBot');
+      Log.e('关闭终端进程时出错: $e',  'MaiBot');
     }
 
     // 移除生命周期观察者

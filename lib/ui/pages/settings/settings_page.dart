@@ -61,7 +61,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _isBatteryOptimizationIgnored = status.isGranted;
       });
     } catch (e) {
-      Log.e('检查电池优化豁免状态失败: $e', tag: 'MaiBot');
+      Log.e('检查电池优化豁免状态失败: $e',  'MaiBot');
     }
   }
 
@@ -107,7 +107,7 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       }
     } catch (e) {
-      Log.e('请求电池优化豁免失败: $e', tag: 'MaiBot');
+      Log.e('请求电池优化豁免失败: $e',  'MaiBot');
       Get.snackbar(
         '请求失败',
         '请求电池优化豁免时发生错误: $e',
@@ -156,7 +156,7 @@ class _SettingsPageState extends State<SettingsPage> {
             break;
           }
         } catch (e) {
-          Log.w('镜像源 $mirror 请求失败: $e', tag: 'MaiBot');
+          Log.w('镜像源 $mirror 请求失败: $e',  'MaiBot');
           continue;
         }
       }
@@ -193,7 +193,7 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     } catch (e) {
       Get.back(); // 关闭加载提示
-      Log.e('检查更新失败: $e', tag: 'MaiBot');
+      Log.e('检查更新失败: $e',  'MaiBot');
       Get.snackbar(
         '检查失败',
         '检查更新时发生错误: $e',
@@ -677,7 +677,7 @@ class _SettingsPageState extends State<SettingsPage> {
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 3),
         );
-        Log.i('备份成功: $backupPath (${fileSizeMB}MB)', tag: 'MaiBot');
+        Log.i('备份成功: $backupPath (${fileSizeMB}MB)',  'MaiBot');
         return true;
       } else {
         if (showLoadingDialog) {
@@ -691,7 +691,7 @@ class _SettingsPageState extends State<SettingsPage> {
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
-        Log.e('备份失败: ${result.stderr}', tag: 'MaiBot');
+        Log.e('备份失败: ${result.stderr}',  'MaiBot');
         return false;
       }
     } catch (e) {
@@ -706,7 +706,7 @@ class _SettingsPageState extends State<SettingsPage> {
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-      Log.e('备份异常: $e', tag: 'MaiBot');
+      Log.e('备份异常: $e',  'MaiBot');
       return false;
     }
   }
@@ -814,7 +814,7 @@ class _SettingsPageState extends State<SettingsPage> {
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
         );
-        Log.i('自动登录QQ号已更新: $newQQ', tag: 'MaiBot');
+        Log.i('自动登录QQ号已更新: $newQQ',  'MaiBot');
       } catch (e) {
         Get.snackbar(
           '保存失败',
@@ -824,7 +824,7 @@ class _SettingsPageState extends State<SettingsPage> {
           colorText: Colors.white,
           duration: const Duration(seconds: 3),
         );
-        Log.e('保存自动登录QQ号失败: $e', tag: 'MaiBot');
+        Log.e('保存自动登录QQ号失败: $e',  'MaiBot');
       }
     }
 
@@ -928,7 +928,7 @@ class _SettingsPageState extends State<SettingsPage> {
         );
 
         await scriptFile.writeAsString(content);
-        Log.i('已更新自定义 Git Clone 命令: $newCommand', tag: 'MaiBot');
+        Log.i('已更新自定义 Git Clone 命令: $newCommand',  'MaiBot');
 
         Get.snackbar(
           '保存成功',
@@ -945,7 +945,7 @@ class _SettingsPageState extends State<SettingsPage> {
           colorText: Colors.white,
           duration: const Duration(seconds: 3),
         );
-        Log.e('保存自定义 Git Clone 命令失败: $e', tag: 'MaiBot');
+        Log.e('保存自定义 Git Clone 命令失败: $e',  'MaiBot');
       }
     }
 
@@ -1041,7 +1041,7 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       }
     } catch (e) {
-      Log.e('打开文件管理器失败: $e', tag: 'MaiBot');
+      Log.e('打开文件管理器失败: $e',  'MaiBot');
       Get.snackbar(
         '打开失败',
         '无法打开文件管理器: $e',
@@ -1191,7 +1191,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 final maiBotDir = Directory(maiBotPath);
                 if (await maiBotDir.exists()) {
                   await maiBotDir.delete(recursive: true);
-                  Log.i('已删除 MaiBot 目录: $maiBotPath', tag: 'MaiBot');
+                  Log.i('已删除 MaiBot 目录: $maiBotPath',  'MaiBot');
                 }
 
                 if (context.mounted) {
@@ -1208,7 +1208,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   });
                 }
               } catch (e) {
-                Log.e('重新安装 MaiBot 失败: $e', tag: 'MaiBot');
+                Log.e('重新安装 MaiBot 失败: $e',  'MaiBot');
                 if (context.mounted) {
                   Get.snackbar(
                     '重新安装失败',
@@ -1255,7 +1255,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 final launcherFile = File(launcherPath);
                 if (await launcherFile.exists()) {
                   await launcherFile.delete();
-                  Log.i('已删除 launcher.sh: $launcherPath', tag: 'MaiBot');
+                  Log.i('已删除 launcher.sh: $launcherPath',  'MaiBot');
                 }
 
                 if (context.mounted) {
@@ -1272,7 +1272,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   });
                 }
               } catch (e) {
-                Log.e('重新安装 NapcatQQ 失败: $e', tag: 'MaiBot');
+                Log.e('重新安装 NapcatQQ 失败: $e',  'MaiBot');
                 if (context.mounted) {
                   Get.snackbar(
                     '重新安装失败',
@@ -1306,7 +1306,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
 
                 await scriptFile.writeAsString(content);
-                Log.i('已设置插件依赖重装标记', tag: 'MaiBot');
+                Log.i('已设置插件依赖重装标记',  'MaiBot');
 
                 Get.snackbar(
                   '设置成功',
@@ -1323,7 +1323,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
               }
             } catch (e) {
-              Log.e('设置重装标记失败: $e', tag: 'MaiBot');
+              Log.e('设置重装标记失败: $e',  'MaiBot');
               Get.snackbar(
                 '操作失败',
                 '设置重装标记失败: $e',
@@ -1378,7 +1378,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                 if (await dataDir.exists()) {
                   await dataDir.delete(recursive: true);
-                  Log.i('已清除 MaiBot 数据目录: $dataPath', tag: 'MaiBot');
+                  Log.i('已清除 MaiBot 数据目录: $dataPath',  'MaiBot');
 
                   Get.snackbar(
                     '清除成功',
@@ -1399,7 +1399,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   );
                 }
               } catch (e) {
-                Log.e('清除 MaiBot 数据失败: $e', tag: 'MaiBot');
+                Log.e('清除 MaiBot 数据失败: $e',  'MaiBot');
                 Get.snackbar(
                   '操作失败',
                   '清除数据失败: $e',
@@ -1446,7 +1446,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                 if (await venvDir.exists()) {
                   await venvDir.delete(recursive: true);
-                  Log.i('已删除 Python 虚拟环境: $venvPath', tag: 'MaiBot');
+                  Log.i('已删除 Python 虚拟环境: $venvPath',  'MaiBot');
 
                   Get.snackbar(
                     '重置成功',
@@ -1467,7 +1467,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   );
                 }
               } catch (e) {
-                Log.e('删除 Python 虚拟环境失败: $e', tag: 'MaiBot');
+                Log.e('删除 Python 虚拟环境失败: $e',  'MaiBot');
                 Get.snackbar(
                   '操作失败',
                   '删除虚拟环境失败: $e',

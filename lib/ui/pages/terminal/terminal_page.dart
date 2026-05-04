@@ -39,7 +39,7 @@ class _TerminalPageState extends State<TerminalPage> {
             alignment: Alignment.center,
             children: [
               Padding(
-                padding: EdgeInsets.all(8.w),
+                padding: EdgeInsets.all(w(8)),
                 child: Visibility(
                   visible: visible,
                   // IgnorePointer
@@ -58,12 +58,12 @@ class _TerminalPageState extends State<TerminalPage> {
               ),
               Center(
                 child: Material(
-                  borderRadius: BorderRadius.circular(12.w),
+                  borderRadius: BorderRadius.circular(w(12)),
                   color: Theme.of(context).colorScheme.surface,
                   child: SizedBox(
-                    width: 300.w,
+                    width: w(300),
                     child: Padding(
-                      padding: EdgeInsets.all(12.w),
+                      padding: EdgeInsets.all(w(12)),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -77,35 +77,35 @@ class _TerminalPageState extends State<TerminalPage> {
                               ),
                             ),
                           ),
-                          SizedBox(height: 12.w),
+                          SizedBox(height: w(12)),
                           GetBuilder<HomeController>(builder: (controller) {
                             return Column(
                               children: [
                                 Stack(
                                   children: [
                                     Container(
-                                      height: 5.w,
+                                      height: w(5),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.primary.opacity02,
-                                        borderRadius: BorderRadius.circular(3.w),
+                                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(w(3)),
                                       ),
                                     ),
                                     AnimatedContainer(
                                       duration: 300.milliseconds,
-                                      height: 5.w,
-                                      width: 300.w * controller.progress,
+                                      height: w(5),
+                                      width: w(300) * controller.progress,
                                       decoration: BoxDecoration(
                                         color: Theme.of(context).colorScheme.primary,
-                                        borderRadius: BorderRadius.circular(3.w),
+                                        borderRadius: BorderRadius.circular(w(3)),
                                       ),
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: 8.w),
+                                SizedBox(height: w(8)),
                                 Text(
                                   controller.currentProgress.trim(),
                                   style: TextStyle(
-                                    fontSize: 12.w,
+                                    fontSize: w(12),
                                     fontWeight: FontWeight.bold,
                                     color: Theme.of(context).colorScheme.onSurface,
                                   ),

@@ -40,7 +40,15 @@ Future<void> main() async {
   ));
   RuntimeEnvir.initEnvirWithPackageName('com.maibot.maibot_android');
   await initSettingStore(RuntimeEnvir.configPath);
-  runApp(const MaiBot());
+  runApp(
+    Builder(builder: (context) {
+      return ViewMetric(
+        uiWidth: 375,
+        screenWidth: MediaQuery.of(context).size.width,
+        child: const MaiBot(),
+      );
+    }),
+  );
 }
 
 class MaiBot extends StatefulWidget {
@@ -72,12 +80,12 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
       // 只有在服务未运行且用户没有点击停止按钮的情况下才重启
       // 这样即使用户从通知栏划掉通知，服务也会被重建
       if (!isRunning && !userClickedStop) {
-        Log.w('主应用检测到服务未运行，尝试重启...', tag: 'MaiBot');
+        Log.w('主应用检测到服务未运行，尝试重启...', 'MaiBot');
         try {
           await ForegroundServiceManager.startService();
-          Log.i('服务重启成功', tag: 'MaiBot');
+          Log.i('服务重启成功', 'MaiBot');
         } catch (e) {
-          Log.e('服务重启失败: $e', tag: 'MaiBot');
+          Log.e('服务重启失败: $e', 'MaiBot');
         }
       }
     });
@@ -96,14 +104,14 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
     
     // 当应用完全退出时，确保清理所有资源
     if (state == AppLifecycleState.detached) {
-      Log.i('应用正在退出，清理所有资源...', tag: 'MaiBot');
+      Log.i('应用正在退出，清理所有资源...', 'MaiBot');
       try {
         // 尝试获取并清理 HomeController
         if (Get.isRegistered<dynamic>()) {
           Get.delete<dynamic>(force: true);
         }
       } catch (e) {
-        Log.e('清理资源时出错: $e', tag: 'MaiBot');
+        Log.e('清理资源时出错: $e', 'MaiBot');
       }
     }
   }

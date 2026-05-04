@@ -12,14 +12,14 @@ dependencies:
     sdk: flutter
   # pub repo
   signale: ^0.0.9
-  intl: ^0.19.0
+  intl: ^0.20.2
   archive: ^4.0.7
   async: ^2.11.0
   dio: ^5.7.0
   cupertino_icons: ^1.0.2
   get: ^4.6.5
-  device_info_plus: ^11.1.1
-  package_info_plus: ^8.0.0
+  device_info_plus: ^12.4.0
+  package_info_plus: ^9.0.1
   tar: ^2.0.0
   path: ^1.9.1
   webview_flutter: ^4.10.0
@@ -27,18 +27,14 @@ dependencies:
   permission_handler: ^11.3.1
   http: ^1.2.2
   url_launcher: ^6.3.1
-  file_picker: ^8.1.6
+  file_picker: ^11.0.2
   flutter_markdown: ^0.7.4+3
 
   # get repo
-  xterm:
-    git:
-      url: https://github.com/TerminalStudio/xterm.dart
-      ref: master
+  xterm: ^4.0.0
   settings:
     git: https://github.com/nightmare-space/settings
-  flutter_pty:
-    git: https://github.com/TerminalStudio/flutter_pty
+  flutter_pty: ^0.4.2
   global_repository:
     git: https://github.com/nightmare-space/global_repository
   behavior_api:
@@ -47,10 +43,29 @@ dependencies:
       path: behavior_api
   flutter_foreground_task: ^9.1.0
 
+dependency_overrides:
+  permission_handler: ^11.3.1
+  signale:
+    git: https://github.com/nightmare-space/signale.git
+  xterm:
+    git: https://github.com/TerminalStudio/xterm.dart
+  flutter_pty:
+    git: https://github.com/TerminalStudio/flutter_pty
+  global_repository:
+    git:
+      url: https://github.com/nightmare-space/global_repository
+  settings:
+    git:
+      url: https://github.com/nightmare-space/settings
+  behavior_api:
+    git:
+      url: https://github.com/nightmare-space/empty_package
+      path: behavior_api
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
   intl_utils: ^2.8.7
 
 flutter:

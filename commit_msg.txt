@@ -1,0 +1,10 @@
+chore: 升级项目依赖并适配新版 API 架构
+
+- 彻底移除 git_repos 本地包依赖，全部切换为线上 Git/Hosted 源
+- 适配新版 global_repository 屏幕适配语法 (w(x) 代替 x.w)
+- 适配新版 signale 日志签名 (移除 tag: 命名参数)
+- 适配新版 settings (SettingNode 迁移至 Setting)
+- 适配新版 file_picker 静态方法调用
+- 适配 Flutter 3.27+ 颜色透明度语法 (withValues 代替 withOpacity)
+- 在 main.dart 中注入 ViewMetric 顶层适配器
+- 优化 analysis_options.yaml 排除规则
