@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:global_repository/global_repository.dart';
 
@@ -197,7 +197,7 @@ class KeepAliveTaskHandler extends TaskHandler {
       Log.i('用户点击停止按钮',  'KeepAliveTaskHandler');
       // 用户点击停止运行按钮，先标记为手动停止，然后退出应用
       ForegroundServiceManager.stopService().then((_) {
-        exit(0);
+        SystemNavigator.pop();
       });
     }
   }

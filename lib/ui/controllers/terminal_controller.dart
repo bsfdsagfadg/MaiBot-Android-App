@@ -1,39 +1,32 @@
 ﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_pty/flutter_pty.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
 import 'package:xterm/xterm.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/config/app_config.dart';
-import '../../generated/l10n.dart';
 import '../../core/constants/scripts.dart';
 import '../../core/utils/file_utils.dart';
-import '../routes/app_routes.dart';
+import '../../generated/l10n.dart';
+import 'napcat_controller.dart';
 import 'terminal_tab_manager.dart';
+import 'webview_controller.dart';
 
 class HomeController extends GetxController {
   // 终端标签页管理器
   late final TerminalTabManager terminalTabManager;
-  // bool vsCodeStaring = false;
   Setting privacySetting = 'privacy'.setting;
-  Setting napCatWebUiEnabled = 'napcat_webui_enabled'.setting;
   Setting showTerminalWhiteText = 'show_terminal_white_text'.setting;
   Setting hideFromRecents = 'hide_from_recents'.setting;
   Pty? pseudoTerminal;
   Pty? napcatTerminal;
 
-  final RxString napCatWebUiToken = ''.obs; // 存储 NapCat WebUI Token
-  final RxString maiBotWebUiToken = ''.obs; // 存储 MaiBot WebUI Token
-  final RxBool _isQrcodeShowing = false.obs;
-  final RxBool napCatWebUiEnabledRx = false.obs; // GetX 响应式变量用于导航栏更新
-  final RxList<Map<String, String>> customWebViews =
-      <Map<String, String>>[].obs; // 自定义 WebView 列表
-  Dialog? _qrcodeDialog;
   StreamSubscription? _qrcodeSubscription;
   StreamSubscription? _webviewSubscription; // 添加webview监听订阅
 
@@ -46,9 +39,7 @@ class HomeController extends GetxController {
       pseudoTerminal?.writeString(data);
     },
   );
-  bool webviewHasOpen = false;
   bool _isLocalhostDetected = false; // localhost:6185 检测标志
-  bool _isQrcodeProcessed = false; // 二维码处理完成标志
   bool _isAppInForeground = true; // 应用是否在前台
 
   File progressFile = File('${RuntimeEnvir.tmpPath}/progress');
@@ -56,6 +47,9 @@ class HomeController extends GetxController {
   double progress = 0.0;
   double step = 14.0;
   String currentProgress = '';
+  
+  final WebviewController webviewController = Get.put(WebviewController());
+  final NapcatController napcatController = Get.put(NapcatController());
 
   // 进度 +1
   // Progress +1
@@ -88,14 +82,10 @@ class HomeController extends GetxController {
   void _checkAndNavigateToWebview() {
     // 只有当两个条件都满足且应用在前台时才跳转
     if (_isLocalhostDetected &&
-        _isQrcodeProcessed &&
+        napcatController.isQrcodeProcessed &&
         _isAppInForeground &&
-        !webviewHasOpen) {
-      Future.microtask(() {
-        // 使用路由跳转
-        Get.toNamed(AppRoutes.webview);
-        webviewHasOpen = true; // 只有真正打开webview时才设置为true
-      });
+        !webviewController.webviewHasOpen) {
+      webviewController.navigateToWebview();
     }
   }
 
@@ -114,23 +104,12 @@ class HomeController extends GetxController {
         final lines = event.split('\n');
         for (var line in lines) {
           if (line.trim().isNotEmpty) {
-            Log.i(line,  'MaiBot');
+            Log.i(line, 'MaiBot');
           }
         }
       }
 
-      // 捕获 MaiBot WebUI Token
-      if (event.contains('WebUI Access Token:')) {
-        final match =
-            RegExp(r'WebUI Access Token:\s+([a-f0-9]+)').firstMatch(event);
-        if (match != null) {
-          final token = match.group(1);
-          if (token != null) {
-            maiBotWebUiToken.value = token;
-            Log.i('捕获到 MaiBot Token: $token',  'MaiBot');
-          }
-        }
-      }
+      napcatController.handleMaibotOutput(event);
 
       // 检查是否包含 MaiBot 全部系统初始化完成的标志
       if (event.contains('全部系统初始化完成')) {
@@ -175,123 +154,13 @@ class HomeController extends GetxController {
         final lines = event.split('\n');
         for (var line in lines) {
           if (line.trim().isNotEmpty) {
-            Log.i(line,  'MaiBot-Napcat');
+            Log.i(line, 'MaiBot-Napcat');
           }
         }
       }
 
-      // 捕获 NapCat WebUI Token
-      if (event.contains('WebUi Token:')) {
-        final match = RegExp(r'WebUi Token:\s+(\w+)').firstMatch(event);
-        if (match != null) {
-          final token = match.group(1);
-          if (token != null) {
-            napCatWebUiToken.value = token;
-            Log.i('捕获到 NapCat Token: $token',  'MaiBot');
-          }
-        }
-      }
-
-      // 检测指令1显示二维码
-      if (event.contains('二维码已保存到') && !_isQrcodeShowing.value) {
-        _isQrcodeShowing.value = true;
-        final qrcodePath = '$ubuntuPath/root/napcat/cache/qrcode.png';
-        final qrcodeFile = File(qrcodePath);
-
-        if (await qrcodeFile.exists()) {
-          _qrcodeDialog = Dialog(
-            backgroundColor: Colors.white,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '请用手机QQ扫码登录',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  Image.file(
-                    qrcodeFile,
-                    width: 200,
-                    height: 200,
-                    fit: BoxFit.contain,
-                  ),
-                ],
-              ),
-            ),
-          );
-
-          // 使用GetX的导航管理避免上下文问题
-          await Get.dialog(
-            _qrcodeDialog!,
-            barrierDismissible: false,
-          );
-
-          _isQrcodeShowing.value = false;
-          _qrcodeDialog = null;
-        } else {
-          Get.showSnackbar(GetSnackBar(
-            message: '二维码图片不存在：$qrcodePath',
-            duration: const Duration(seconds: 3),
-          ));
-          _isQrcodeShowing.value = false;
-        }
-      }
-
-      // 检测指令2关闭二维码
-      if (event.contains('配置加载') && _isQrcodeShowing.value) {
-        // 关闭对话框
-        if (_qrcodeDialog != null) {
-          Get.back();
-          _isQrcodeShowing.value = false;
-          _qrcodeDialog = null;
-        }
-
-        // 标记二维码处理完成
-        _isQrcodeProcessed = true;
-
-        // 检查是否两个条件都满足
-        _checkAndNavigateToWebview();
-
-        // 检测登录并询问是否保存QQ
-        _checkAndPromptSaveQQ();
-
-        // 不再在此处取消订阅，让输出流继续流向日志记录器，防止缓冲区满导致进程卡死
-        // We no longer cancel subscription here to keep the output flow going to the logger,
-        // preventing process hang due to full buffer.
-      }
-
-      // 检测指令3处理登录错误
-      if (event.contains('Login Error') && _isQrcodeShowing.value) {
-        // 关闭二维码对话框
-        if (_qrcodeDialog != null) {
-          Get.back();
-          _isQrcodeShowing.value = false;
-          _qrcodeDialog = null;
-        }
-
-        // 提取错误信息
-        String errorMsg = '登录失败';
-        if (event.contains('"message":"')) {
-          final match = RegExp(r'"message":"([^"]+)"').firstMatch(event);
-          if (match != null) {
-            errorMsg = match.group(1) ?? errorMsg;
-          }
-        }
-
-        // 显示错误提示
-        Get.snackbar(
-          'NapCat 登录失败',
-          errorMsg,
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red.withValues(alpha: 0.8),
-          colorText: Colors.white,
-          duration: const Duration(seconds: 5),
-        );
-
-        // 不取消订阅，允许用户重新扫码
-      }
+      napcatController.handleNapcatOutput(event);
+      _checkAndNavigateToWebview();
     });
   }
 
@@ -379,7 +248,7 @@ class HomeController extends GetxController {
         if (content.contains('Napcat ${S.current.installed}')) {
           napcatTerminal?.writeString('$command\n');
           bumpProgress();
-          Log.i('检测到 Napcat 已安装，启动 NapCat 终端',  'MaiBot');
+          Log.i('检测到 Napcat 已安装，启动 NapCat 终端', 'MaiBot');
         }
 
         // 当进度到达 "MaiBot Core 配置中" 时，清除终端
@@ -387,7 +256,7 @@ class HomeController extends GetxController {
           // 清除终端先前显示的所有文本
           terminal.buffer.clear();
           terminal.buffer.setCursor(0, 0);
-          Log.i('检测到 MaiBot Core 配置中，清除终端内容',  'MaiBot');
+          Log.i('检测到 MaiBot Core 配置中，清除终端内容', 'MaiBot');
         }
 
         update();
@@ -498,15 +367,16 @@ class HomeController extends GetxController {
         '${RuntimeEnvir.homePath}/${Config.ubuntuFileName}');
     await AssetsUtils.copyAssetToPath('assets/maibot-startup.sh',
         '${RuntimeEnvir.homePath}/maibot-startup.sh');
-    await AssetsUtils.copyAssetToPath('assets/config.toml',
-        '${RuntimeEnvir.homePath}/config.toml');
+    await AssetsUtils.copyAssetToPath(
+        'assets/config.toml', '${RuntimeEnvir.homePath}/config.toml');
     bumpProgress();
 
     // 获取当前应用版本号
     final appVersion = await getAppVersion();
 
     // 替换 maibot-startup.sh 中的版本号占位符
-    final startupScriptFile = File('${RuntimeEnvir.homePath}/maibot-startup.sh');
+    final startupScriptFile =
+        File('${RuntimeEnvir.homePath}/maibot-startup.sh');
     if (await startupScriptFile.exists()) {
       String scriptContent = await startupScriptFile.readAsString();
       scriptContent = scriptContent.replaceAll('{{VERSION}}', appVersion);
@@ -538,16 +408,11 @@ class HomeController extends GetxController {
     // 初始化终端标签页管理器
     terminalTabManager = TerminalTabManager();
 
-    // 初始化 NapCat WebUI 启用状态
-    napCatWebUiEnabledRx.value = napCatWebUiEnabled.get() ?? false;
 
     // 初始化隐藏最近活动状态
     if (hideFromRecents.get() == true) {
       setHideFromRecents(true);
     }
-
-    // 从持久化存储加载自定义 WebView 列表
-    _loadCustomWebViews();
 
     // 为 Google Play 上架做准备
     // For Google Play
@@ -577,11 +442,10 @@ class HomeController extends GetxController {
         onResume: () {
           _isAppInForeground = true;
           // 当应用回到前台且两个条件都满足但webview未打开时，打开webview
-          if (_isLocalhostDetected && _isQrcodeProcessed && !webviewHasOpen) {
-            Future.microtask(() {
-              Get.toNamed(AppRoutes.webview);
-              webviewHasOpen = true;
-            });
+          if (_isLocalhostDetected &&
+              napcatController.isQrcodeProcessed &&
+              !webviewController.webviewHasOpen) {
+            webviewController.navigateToWebview();
           }
         },
         onPause: () {
@@ -591,131 +455,19 @@ class HomeController extends GetxController {
     );
   }
 
-  // 加载自定义 WebView 列表
-  void _loadCustomWebViews() {
-    final stored = box!.get('custom_webviews', defaultValue: <dynamic>[]);
-    if (stored is List) {
-      customWebViews.value = stored.map((e) {
-        if (e is Map) {
-          return {
-            'title': e['title']?.toString() ?? '',
-            'url': e['url']?.toString() ?? '',
-          };
-        }
-        return <String, String>{};
-      }).toList();
-    }
-  }
-
-  // 保存自定义 WebView 列表
-  void _saveCustomWebViews() {
-    box!.put('custom_webviews', customWebViews.toList());
-  }
-
-  // 添加自定义 WebView
-  void addCustomWebView(String title, String url) {
-    customWebViews.add({'title': title, 'url': url});
-    _saveCustomWebViews();
-  }
-
-  // 删除自定义 WebView
-  void removeCustomWebView(int index) {
-    if (index >= 0 && index < customWebViews.length) {
-      customWebViews.removeAt(index);
-      _saveCustomWebViews();
-    }
-  }
-
-  // 更新自定义 WebView
-  void updateCustomWebView(int index, String title, String url) {
-    if (index >= 0 && index < customWebViews.length) {
-      customWebViews[index] = {'title': title, 'url': url};
-      _saveCustomWebViews();
-    }
-  }
-
-  // 检测登录并询问是否保存QQ
-  void _checkAndPromptSaveQQ() async {
-    try {
-      final String configPath = '$ubuntuPath/root/napcat/config';
-      final Directory configDir = Directory(configPath);
-      if (!configDir.existsSync()) return;
-
-      // 扫描 onebot11_QQ.json 文件
-      final List<FileSystemEntity> files = configDir.listSync();
-      String? loggedInQQ;
-
-      for (var file in files) {
-        final String fileName = file.path.split(Platform.pathSeparator).last;
-        if (fileName.startsWith('onebot11_') && fileName.endsWith('.json')) {
-          loggedInQQ = fileName.substring('onebot11_'.length, fileName.length - '.json'.length);
-          // 确保是纯数字QQ号
-          if (RegExp(r'^\d+$').hasMatch(loggedInQQ)) {
-            break;
-          } else {
-            loggedInQQ = null;
-          }
-        }
-      }
-
-      if (loggedInQQ == null || loggedInQQ.isEmpty) return;
-
-      // 读取 webui.json
-      final File webuiFile = File('$configPath/webui.json');
-      if (!webuiFile.existsSync()) return;
-
-      final Map<String, dynamic> webuiConfig = jsonDecode(await webuiFile.readAsString());
-      final String currentQQ = webuiConfig['autoLoginAccount']?.toString() ?? '';
-
-      if (currentQQ.isEmpty) {
-        // 弹出对话框询问
-        Get.dialog(
-          AlertDialog(
-            title: const Text('快速登录设置'),
-            content: Text('检测到您已登录 QQ: $loggedInQQ\n是否将其保存为快速登录账号？\n设置后下次启动将免扫码自动登录。'),
-            actions: [
-              TextButton(
-                onPressed: () => Get.back(),
-                child: const Text('取消'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  webuiConfig['autoLoginAccount'] = loggedInQQ;
-                  await webuiFile.writeAsString(
-                    const JsonEncoder.withIndent('    ').convert(webuiConfig),
-                  );
-                  Get.back();
-                  Get.snackbar('保存成功', '已将 $loggedInQQ 设置为快速登录账号',
-                      snackPosition: SnackPosition.BOTTOM);
-                },
-                child: const Text('保存'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      Log.e('检测登录账号失败: $e',  'MaiBot');
-    }
-  }
-
-  // 更新 NapCat WebUI 启用状态（用于同步响应式变量）
-  void setNapCatWebUiEnabled(bool value) {
-    napCatWebUiEnabled.set(value);
-    napCatWebUiEnabledRx.value = value;
-  }
-
   // 彻底清理可能的残留进程
   void _cleanupZombieProcesses() {
-    Log.i('清理残留进程...',  'MaiBot');
+    Log.i('清理残留进程...', 'MaiBot');
     try {
       // 通过 pkill -P 杀死应用启动的所有子进程，避免 killall 误杀其他应用（如 Termux）的进程
       // 获取当前应用进程 ID
       final myPid = pid;
-      
+
       // 使用 busybox pkill 杀死当前进程的所有子进程和进程组
-      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['pkill', '-P', myPid.toString()]);
-      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['pkill', '-g', myPid.toString()]);
+      Process.runSync(
+          '${RuntimeEnvir.binPath}/busybox', ['pkill', '-P', myPid.toString()]);
+      Process.runSync(
+          '${RuntimeEnvir.binPath}/busybox', ['pkill', '-g', myPid.toString()]);
     } catch (e) {
       // 忽略错误
     }
@@ -728,7 +480,7 @@ class HomeController extends GetxController {
       const channel = MethodChannel('maibot_channel');
       await channel.invokeMethod('hide_from_recents', {'hide': value});
     } catch (e) {
-      Log.e('设置从最近活动隐藏失败: $e',  'MaiBot');
+      Log.e('设置从最近活动隐藏失败: $e', 'MaiBot');
     }
   }
 
@@ -743,19 +495,19 @@ class HomeController extends GetxController {
     // 杀死所有终端进程，释放端口
     try {
       if (pseudoTerminal != null) {
-        Log.i('正在关闭主终端进程...',  'MaiBot');
+        Log.i('正在关闭主终端进程...', 'MaiBot');
         pseudoTerminal?.kill();
         pseudoTerminal = null;
       }
       if (napcatTerminal != null) {
-        Log.i('正在关闭 NapCat 终端进程...',  'MaiBot-Napcat');
+        Log.i('正在关闭 NapCat 终端进程...', 'MaiBot-Napcat');
         napcatTerminal?.kill();
         napcatTerminal = null;
       }
       // 彻底清理可能的残留进程
       _cleanupZombieProcesses();
     } catch (e) {
-      Log.e('关闭终端进程时出错: $e',  'MaiBot');
+      Log.e('关闭终端进程时出错: $e', 'MaiBot');
     }
 
     // 移除生命周期观察者

@@ -534,7 +534,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 url = 'http://127.0.0.1:$url';
               }
 
-              homeController.addCustomWebView(title, url);
+              homeController.webviewController.addCustomWebView(title, url);
               Get.back();
 
               Get.snackbar(
@@ -613,7 +613,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 url = 'http://127.0.0.1:$url';
               }
 
-              homeController.updateCustomWebView(index, title, url);
+              homeController.webviewController.updateCustomWebView(index, title, url);
               Get.back();
 
               Get.snackbar(
@@ -640,7 +640,7 @@ class _SettingsPageState extends State<SettingsPage> {
           TextButton(onPressed: () => Get.back(), child: const Text('取消')),
           TextButton(
             onPressed: () {
-              homeController.removeCustomWebView(index);
+              homeController.webviewController.removeCustomWebView(index);
               Get.back();
 
               Get.snackbar(
@@ -1274,7 +1274,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // 2秒后自动退出应用
                   Future.delayed(const Duration(seconds: 2), () {
-                    exit(0);
+                    SystemNavigator.pop();
                   });
                 }
               } catch (e) {
@@ -1338,7 +1338,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // 2秒后自动退出应用
                   Future.delayed(const Duration(seconds: 2), () {
-                    exit(0);
+                    SystemNavigator.pop();
                   });
                 }
               } catch (e) {
@@ -1459,7 +1459,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // 等待提示显示后退出应用
                   await Future.delayed(const Duration(seconds: 2));
-                  exit(0);
+                  SystemNavigator.pop();
                 } else {
                   Get.snackbar(
                     '提示',
@@ -1527,7 +1527,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // 等待提示显示后退出应用
                   await Future.delayed(const Duration(seconds: 2));
-                  exit(0);
+                  SystemNavigator.pop();
                 } else {
                   Get.snackbar(
                     '提示',
@@ -1577,7 +1577,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         Obx(() {
-          final customWebViews = homeController.customWebViews;
+          final customWebViews = homeController.webviewController.customWebViews;
           if (customWebViews.isEmpty) {
             return const Padding(
               padding: EdgeInsets.all(16.0),
@@ -1656,10 +1656,10 @@ class _SettingsPageState extends State<SettingsPage> {
           title: const Text('NapCat WebUI'),
           subtitle: const Text('显示或隐藏 NapCat 网页控制面板（默认隐藏）'),
           trailing: Switch(
-            value: homeController.napCatWebUiEnabled.get() ?? false,
+            value: homeController.napcatController.napCatWebUiEnabled.get() ?? false,
             onChanged: (bool value) {
               // 使用新的方法来同步更新响应式变量
-              homeController.setNapCatWebUiEnabled(value);
+              homeController.napcatController.setNapCatWebUiEnabled(value);
 
               Get.snackbar(
                 value ? 'WebUI 已启用' : 'WebUI 已禁用',
@@ -1683,7 +1683,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         Obx(() {
-          final token = homeController.napCatWebUiToken.value;
+          final token = homeController.napcatController.napCatWebUiToken.value;
           return ListTile(
             leading: const Icon(Icons.vpn_key),
             title: const Text('NapCat 登录 token'),
@@ -1702,7 +1702,7 @@ class _SettingsPageState extends State<SettingsPage> {
           );
         }),
         Obx(() {
-          final token = homeController.maiBotWebUiToken.value;
+          final token = homeController.napcatController.maiBotWebUiToken.value;
           return ListTile(
             leading: const Icon(Icons.key),
             title: const Text('MaiBot 登录 token'),
@@ -1877,7 +1877,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
               // 2秒后自动退出应用
               Future.delayed(const Duration(seconds: 2), () {
-                exit(0);
+                SystemNavigator.pop();
               });
             }
           },

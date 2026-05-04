@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -38,7 +39,7 @@ class _WebViewPageState extends State<WebViewPage> {
     _initNapCatController();
 
     // 监听自定义 WebView 列表变化,清理已删除的控制器
-    ever(homeController.customWebViews, (List<Map<String, String>> webviews) {
+    ever(homeController.webviewController.customWebViews, (List<Map<String, String>> webviews) {
       // 清理不再存在的控制器
       final validUrls = webviews.map((wv) => wv['url'] ?? '').toSet();
       final controllersToRemove = _customControllers.keys.where((key) => !validUrls.contains(key)).toList();
@@ -156,7 +157,9 @@ class _WebViewPageState extends State<WebViewPage> {
       ..loadRequest(Uri.parse('http://127.0.0.1:8001'));
 
     if (_maiBotController.platform is AndroidWebViewController) {
-      AndroidWebViewController.enableDebugging(true);
+      if (kDebugMode) {
+        AndroidWebViewController.enableDebugging(true);
+      }
       final androidController = _maiBotController.platform as AndroidWebViewController;
       androidController
           .setMediaPlaybackRequiresUserGesture(false);
@@ -208,7 +211,7 @@ class _WebViewPageState extends State<WebViewPage> {
       );
 
     // 监听 Token 变化
-    ever(homeController.napCatWebUiToken, (String token) {
+    ever(homeController.napcatController.napCatWebUiToken, (String token) {
       if (token.isNotEmpty) {
         final url = 'http://127.0.0.1:6099/webui?token=$token';
         _napCatController.loadRequest(Uri.parse(url));
@@ -216,8 +219,8 @@ class _WebViewPageState extends State<WebViewPage> {
     });
 
     // 初始加载
-    if (homeController.napCatWebUiToken.isNotEmpty) {
-      final url = 'http://127.0.0.1:6099/webui?token=${homeController.napCatWebUiToken.value}';
+    if (homeController.napcatController.napCatWebUiToken.isNotEmpty) {
+      final url = 'http://127.0.0.1:6099/webui?token=${homeController.napcatController.napCatWebUiToken.value}';
       _napCatController.loadRequest(Uri.parse(url));
     } else {
       _napCatController.loadRequest(Uri.parse('http://127.0.0.1:6099/webui'));
@@ -471,8 +474,8 @@ class _WebViewPageState extends State<WebViewPage> {
 
     return Obx(() {
       // 检查 NapCat WebUI 是否启用
-      final bool napCatEnabled = homeController.napCatWebUiEnabledRx.value;
-      final customWebViews = homeController.customWebViews;
+      final bool napCatEnabled = homeController.napcatController.napCatWebUiEnabledRx.value;
+      final customWebViews = homeController.webviewController.customWebViews;
 
       // 动态构建页面列表
       final List<Widget> pages = [
