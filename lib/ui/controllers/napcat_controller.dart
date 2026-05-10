@@ -138,9 +138,10 @@ class NapcatController extends GetxController {
   }
   
   void handleMaibotOutput(String event) {
-    if (event.contains('WebUI Access Token:')) {
+    // 适配新版日志：🔑 WebUI 登录 Token: ...
+    if (event.contains('WebUI 登录 Token:')) {
         final match =
-            RegExp(r'WebUI Access Token:\s+([a-f0-9]+)').firstMatch(event);
+            RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)').firstMatch(event);
         if (match != null) {
           final token = match.group(1);
           if (token != null) {
