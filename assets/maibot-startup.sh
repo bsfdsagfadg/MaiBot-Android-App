@@ -1,6 +1,7 @@
 #!/bin/bash
 
 MAIBOT_APP_VERSION="{{VERSION}}"
+export UV_LINK_MODE=copy
 
 # 自定义 Git Clone 命令（为空时使用默认逻辑）
 CUSTOM_GIT_CLONE=""
@@ -268,7 +269,7 @@ install_maibot(){
     progress_echo "安装适配器插件..."
     mkdir -p "$INSTALL_DIR/plugins"
     network_test
-    if ! git clone --depth=1 --branch plugin ${target_proxy:+${target_proxy}/}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git "$ADAPTER_DIR"; then
+    if ! git clone --depth=1 --branch main ${target_proxy:+${target_proxy}/}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git "$ADAPTER_DIR"; then
       echo "适配器插件克隆失败"
       exit 1
     fi

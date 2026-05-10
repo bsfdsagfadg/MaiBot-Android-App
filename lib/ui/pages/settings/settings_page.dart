@@ -1274,7 +1274,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // 2秒后自动退出应用
                   Future.delayed(const Duration(seconds: 2), () {
-                    SystemNavigator.pop();
+                    exit(0);
                   });
                 }
               } catch (e) {
@@ -1338,7 +1338,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // 2秒后自动退出应用
                   Future.delayed(const Duration(seconds: 2), () {
-                    SystemNavigator.pop();
+                    exit(0);
                   });
                 }
               } catch (e) {
@@ -1459,7 +1459,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // 等待提示显示后退出应用
                   await Future.delayed(const Duration(seconds: 2));
-                  SystemNavigator.pop();
+                  exit(0);
                 } else {
                   Get.snackbar(
                     '提示',
@@ -1527,7 +1527,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // 等待提示显示后退出应用
                   await Future.delayed(const Duration(seconds: 2));
-                  SystemNavigator.pop();
+                  exit(0);
                 } else {
                   Get.snackbar(
                     '提示',
@@ -1877,7 +1877,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
               // 2秒后自动退出应用
               Future.delayed(const Duration(seconds: 2), () {
-                SystemNavigator.pop();
+                exit(0);
               });
             }
           },

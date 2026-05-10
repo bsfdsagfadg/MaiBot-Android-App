@@ -492,6 +492,7 @@ login_ubuntu(){
       LANG=en_US.UTF-8 \
       TZ="$ANDROID_TZ" \
       PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+UV_LINK_MODE=copy \
       COMMAND_TO_EXEC="$COMMAND_TO_EXEC" \
       /bin/bash -lc "eval \"\$COMMAND_TO_EXEC\""
 }
