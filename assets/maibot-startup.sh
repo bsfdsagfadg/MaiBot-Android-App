@@ -173,11 +173,16 @@ install_napcat(){
       mkdir -p "$HOME/napcat/config"
       cp -r "$HOME/napcat_config_backup"/* "$HOME/napcat/config/"
       rm -rf "$HOME/napcat_config_backup"
+    elif [ "$BACKUP_HAS_NAPCAT_CONFIG" -eq 1 ]; then
+      echo "检测到备份，正在恢复备份的 NapCat 配置..."
+      mkdir -p "$HOME/napcat/config"
+      cp -r "$TMPDIR/backup_restore/napcat/config"/* "$HOME/napcat/config/"
     fi
     
-  # 写入 onebot11.json 默认配置文件
-  if [ ! -f "$HOME/napcat/config/onebot11.json" ]; then
+  # 写入 onebot11.json 默认配置文件 (如果 napcat/config 目录为空或不存在才写入默认值)
+  if [ ! -d "$HOME/napcat/config" ] || [ -z "$(ls -A "$HOME/napcat/config" 2>/dev/null)" ]; then
     echo "写入 onebot11.json 默认配置文件"
+    mkdir -p "$HOME/napcat/config"
     cat > "$HOME/napcat/config/onebot11.json" <<'EOF'
 {
   "network": {
@@ -263,56 +268,52 @@ install_maibot(){
     progress_echo "MaiBot $L_INSTALLED"
   fi
 
-  # 适配器作为插件安装
+  # --- 插件安装逻辑 (事务和备份合并) ---
   local ADAPTER_DIR="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter"
-  if [ ! -d "$ADAPTER_DIR" ]; then
-    progress_echo "安装适配器插件..."
+  
+  # 判断：如果备份中含有自定义插件，我们将这些插件覆盖复制进去，并且不安装默认适配器
+  if [ "$BACKUP_HAS_MAIBOT_PLUGINS" -eq 1 ]; then
+    echo "检测到备份中包含插件，正在恢复备份的插件目录..."
     mkdir -p "$INSTALL_DIR/plugins"
-    network_test
-    if ! git clone --depth=1 --branch main ${target_proxy:+${target_proxy}/}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git "$ADAPTER_DIR"; then
-      echo "适配器插件克隆失败"
-      exit 1
+    cp -r "$TMPDIR/backup_restore/MaiBot/plugins"/* "$INSTALL_DIR/plugins/"
+    echo "插件恢复完成，跳过安装默认适配器"
+  else
+    # 如果没有备份插件，才进行默认适配器的下载
+    if [ ! -d "$ADAPTER_DIR" ]; then
+      progress_echo "安装默认适配器插件..."
+      mkdir -p "$INSTALL_DIR/plugins"
+      network_test
+      if ! git clone --depth=1 --branch main ${target_proxy:+${target_proxy}/}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git "$ADAPTER_DIR"; then
+        echo "适配器插件克隆失败"
+        exit 1
+      fi
+      # 刚克隆下来删掉默认配置
+      rm -f "$ADAPTER_DIR/config.toml"
     fi
-    # 刚克隆下来删掉默认配置
-    rm -f "$ADAPTER_DIR/config.toml"
   fi
 
   progress_echo "MaiBot 初始化中"
   cd "$INSTALL_DIR"
 
-  local BACKUP_DIR="/sdcard/Download/MaiBot"
-
+  # --- 数据恢复逻辑 ---
   if [ ! -d "$INSTALL_DIR/data" ]; then
     echo "检测到 data 目录不存在，初始化数据目录..."
-    mkdir "$INSTALL_DIR/data"
+    mkdir -p "$INSTALL_DIR/data"
     
-    # 检查并恢复最新备份
-    if [ -d "$BACKUP_DIR" ]; then
-      echo "扫描备份目录: $BACKUP_DIR"
-      
-      # 查找普通数据备份
-      LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/MaiBot-backup-*.tar.gz 2>/dev/null | head -n 1)
-      
-      if [ -n "$LATEST_BACKUP" ]; then
-        echo "找到备份文件: $LATEST_BACKUP"
-        echo "恢复 MaiBot 数据备份..."
-        
-        # 解压备份到 data 目录 (由于备份是 -C root/MaiBot data 打包的，解压到 INSTALL_DIR)
-        if tar -xzf "$LATEST_BACKUP" -C "$INSTALL_DIR"; then
-          echo "备份恢复成功"
-          echo "MaiBot 数据已从备份恢复"
-          REINSTALL_PLUGINS_FLAG=1  # 备份恢复成功，需要重装插件依赖
-        else
-          echo "备份恢复失败"
-        fi
-      else
-        echo "未找到备份文件"
-      fi
-    else
-      echo "备份目录不存在"
+    if [ "$BACKUP_HAS_MAIBOT_DATA" -eq 1 ]; then
+      echo "从备份中恢复 MaiBot 数据..."
+      cp -r "$TMPDIR/backup_restore/MaiBot/data"/* "$INSTALL_DIR/data/"
+      REINSTALL_PLUGINS_FLAG=1  # 恢复成功，标记需要重装插件依赖
     fi
     
     rm -rf "$INSTALL_DIR/.venv"
+  fi
+
+  # --- 额外的配置目录恢复逻辑 ---
+  if [ -d "$TMPDIR/backup_restore/MaiBot/config" ] && [ -n "$(ls -A "$TMPDIR/backup_restore/MaiBot/config" 2>/dev/null)" ]; then
+    echo "从备份中恢复 MaiBot 配置目录..."
+    mkdir -p "$INSTALL_DIR/config"
+    cp -r "$TMPDIR/backup_restore/MaiBot/config"/* "$INSTALL_DIR/config/"
   fi
 
   if [ ! -d "$INSTALL_DIR/.venv" ]; then
@@ -361,12 +362,16 @@ install_maibot(){
   # 启动 MaiBot Core (自动处理配置生成)
   progress_echo "MaiBot Core 配置中"
   
-  # 拷贝适配器插件配置 (判断文件不存在才复制)
+  # 拷贝适配器插件配置 (仅在未使用备份插件，且目标配置不存在时复制)
   local TARGET_CONFIG="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter/config.toml"
-  if [ -f "/root/config.toml" ] && [ ! -f "$TARGET_CONFIG" ]; then
-    echo "正在拷贝适配器插件配置..."
-    mkdir -p "$(dirname "$TARGET_CONFIG")"
-    cp /root/config.toml "$TARGET_CONFIG"
+  if [ "$BACKUP_HAS_MAIBOT_PLUGINS" -eq 0 ]; then
+    if [ -f "/root/config.toml" ] && [ ! -f "$TARGET_CONFIG" ]; then
+      echo "正在拷贝适配器插件配置..."
+      mkdir -p "$(dirname "$TARGET_CONFIG")"
+      cp /root/config.toml "$TARGET_CONFIG"
+    fi
+  else
+    echo "检测到备份插件，跳过默认适配器配置拷贝"
   fi
 
   cd "$INSTALL_DIR"
@@ -394,10 +399,70 @@ install_maibot(){
   done
 }
 
+# 声明全局事务状态标记
+BACKUP_HAS_NAPCAT_CONFIG=0
+BACKUP_HAS_MAIBOT_DATA=0
+BACKUP_HAS_MAIBOT_PLUGINS=0
+
+# 备份预先解压与资产检验函数
+stage_and_restore_backup(){
+  local BACKUP_DIR="/sdcard/Download/MaiBot"
+  local TEMP_RESTORE="$TMPDIR/backup_restore"
+  local DATA_DIR="$HOME/MaiBot/data"
+  
+  rm -rf "$TEMP_RESTORE"
+  
+  # 如果目前还没有主数据目录，则表明是全新初始化/清除数据，尝试从备份恢复
+  if [ ! -d "$DATA_DIR" ]; then
+    echo "检测到 data 目录不存在，准备扫描并解析备份..."
+    if [ -d "$BACKUP_DIR" ]; then
+      LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/MaiBot-backup-*.tar.gz 2>/dev/null | head -n 1)
+      if [ -n "$LATEST_BACKUP" ]; then
+        echo "找到备份文件: $LATEST_BACKUP"
+        echo "正在将备份解压至临时目录..."
+        mkdir -p "$TEMP_RESTORE"
+        
+        if tar -xzf "$LATEST_BACKUP" -C "$TEMP_RESTORE"; then
+          echo "备份解压完成，开始内容分析..."
+          
+          # 1. 检查 NapCat 配置文件
+          if [ -d "$TEMP_RESTORE/napcat/config" ] && [ -n "$(ls -A "$TEMP_RESTORE/napcat/config" 2>/dev/null)" ]; then
+            BACKUP_HAS_NAPCAT_CONFIG=1
+            echo "✓ 备份检验：包含有效的 NapCat 配置文件"
+          fi
+          
+          # 2. 检查 MaiBot 主运行数据
+          if [ -d "$TEMP_RESTORE/MaiBot/data" ] && [ -n "$(ls -A "$TEMP_RESTORE/MaiBot/data" 2>/dev/null)" ]; then
+            BACKUP_HAS_MAIBOT_DATA=1
+            echo "✓ 备份检验：包含有效的 MaiBot 数据文件"
+          fi
+          
+          # 3. 检查 plugins 目录
+          # 通过查找子文件夹（不限制是否为空），判断用户在备份中是否定制了插件（包含默认测试插件等）
+          if [ -d "$TEMP_RESTORE/MaiBot/plugins" ] && [ -n "$(find "$TEMP_RESTORE/MaiBot/plugins" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)" ]; then
+            BACKUP_HAS_MAIBOT_PLUGINS=1
+            echo "✓ 备份检验：包含自定义插件目录"
+          fi
+        else
+          echo "警告：备份解压失败"
+        fi
+      else
+        echo "未找到备份文件，将进行全新初始化"
+      fi
+    else
+      echo "备份存放路径不存在，将进行全新初始化"
+    fi
+  fi
+}
+
 install_sudo_curl_git
 bump_progress
 install_uv
 bump_progress
+stage_and_restore_backup
 install_napcat
 bump_progress
 install_maibot
+
+# 整体安装完后，清理备份临时解压目录
+rm -rf "$TMPDIR/backup_restore"

@@ -721,15 +721,30 @@ class _SettingsPageState extends State<SettingsPage> {
         return false;
       }
 
-      // 执行备份命令
+      // 确保备份的其他目标文件夹都存在，避免 tar 报错
+      final List<String> pathsToCreate = [
+        '${scripts.ubuntuPath}/root/MaiBot/config',
+        '${scripts.ubuntuPath}/root/MaiBot/plugins',
+        '${scripts.ubuntuPath}/root/napcat/config',
+      ];
+      for (final path in pathsToCreate) {
+        final dir = Directory(path);
+        if (!await dir.exists()) {
+          await dir.create(recursive: true);
+        }
+      }
+
+      // 执行备份命令，工作目录设为 /root
       final result = await Process.run('${RuntimeEnvir.binPath}/busybox', [
         'tar',
         '-czf',
         backupPath,
         '-C',
-        '${scripts.ubuntuPath}/root/MaiBot',
-        'data',
-        'config',
+        '${scripts.ubuntuPath}/root',
+        'MaiBot/data',
+        'MaiBot/config',
+        'MaiBot/plugins',
+        'napcat/config',
       ]);
 
       if (result.exitCode == 0) {
