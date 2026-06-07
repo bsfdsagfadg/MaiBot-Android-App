@@ -168,6 +168,15 @@ class HomeController extends GetxController {
         }
       }
 
+      // 将输出同时写入给前端展示的 NapCat 终端
+      napcatShowTerminal.write(event);
+      
+      // 避免缓冲区过载
+      if (napcatShowTerminal.buffer.lines.length >= 5000) {
+        napcatShowTerminal.buffer.clear();
+        napcatShowTerminal.buffer.setCursor(0, 0);
+      }
+
       napcatController.handleNapcatOutput(event);
       _checkAndNavigateToWebview();
     });
@@ -362,10 +371,19 @@ class HomeController extends GetxController {
     await initEnvir();
     createBusyboxLink();
 
-    // 创建终端
+    // 创建终端并初始化
     pseudoTerminal =
         createPTY(rows: terminal.viewHeight, columns: terminal.viewWidth);
-    napcatTerminal = createPTY();
+    napcatTerminal = 
+        createPTY(rows: napcatShowTerminal.viewHeight, columns: napcatShowTerminal.viewWidth);
+
+    // 绑定 napcat 终端的数据通道，使其能够接受用户键盘输入和动态改变大小
+    napcatShowTerminal.onResize = (width, height, pixelWidth, pixelHeight) {
+      napcatTerminal?.resize(height, width);
+    };
+    napcatShowTerminal.onOutput = (data) {
+      napcatTerminal?.writeString(data);
+    };
 
     setProgress('复制 Ubuntu 系统镜像...');
     await AssetsUtils.copyAssetToPath('assets/${Config.ubuntuFileName}',
@@ -404,6 +422,10 @@ class HomeController extends GetxController {
     setProgress('开始安装 MaiBot...');
     pseudoTerminal.writeString(
         'source ${RuntimeEnvir.homePath}/common.sh\nstart_maibot\n');
+    
+    // 同时让 Napcat 终端做好准备，直接载入并启动
+    napcatTerminal?.writeString(
+        'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash /root/launcher.sh"\n');
   }
 
   @override
