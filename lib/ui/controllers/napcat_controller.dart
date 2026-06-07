@@ -32,6 +32,17 @@ class NapcatController extends GetxController {
   }
 
   void handleNapcatOutput(String event) async {
+    // 检测自动快速登录成功
+    if (event.contains('自动快速登录成功')) {
+      isQrcodeProcessed = true;
+      if (_qrcodeShowing.value && _qrcodeDialog != null) {
+        Get.back();
+        _isQrcodeShowing.value = false;
+        _qrcodeDialog = null;
+      }
+      Log.i('检测到 NapCat 自动快速登录成功，准备进入主页面...', 'MaiBot');
+    }
+
     // 捕获 NapCat WebUI Token
     if (event.contains('WebUi Token:')) {
       final match = RegExp(r'WebUi Token:\s+(\w+)').firstMatch(event);
