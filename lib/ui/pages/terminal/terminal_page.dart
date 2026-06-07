@@ -45,13 +45,11 @@ class _TerminalPageState extends State<TerminalPage> {
                   // IgnorePointer
                   child: AbsorbPointer(
                     absorbing: false,
-                    child: RepaintBoundary(
-                      child: TerminalView(
-                        controller.terminal,
-                        readOnly: false,
-                        backgroundOpacity: 1,
-                        theme: ManjaroTerminalTheme(),
-                      ),
+                    child: TerminalView(
+                      controller.terminal,
+                      readOnly: false,
+                      backgroundOpacity: 1,
+                      theme: ManjaroTerminalTheme(),
                     ),
                   ),
                 ),
@@ -69,12 +67,10 @@ class _TerminalPageState extends State<TerminalPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Center(
-                            child: RepaintBoundary(
-                              child: LoadingProgress(
-                                minRadius: 6,
-                                strokeWidth: 3,
-                                increaseRadius: 3,
-                              ),
+                            child: LoadingProgress(
+                              minRadius: 6,
+                              strokeWidth: 3,
+                              increaseRadius: 3,
                             ),
                           ),
                           SizedBox(height: w(12)),

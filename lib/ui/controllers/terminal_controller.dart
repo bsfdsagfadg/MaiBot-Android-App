@@ -68,8 +68,7 @@ class HomeController extends GetxController {
     } catch (e) {
       progressFile.writeAsStringSync('1');
     }
-    // 使用 microtask 延迟更新，减少渲染压力
-    Future.microtask(() => update());
+    update();
   }
 
   // 使用 login_ubuntu 函数，传入要执行的命令
