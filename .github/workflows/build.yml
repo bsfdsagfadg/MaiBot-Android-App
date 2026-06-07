@@ -3,8 +3,14 @@ name: Build Android APK
 on:
   push:
     branches:
-      - master  # 当推送到 master 分支时触发
+      - master  # 当推送到 master 分支时触发构建
+    tags:
+      - '*'     # 关键修复：当推送任意格式的 tag 时触发构建，否则原工作流在推 tag 时不会执行
   workflow_dispatch: # 允许手动触发构建
+
+# 关键修复：显式声明写入权限，现代 GitHub Actions 在创建 Release 时必须拥有 contents: write 权限
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -15,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # 如果你有子模块，递归检出
+          submodules: recursive # 如果有子模块，递归检出
 
       # 2. 设置 Java 环境 (Flutter Android 构建需要 Java 17)
       - name: Set up JDK 17
@@ -36,11 +42,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # 5. (可选) 检查代码格式
-      # - name: Check formatting
-      #   run: flutter format --set-exit-if-changed .
-
-      # 6. 准备签名文件
+      # 5. 准备签名文件
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.jks
@@ -49,27 +51,31 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
 
-      # 7. 构建 APK
+      # 6. 构建 APK
       - name: Build APK
         run: flutter build apk --release
 
-      # 8. 重命名 APK (方便识别)
+      # 7. 重命名 APK (方便识别)
       - name: Rename APK
         run: |
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/MaiBot-Android-release.apk
 
-      # 9. 上传构建产物到 GitHub Actions 页面的 Artifacts
+      # 8. 上传构建产物到 GitHub Actions 页面的 Artifacts
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MaiBot-Android-APK
           path: build/app/outputs/flutter-apk/MaiBot-Android-release.apk
 
-      # 10. 如果是推送 Tag，则自动发布到 Release
+      # 9. 自动发布到 Release
       - name: Release APK
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: build/app/outputs/flutter-apk/MaiBot-Android-release.apk
+          name: "MaiBot Android ${{ github.ref_name }}"
+          generate_release_notes: true  # 核心优化：自动根据两次 Tag 之间的 Commit 记录生成更新简介，无需手动编写
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
