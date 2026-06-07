@@ -35,7 +35,7 @@ class NapcatController extends GetxController {
     // 检测自动快速登录成功
     if (event.contains('自动快速登录成功')) {
       isQrcodeProcessed = true;
-      if (_qrcodeShowing.value && _qrcodeDialog != null) {
+      if (_isQrcodeShowing.value && _qrcodeDialog != null) {
         Get.back();
         _isQrcodeShowing.value = false;
         _qrcodeDialog = null;
