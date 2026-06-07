@@ -39,22 +39,33 @@ class TerminalTabManager extends GetxController {
   // 当前激活的标签页索引
   final RxInt activeTabIndex = 0.obs;
 
-  /// 初始化固定的MaiBot终端标签页
-  void initializeFixedTab(Terminal terminal) {
+  /// 初始化固定的终端标签页
+  void initializeFixedTabs(Terminal maibotTerminal, Terminal napcatTerminal) {
     // 清空现有标签页
     tabs.clear();
 
     // 添加固定的MaiBot终端标签页
-    final fixedTab = TerminalTab(
+    final maibotTab = TerminalTab(
       id: 'fixed_maibot',
       title: 'MaiBot',
       type: TerminalTabType.fixed,
-      terminal: terminal,
+      terminal: maibotTerminal,
       pty: null, // 固定终端使用外部管理的 pseudoTerminal
       isActive: true,
     );
 
-    tabs.add(fixedTab);
+    // 添加固定的NapCat终端标签页
+    final napcatTab = TerminalTab(
+      id: 'fixed_napcat',
+      title: 'NapCat',
+      type: TerminalTabType.fixed,
+      terminal: napcatTerminal,
+      pty: null, // 固定终端使用外部管理的 napcatTerminal
+      isActive: false,
+    );
+
+    tabs.add(maibotTab);
+    tabs.add(napcatTab);
     activeTabIndex.value = 0;
   }
 

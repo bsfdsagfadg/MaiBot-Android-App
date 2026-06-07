@@ -120,8 +120,8 @@ class HomeController extends GetxController {
 
       napcatController.handleMaibotOutput(event);
 
-      // 检查是否包含 MaiBot 全部系统初始化完成的标志
-      if (event.contains('全部系统初始化完成')) {
+      // 检查是否包含 MaiBot 启动完成的标志
+      if (event.contains('访问地址:')) {
         _isLocalhostDetected = true;
         bumpProgress();
 
@@ -459,7 +459,7 @@ class HomeController extends GetxController {
       // 在终端创建完成后初始化固定标签页
       // 等待terminal创建完成
       Future.delayed(const Duration(milliseconds: 500), () {
-        terminalTabManager.initializeFixedTab(terminal);
+        terminalTabManager.initializeFixedTabs(terminal, napcatShowTerminal);
       });
     });
 
