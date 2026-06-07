@@ -422,10 +422,6 @@ class HomeController extends GetxController {
     setProgress('开始安装 MaiBot...');
     pseudoTerminal.writeString(
         'source ${RuntimeEnvir.homePath}/common.sh\nstart_maibot\n');
-    
-    // 同时让 Napcat 终端做好准备，直接载入并启动
-    napcatTerminal?.writeString(
-        'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash /root/launcher.sh"\n');
   }
 
   @override
