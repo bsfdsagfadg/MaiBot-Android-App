@@ -370,8 +370,19 @@ install_maibot(){
   fi
 
   cd "$INSTALL_DIR"
-  export EULA_AGREE="1b662741904d7155d1ce1c00b3530d0d"
-  export PRIVACY_AGREE="9943b855e72199d0f5016ea39052f1b6"
+  
+  # 动态计算 EULA 和 PRIVACY 的 MD5
+  if [ -f "EULA.md" ]; then
+    export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}')
+  else
+    export EULA_AGREE="1b662741904d7155d1ce1c00b3530d0d"
+  fi
+
+  if [ -f "PRIVACY.md" ]; then
+    export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}')
+  else
+    export PRIVACY_AGREE="9943b855e72199d0f5016ea39052f1b6"
+  fi
   
   # 循环保活模式启动 bot.py
   echo "正在启动 MaiBot 并进入保活模式..."
