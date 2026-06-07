@@ -39,6 +39,16 @@ class HomeController extends GetxController {
       pseudoTerminal?.writeString(data);
     },
   );
+
+  late Terminal napcatShowTerminal = Terminal(
+    maxLines: 5000,
+    onResize: (width, height, pixelWidth, pixelHeight) {
+      napcatTerminal?.resize(height, width);
+    },
+    onOutput: (data) {
+      napcatTerminal?.writeString(data);
+    },
+  );
   bool _isLocalhostDetected = false; // localhost:6185 检测标志
   bool _isAppInForeground = true; // 应用是否在前台
 
