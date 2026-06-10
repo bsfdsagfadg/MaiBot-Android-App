@@ -80,7 +80,7 @@ Desktop.ini
 .env*
 !.env.example
 *.log
-repomix-output.txt
+repomix-output.xml
 *.base64
 .metadata
 .trae/

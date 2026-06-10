@@ -10,7 +10,9 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:shizuku_api/shizuku_api.dart';
+import 'package:settings/settings.dart';
 import '../../controllers/terminal_controller.dart';
+import '../../../core/services/foreground_service.dart';
 import '../../../core/constants/scripts.dart' as scripts;
 import '../../../core/config/app_config.dart';
 
@@ -32,7 +34,6 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   String _appVersion = '';
-  bool _isBatteryOptimizationIgnored = false;
   final HomeController homeController = Get.find<HomeController>();
 
   // 存储从GitHub API获取的原始下载URL
@@ -42,7 +43,6 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _loadAppVersion();
-    _checkBatteryOptimizationStatus();
   }
 
   Future<void> _loadAppVersion() async {
@@ -50,143 +50,6 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _appVersion = packageInfo.version;
     });
-  }
-
-  // 检查电池优化豁免状态
-  Future<void> _checkBatteryOptimizationStatus() async {
-    if (!Platform.isAndroid) return;
-
-    try {
-      final status = await Permission.ignoreBatteryOptimizations.status;
-      setState(() {
-        _isBatteryOptimizationIgnored = status.isGranted;
-      });
-    } catch (e) {
-      Log.e('检查电池优化豁免状态失败: $e',  'MaiBot');
-    }
-  }
-
-  // 请求电池优化豁免
-  Future<void> _requestBatteryOptimization() async {
-    if (!Platform.isAndroid) return;
-
-    try {
-      final status = await Permission.ignoreBatteryOptimizations.status;
-
-      if (status.isGranted) {
-        Get.snackbar(
-          '已授权',
-          '已获得电池优化豁免权限',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(seconds: 2),
-        );
-        return;
-      }
-
-      // 请求权限
-      final result = await Permission.ignoreBatteryOptimizations.request();
-
-      // 等待对话框关闭后重新检查状态
-      await Future.delayed(const Duration(milliseconds: 500));
-      await _checkBatteryOptimizationStatus();
-
-      if (result.isGranted) {
-        Get.snackbar(
-          '授权成功',
-          '已获得电池优化豁免权限',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(seconds: 2),
-        );
-      } else {
-        Get.snackbar(
-          '授权失败',
-          '未获得电池优化豁免权限',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 2),
-        );
-      }
-    } catch (e) {
-      Log.e('请求电池优化豁免失败: $e',  'MaiBot');
-      Get.snackbar(
-        '请求失败',
-        '请求电池优化豁免时发生错误: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
-      );
-    }
-  }
-
-  // 解除幻影进程限制 (通过 Shizuku)
-  Future<void> _disablePhantomProcessKiller() async {
-    try {
-      final shizukuApi = ShizukuApi();
-      bool isBinderRunning = await shizukuApi.pingBinder() ?? false;
-      
-      if (!isBinderRunning) {
-        Get.snackbar(
-          '未检测到 Shizuku',
-          '请先安装并启动 Shizuku 软件',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 3),
-        );
-        return;
-      }
-
-      bool hasPermission = await shizukuApi.checkPermission() ?? false;
-      if (!hasPermission) {
-        // 请求权限
-        hasPermission = await shizukuApi.requestPermission() ?? false;
-      }
-
-      if (hasPermission) {
-        Get.dialog(
-          const Center(child: CircularProgressIndicator()),
-          barrierDismissible: false,
-        );
-
-        Log.i('Shizuku 已授权，正在执行解除幻影进程限制指令...', 'MaiBot');
-        // 增大限制阈值
-        await shizukuApi.runCommand('device_config put activity_manager max_phantom_processes 2147483647');
-        // 关闭监控
-        await shizukuApi.runCommand('settings put global settings_enable_monitor_phantom_procs false');
-        
-        Get.back(); // 关闭加载提示
-        Log.i('解除幻影进程限制指令执行完毕', 'MaiBot');
-        
-        Get.snackbar(
-          '解除成功',
-          '幻影进程限制已被解除，可提高应用稳定性',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(seconds: 3),
-        );
-      } else {
-        Get.snackbar(
-          '授权失败',
-          '需要 Shizuku 授权才能执行解除指令',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 3),
-        );
-      }
-    } catch (e) {
-      if (Get.isDialogOpen ?? false) Get.back(); // 如果有弹窗则关闭
-      Log.e('使用 Shizuku 解除幻影进程限制失败: $e', 'MaiBot');
-      Get.snackbar(
-        '执行失败',
-        '遇到错误: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
-      );
-    }
   }
 
   // 检查更新
@@ -1651,20 +1514,13 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         ListTile(
-          leading: const Icon(Icons.battery_saver),
-          title: const Text('电池优化豁免'),
-          subtitle: Text(_isBatteryOptimizationIgnored ? '已授权' : '未授权（点击授权）'),
-          trailing: _isBatteryOptimizationIgnored
-              ? const Icon(Icons.check_circle, color: Colors.green)
-              : const Icon(Icons.warning, color: Colors.orange),
-          onTap: () => _requestBatteryOptimization(),
-        ),
-        ListTile(
-          leading: const Icon(Icons.flash_off),
-          title: const Text('解除幻影进程限制'),
-          subtitle: const Text('通过 Shizuku 解除系统对进程的严格限制'),
+          leading: const Icon(Icons.security),
+          title: const Text('后台保活设置'),
+          subtitle: const Text('电池优化、前台服务以及后台锁提示'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => _disablePhantomProcessKiller(),
+          onTap: () {
+            Get.to(() => const KeepAliveSettingsPage());
+          },
         ),
         ListTile(
           leading: const Icon(Icons.web),
@@ -1898,6 +1754,301 @@ class _SettingsPageState extends State<SettingsPage> {
           },
         ),
       ],
+    );
+  }
+}
+
+class KeepAliveSettingsPage extends StatefulWidget {
+  const KeepAliveSettingsPage({super.key});
+
+  @override
+  State<KeepAliveSettingsPage> createState() => _KeepAliveSettingsPageState();
+}
+
+class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
+  bool _isBatteryOptimizationIgnored = false;
+  final Setting _enableForegroundService = 'enable_foreground_service'.setting;
+
+  // Shizuku Keep-Alive 状态
+  bool _shizukuDozeWhitelist = false;
+  bool _shizukuRunAnyInBackground = false;
+  bool _shizukuAvailable = false;
+  bool _shizukuPermissionGranted = false;
+  final ShizukuApi _shizukuApi = ShizukuApi();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBatteryOptimizationStatus();
+    _checkShizukuStatus();
+    if (_enableForegroundService.get() == null) {
+      _enableForegroundService.set(true);
+    }
+  }
+
+  Future<void> _checkBatteryOptimizationStatus() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final status = await Permission.ignoreBatteryOptimizations.status;
+      setState(() {
+        _isBatteryOptimizationIgnored = status.isGranted;
+      });
+    } catch (e) {
+      Log.e('检查电池优化豁免状态失败: $e', 'MaiBot');
+    }
+  }
+
+  // 检测并查询当前设备上特定保活命令的实际生效状态
+  Future<void> _checkShizukuStatus() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final isBinderRunning = await _shizukuApi.pingBinder() ?? false;
+      if (!isBinderRunning) {
+        setState(() {
+          _shizukuAvailable = false;
+          _shizukuPermissionGranted = false;
+        });
+        return;
+      }
+      
+      final hasPermission = await _shizukuApi.checkPermission() ?? false;
+      setState(() {
+        _shizukuAvailable = isBinderRunning;
+        _shizukuPermissionGranted = hasPermission;
+      });
+
+      if (hasPermission) {
+        // 1. 查询 Doze 白名单
+        final dozeOut = await _shizukuApi.runCommand('dumpsys deviceidle whitelist');
+        final isDozeWhitelisted = dozeOut != null && dozeOut.contains('com.maibot.maibot_android');
+
+        // 2. 查询 RUN_ANY_IN_BACKGROUND
+        final appopsOut = await _shizukuApi.runCommand('cmd appops get com.maibot.maibot_android RUN_ANY_IN_BACKGROUND');
+        final isRunAnyAllowed = appopsOut != null && appopsOut.toLowerCase().contains('allow');
+
+        setState(() {
+          _shizukuDozeWhitelist = isDozeWhitelisted;
+          _shizukuRunAnyInBackground = isRunAnyAllowed;
+        });
+      }
+    } catch (e) {
+      Log.e('检查 Shizuku 状态失败: $e', 'KeepAliveSettingsPage');
+    }
+  }
+
+  // 确保已授权 Shizuku 权限
+  Future<bool> _ensureShizukuPermission() async {
+    final isBinderRunning = await _shizukuApi.pingBinder() ?? false;
+    if (!isBinderRunning) {
+      Get.snackbar('Shizuku 未运行', '请确认 Shizuku 应用程序已在后台启动并运行',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white);
+      setState(() {
+        _shizukuAvailable = false;
+        _shizukuPermissionGranted = false;
+      });
+      return false;
+    }
+
+    var hasPermission = await _shizukuApi.checkPermission() ?? false;
+    if (!hasPermission) {
+      final requested = await _shizukuApi.requestPermission() ?? false;
+      if (!requested) {
+        Get.snackbar('权限拒绝', '未授予 Shizuku 权限',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white);
+        setState(() {
+          _shizukuPermissionGranted = false;
+        });
+        return false;
+      }
+      hasPermission = await _shizukuApi.checkPermission() ?? false;
+    }
+    setState(() {
+      _shizukuAvailable = true;
+      _shizukuPermissionGranted = hasPermission;
+    });
+    return hasPermission;
+  }
+
+  // 2. 豁免电池优化 (Doze Whitelist) 状态切换
+  Future<void> _toggleDozeWhitelist(bool value) async {
+    if (!await _ensureShizukuPermission()) return;
+    try {
+      if (value) {
+        await _shizukuApi.runCommand('dumpsys deviceidle whitelist +com.maibot.maibot_android');
+        Get.snackbar('设置成功', '已通过 Shell 将本应用加入电池优化白名单',
+            snackPosition: SnackPosition.BOTTOM);
+      } else {
+        await _shizukuApi.runCommand('dumpsys deviceidle whitelist -com.maibot.maibot_android');
+        Get.snackbar('还原成功', '已将本应用移出电池优化白名单',
+            snackPosition: SnackPosition.BOTTOM);
+      }
+      await _checkShizukuStatus();
+    } catch (e) {
+      Get.snackbar('执行失败', e.toString(),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white);
+    }
+  }
+
+  // 3. 无限制后台运行 AppOps 状态切换
+  Future<void> _toggleRunAnyInBackground(bool value) async {
+    if (!await _ensureShizukuPermission()) return;
+    try {
+      if (value) {
+        await _shizukuApi.runCommand('cmd appops set com.maibot.maibot_android RUN_ANY_IN_BACKGROUND allow');
+        await _shizukuApi.runCommand('cmd appops set com.maibot.maibot_android RUN_IN_BACKGROUND allow');
+        Get.snackbar('设置成功', '已允许后台无限制自由运行',
+            snackPosition: SnackPosition.BOTTOM);
+      } else {
+        await _shizukuApi.runCommand('cmd appops set com.maibot.maibot_android RUN_ANY_IN_BACKGROUND default');
+        await _shizukuApi.runCommand('cmd appops set com.maibot.maibot_android RUN_IN_BACKGROUND default');
+        Get.snackbar('还原成功', 'AppOps 权限已恢复至系统默认托管',
+            snackPosition: SnackPosition.BOTTOM);
+      }
+      await _checkShizukuStatus();
+    } catch (e) {
+      Get.snackbar('执行失败', e.toString(),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white);
+    }
+  }
+
+  Future<void> _requestBatteryOptimization() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final status = await Permission.ignoreBatteryOptimizations.status;
+      if (status.isGranted) {
+        Get.snackbar('已授权', '已获得电池优化豁免权限', snackPosition: SnackPosition.BOTTOM, duration: const Duration(seconds: 2));
+        return;
+      }
+      final result = await Permission.ignoreBatteryOptimizations.request();
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _checkBatteryOptimizationStatus();
+      if (result.isGranted) {
+        Get.snackbar('授权成功', '已获得电池优化豁免权限', snackPosition: SnackPosition.BOTTOM, duration: const Duration(seconds: 2));
+      } else {
+        Get.snackbar('授权失败', '未获得电池优化豁免权限', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orange, colorText: Colors.white, duration: const Duration(seconds: 2));
+      }
+    } catch (e) {
+      Log.e('请求电池优化豁免失败: $e', 'MaiBot');
+      Get.snackbar('请求失败', '请求电池优化豁免时发生错误: $e', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 3));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('后台保活设置', style: TextStyle(fontSize: 18)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
+      body: ListView(
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              '为了让 MaiBot 在后台稳定运行，建议开启以下权限和设置。',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.battery_saver),
+            title: const Text('电池优化豁免'),
+            subtitle: Text(_isBatteryOptimizationIgnored ? '已授权' : '未授权（点击授权）'),
+            trailing: _isBatteryOptimizationIgnored
+                ? const Icon(Icons.check_circle, color: Colors.green)
+                : const Icon(Icons.warning, color: Colors.orange),
+            onTap: _requestBatteryOptimization,
+          ),
+          ListTile(
+            leading: const Icon(Icons.notifications_active),
+            title: const Text('前台服务与通知保活'),
+            subtitle: const Text('开启后将在通知栏常驻，防止系统杀后台'),
+            trailing: Switch(
+              value: _enableForegroundService.get() ?? true,
+              onChanged: (bool value) async {
+                _enableForegroundService.set(value);
+                setState(() {});
+                if (value) {
+                  await ForegroundServiceManager.startService();
+                } else {
+                  await ForegroundServiceManager.stopService();
+                }
+              },
+            ),
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text(
+              'Shizuku 保活扩展',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.extension),
+            title: const Text('Shizuku 授权状态'),
+            subtitle: Text(
+              !_shizukuAvailable 
+                  ? '服务未运行，请先启动 Shizuku 应用程序' 
+                  : (_shizukuPermissionGranted ? '已成功授权并连接' : '已检测到服务，点击请求授权'),
+            ),
+            trailing: Icon(
+              !_shizukuAvailable
+                  ? Icons.error_outline
+                  : (_shizukuPermissionGranted ? Icons.check_circle_outline : Icons.help_outline),
+              color: !_shizukuAvailable
+                  ? Colors.red
+                  : (_shizukuPermissionGranted ? Colors.green : Colors.orange),
+            ),
+            onTap: () async {
+              await _ensureShizukuPermission();
+              await _checkShizukuStatus();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.battery_charging_full),
+            title: const Text('强制 Doze 电池优化白名单'),
+            subtitle: const Text('通过 Shell 将本应用加入 Doze 白名单，保证息屏连接不中断'),
+            trailing: Switch(
+              value: _shizukuDozeWhitelist,
+              onChanged: (bool value) {
+                _toggleDozeWhitelist(value);
+              },
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings_suggest),
+            title: const Text('无限制后台运行'),
+            subtitle: const Text('突破 Android AppOps 后台广播与进程限制，始终允许在后台运行'),
+            trailing: Switch(
+              value: _shizukuRunAnyInBackground,
+              onChanged: (bool value) {
+                _toggleRunAnyInBackground(value);
+              },
+            ),
+          ),
+          const Divider(),
+          const ListTile(
+            leading: Icon(Icons.lock_outline),
+            title: Text('添加后台锁提示'),
+            subtitle: Text('请在系统的多任务（最近任务）界面，下拉或长按 MaiBot 卡片，为其添加后台锁定状态（通常显示为小锁图标）。这能有效防止系统自动清理应用。'),
+          ),
+        ],
+      ),
     );
   }
 }

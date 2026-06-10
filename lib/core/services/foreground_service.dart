@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:global_repository/global_repository.dart';
+import 'package:settings/settings.dart';
 
 /// 前台服务管理类
 /// Foreground Service Manager
@@ -131,7 +132,8 @@ class KeepAliveTaskHandler extends TaskHandler {
 
     // 定期检查服务状态，如果发现服务已停止且用户没有点击停止按钮，则重建
     FlutterForegroundTask.isRunningService.then((isRunning) {
-      if (!isRunning && !ForegroundServiceManager.userClickedStopButton) {
+      final enableForegroundService = 'enable_foreground_service'.setting.get() ?? true;
+      if (enableForegroundService && !isRunning && !ForegroundServiceManager.userClickedStopButton) {
         Log.w('检测到服务意外停止，准备重建...',  'KeepAliveTaskHandler');
         _rebuildService();
       }
@@ -149,7 +151,8 @@ class KeepAliveTaskHandler extends TaskHandler {
     // 2. 如果是系统自动清理通知（如充电完成等）：onNotificationDismissed() 不会被调用，需要在这里重建
     // 3. 如果是用户点击停止按钮：不重建
 
-    if (!_userDismissedNotification && !ForegroundServiceManager.userClickedStopButton) {
+    final enableForegroundService = 'enable_foreground_service'.setting.get() ?? true;
+    if (enableForegroundService && !_userDismissedNotification && !ForegroundServiceManager.userClickedStopButton) {
       Log.w('检测到系统自动清理通知或服务被终止，准备重建...',  'KeepAliveTaskHandler');
       // 延迟重建以确保服务完全关闭
       await Future.delayed(const Duration(milliseconds: 500));
@@ -218,16 +221,16 @@ class KeepAliveTaskHandler extends TaskHandler {
     // 标记为用户主动划掉，避免 onDestroy() 中重复处理
     _userDismissedNotification = true;
 
-    // 只有用户点击了停止按钮才不重建
-    // 划掉通知应该重建服务
-    if (!ForegroundServiceManager.userClickedStopButton) {
+    final enableForegroundService = 'enable_foreground_service'.setting.get() ?? true;
+    // 只有开启了保活并且用户没有点击停止按钮，才重建服务
+    if (enableForegroundService && !ForegroundServiceManager.userClickedStopButton) {
       Log.i('检测到用户主动划掉通知，将重建服务',  'KeepAliveTaskHandler');
       // 延迟一小段时间后重建服务
       Future.delayed(const Duration(milliseconds: 500), () {
         _rebuildService();
       });
     } else {
-      Log.i('用户点击了停止按钮，不重建服务',  'KeepAliveTaskHandler');
+      Log.i('不重建服务（功能已关闭或用户手动停止）',  'KeepAliveTaskHandler');
     }
   }
 }
