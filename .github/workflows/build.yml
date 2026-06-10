@@ -38,11 +38,22 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 4. 获取依赖
+      # 4. 核心优化：缓存 Android NDK 和 CMake (减少每次构建时的下载耗时)
+      - name: Cache Android NDK and CMake
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/ndk
+            /usr/local/lib/android/sdk/cmake
+          key: ${{ runner.os }}-android-ndk-cmake-${{ hashFiles('android/app/build.gradle') }}
+          restore-keys: |
+            ${{ runner.os }}-android-ndk-cmake-
+
+      # 5. 获取依赖
       - name: Install dependencies
         run: flutter pub get
 
-      # 5. 准备签名文件
+      # 6. 准备签名文件
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.jks
@@ -51,23 +62,23 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
 
-      # 6. 构建 APK
+      # 7. 构建 APK
       - name: Build APK
         run: flutter build apk --release
 
-      # 7. 重命名 APK (方便识别)
+      # 8. 重命名 APK (方便识别)
       - name: Rename APK
         run: |
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/MaiBot-Android-release.apk
 
-      # 8. 上传构建产物到 GitHub Actions 页面的 Artifacts
+      # 9. 上传构建产物到 GitHub Actions 页面的 Artifacts
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MaiBot-Android-APK
           path: build/app/outputs/flutter-apk/MaiBot-Android-release.apk
 
-      # 9. 自动发布到 Release
+      # 10. 自动发布到 Release
       - name: Release APK
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
