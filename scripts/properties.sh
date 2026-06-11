@@ -1,4 +1,0 @@
-VERSION='1.2.0'
-VERSION_CODE='25'
-APP_NAME='MaiBot Android'
-APP_NAME_CN='MaiBot Android'

@@ -26,6 +26,8 @@ class HomeController extends GetxController {
   Setting hideFromRecents = 'hide_from_recents'.setting;
   Pty? pseudoTerminal;
   Pty? napcatTerminal;
+  Pty? maibotLogPty;
+  Pty? napcatLogPty;
 
   StreamSubscription? _qrcodeSubscription;
   StreamSubscription? _webviewSubscription; // 添加webview监听订阅
@@ -84,7 +86,7 @@ class HomeController extends GetxController {
   // 使用 login_ubuntu 函数，传入要执行的命令
   // Use login_ubuntu function, passing the command to execute
   String get command {
-    return 'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "if ! command -v tmux >/dev/null 2>&1; then apt-get update && apt-get install -y tmux; fi; export TMUX_TMPDIR=/tmp; tmux new-session -A -s napcat \'while true; do bash /root/launcher.sh; echo NapCat 意外退出，3秒后尝试重启...; sleep 3; done\'"\n';
+    return 'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "if ! command -v tmux >/dev/null 2>&1; then apt-get update && apt-get install -y tmux; fi; export TMUX_TMPDIR=/tmp; tmux new-session -A -s napcat \'while true; do bash /root/launcher.sh 2>&1 | tee /root/napcat_clean.log; echo NapCat 意外退出，3秒后尝试重启...; sleep 3; done\'"\n';
   }
 
   // 检查两个条件是否都满足，如果满足则触发跳转
@@ -100,16 +102,28 @@ class HomeController extends GetxController {
 
   // 监听输出，当输出中包含启动成功的标志时，启动 VewView 和导航栏页面
   void initWebviewListener() {
-    if (pseudoTerminal == null) return;
+    if (pseudoTerminal == null || maibotLogPty == null) return;
 
-    _webviewSubscription = pseudoTerminal!.output
+    // 监听交互式终端，仅用于前端屏幕渲染
+    pseudoTerminal!.output
+        .cast<List<int>>()
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .listen((event) {
+      terminal.write(event);
+
+      // 如果缓冲区满了，清屏
+      if (terminal.buffer.lines.length >= 5000) {
+        terminal.buffer.clear();
+        terminal.buffer.setCursor(0, 0);
+      }
+    });
+
+    // 监控后台干净日志，用于解析启动标志与 Token
+    _webviewSubscription = maibotLogPty!.output
         .cast<List<int>>()
         .transform(const Utf8Decoder(allowMalformed: true))
         .listen((event) async {
-      // 输出到 Flutter 控制台
-      // Output to Flutter console
       if (event.trim().isNotEmpty) {
-        // 按行分割输出，避免控制台输出混乱
         final lines = event.split('\n');
         for (var line in lines) {
           if (line.trim().isNotEmpty) {
@@ -131,50 +145,41 @@ class HomeController extends GetxController {
         Future.delayed(const Duration(milliseconds: 2000), () {
           update();
         });
-
-        // 不取消订阅，继续监听以便终端日志持续更新
-      }
-
-      // 显示所有输出，不再过滤
-      terminal.write(event);
-
-      // 如果缓冲区满了，清屏
-      if (terminal.buffer.lines.length >= 5000) {
-        terminal.buffer.clear();
-        terminal.buffer.setCursor(0, 0);
       }
     });
   }
 
   void initQrcodeListener() {
-    if (napcatTerminal == null) return;
+    if (napcatTerminal == null || napcatLogPty == null) return;
 
-    _qrcodeSubscription = napcatTerminal!.output
+    // 监听交互式终端，仅用于前端屏幕渲染
+    napcatTerminal!.output
+        .cast<List<int>>()
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .listen((event) {
+      napcatShowTerminal.write(event);
+
+      // 避免缓冲区过载
+      if (napcatShowTerminal.buffer.lines.length >= 5000) {
+        napcatShowTerminal.buffer.clear();
+        napcatShowTerminal.buffer.setCursor(0, 0);
+      }
+    });
+
+    // 监控后台干净日志，用于解析二维码及登录状态
+    _qrcodeSubscription = napcatLogPty!.output
         .cast<List<int>>()
         .transform(const Utf8Decoder(allowMalformed: true))
         .listen((event) async {
-      // 先判断订阅是否已取消，避免重复处理
       if (_qrcodeSubscription == null) return;
 
-      // 输出到 Flutter 控制台
-      // Output to Flutter console
       if (event.trim().isNotEmpty) {
-        // 按行分割输出，避免控制台输出混乱
         final lines = event.split('\n');
         for (var line in lines) {
           if (line.trim().isNotEmpty) {
             Log.i(line, 'MaiBot-Napcat');
           }
         }
-      }
-
-      // 将输出同时写入给前端展示的 NapCat 终端
-      napcatShowTerminal.write(event);
-      
-      // 避免缓冲区过载
-      if (napcatShowTerminal.buffer.lines.length >= 5000) {
-        napcatShowTerminal.buffer.clear();
-        napcatShowTerminal.buffer.setCursor(0, 0);
       }
 
       napcatController.handleNapcatOutput(event);
@@ -377,6 +382,10 @@ class HomeController extends GetxController {
     napcatTerminal = 
         createPTY(rows: napcatShowTerminal.viewHeight, columns: napcatShowTerminal.viewWidth);
 
+    // 初始化后台监控日志的 PTY
+    maibotLogPty = createPTY(rows: 10, columns: 80);
+    napcatLogPty = createPTY(rows: 10, columns: 80);
+
     // 绑定 napcat 终端的数据通道，使其能够接受用户键盘输入和动态改变大小
     napcatShowTerminal.onResize = (width, height, pixelWidth, pixelHeight) {
       napcatTerminal?.resize(height, width);
@@ -409,6 +418,16 @@ class HomeController extends GetxController {
     // 写入 common.sh 脚本
     File('${RuntimeEnvir.homePath}/common.sh')
         .writeAsStringSync(getCommonScript(appVersion));
+
+    // 启动干净的后台日志监控
+    maibotLogPty!.writeString(
+      'source ${RuntimeEnvir.homePath}/common.sh\n'
+      'login_ubuntu "touch /root/maibot_clean.log && tail -f -n +1 /root/maibot_clean.log"\n'
+    );
+    napcatLogPty!.writeString(
+      'source ${RuntimeEnvir.homePath}/common.sh\n'
+      'login_ubuntu "touch /root/napcat_clean.log && tail -f -n +1 /root/napcat_clean.log"\n'
+    );
 
     initWebviewListener();
     bumpProgress();
@@ -526,6 +545,16 @@ class HomeController extends GetxController {
         Log.i('正在关闭 NapCat 终端进程...', 'MaiBot-Napcat');
         napcatTerminal?.kill();
         napcatTerminal = null;
+      }
+      if (maibotLogPty != null) {
+        Log.i('正在关闭主日志监控...', 'MaiBot');
+        maibotLogPty?.kill();
+        maibotLogPty = null;
+      }
+      if (napcatLogPty != null) {
+        Log.i('正在关闭 NapCat 日志监控...', 'MaiBot-Napcat');
+        napcatLogPty?.kill();
+        napcatLogPty = null;
       }
       // 彻底清理可能的残留进程
       _cleanupZombieProcesses();
