@@ -84,7 +84,7 @@ class HomeController extends GetxController {
   // 使用 login_ubuntu 函数，传入要执行的命令
   // Use login_ubuntu function, passing the command to execute
   String get command {
-    return 'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash /root/launcher.sh"\n';
+    return 'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "if ! command -v tmux >/dev/null 2>&1; then apt-get update && apt-get install -y tmux; fi; export TMUX_TMPDIR=/tmp; tmux new-session -A -s napcat \'while true; do bash /root/launcher.sh; echo \"NapCat 意外退出，3秒后尝试重启...\"; sleep 3; done\'"\n';
   }
 
   // 检查两个条件是否都满足，如果满足则触发跳转

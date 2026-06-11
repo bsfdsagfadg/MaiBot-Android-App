@@ -21,9 +21,6 @@ Future<void> main() async {
     await Permission.notification.request();
   }
   
-  // 初始化前台服务
-  ForegroundServiceManager.init();
-  
   // 隐藏系统 UI
   // Hide system UI
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [
@@ -39,6 +36,9 @@ Future<void> main() async {
   ));
   RuntimeEnvir.initEnvirWithPackageName('com.maibot.maibot_android');
   await initSettingStore(RuntimeEnvir.configPath);
+  
+  // 初始化前台服务
+  ForegroundServiceManager.init();
   
   // 检查是否开启了前台服务保活
   final enableForegroundService = 'enable_foreground_service'.setting.get() ?? true;

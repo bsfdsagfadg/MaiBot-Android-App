@@ -12,6 +12,7 @@ class ForegroundServiceManager {
   /// 初始化前台服务
   /// Initialize foreground service
   static void init() {
+    final enableWifiLock = 'enable_wifi_lock'.setting.get() ?? true;
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'maibot_keep_alive_channel',
@@ -28,7 +29,7 @@ class ForegroundServiceManager {
         eventAction: ForegroundTaskEventAction.repeat(5000), // 每5秒检查一次
         autoRunOnBoot: false,
         allowWakeLock: true,
-        allowWifiLock: false,
+        allowWifiLock: enableWifiLock,
       ),
     );
   }

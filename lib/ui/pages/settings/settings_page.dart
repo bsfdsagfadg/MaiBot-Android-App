@@ -1541,18 +1541,6 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
         ),
-        ListTile(
-          leading: const Icon(Icons.visibility_off),
-          title: const Text('从最近活动中隐藏自身'),
-          subtitle: const Text('开启后应用将不会出现在系统的最近任务列表中'),
-          trailing: Switch(
-            value: homeController.hideFromRecents.get() ?? false,
-            onChanged: (bool value) {
-              homeController.setHideFromRecents(value);
-              setState(() {});
-            },
-          ),
-        ),
         Obx(() {
           final token = homeController.napcatController.napCatWebUiToken.value;
           return ListTile(
@@ -1768,6 +1756,7 @@ class KeepAliveSettingsPage extends StatefulWidget {
 class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
   bool _isBatteryOptimizationIgnored = false;
   final Setting _enableForegroundService = 'enable_foreground_service'.setting;
+  final Setting _enableWifiLock = 'enable_wifi_lock'.setting;
 
   // Shizuku Keep-Alive 状态
   bool _shizukuDozeWhitelist = false;
@@ -1783,6 +1772,9 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     _checkShizukuStatus();
     if (_enableForegroundService.get() == null) {
       _enableForegroundService.set(true);
+    }
+    if (_enableWifiLock.get() == null) {
+      _enableWifiLock.set(true);
     }
   }
 
@@ -1956,7 +1948,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
-              '为了让 MaiBot 在后台稳定运行，建议开启以下权限和设置。',
+              '为了让 MaiBot 在后台稳定运行，建议开启以下权限和设置。\n\n💡 防杀终极指南：\n请在系统多任务（最近任务）界面为 MaiBot 加上小锁。只要保留在后台不手贱划掉清理，配合下方的电池优化等设置，MaiBot 就能稳定长久地陪伴你！',
               style: TextStyle(color: Colors.grey, fontSize: 14),
             ),
           ),
@@ -1983,6 +1975,18 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 } else {
                   await ForegroundServiceManager.stopService();
                 }
+              },
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.wifi_lock),
+            title: const Text('保持 Wi-Fi 唤醒 (WLAN 锁)'),
+            subtitle: const Text('息屏时防止 Wi-Fi 休眠，避免断网导致的掉线（重启应用后生效）'),
+            trailing: Switch(
+              value: _enableWifiLock.get() ?? true,
+              onChanged: (bool value) {
+                _enableWifiLock.set(value);
+                setState(() {});
               },
             ),
           ),
@@ -2046,6 +2050,18 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
             leading: Icon(Icons.lock_outline),
             title: Text('添加后台锁提示'),
             subtitle: Text('请在系统的多任务（最近任务）界面，下拉或长按 MaiBot 卡片，为其添加后台锁定状态（通常显示为小锁图标）。这能有效防止系统自动清理应用。'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.visibility_off),
+            title: const Text('从最近活动中隐藏自身'),
+            subtitle: const Text('开启后应用将不会出现在最近任务列表中。\n⚠️ 警告：这会导致系统在内存紧张时大概率清理掉本应用，引起运行不稳定，请谨慎开启！'),
+            trailing: Switch(
+              value: Get.find<HomeController>().hideFromRecents.get() ?? false,
+              onChanged: (bool value) {
+                Get.find<HomeController>().setHideFromRecents(value);
+                setState(() {});
+              },
+            ),
           ),
         ],
       ),
