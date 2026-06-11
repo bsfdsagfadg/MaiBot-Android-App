@@ -5,10 +5,10 @@ on:
     branches:
       - master  # 当推送到 master 分支时触发构建
     tags:
-      - '*'     # 关键修复：当推送任意格式的 tag 时触发构建，否则原工作流在推 tag 时不会执行
+      - '*'     # 当推送任意格式的 tag 时触发构建
   workflow_dispatch: # 允许手动触发构建
 
-# 关键修复：显式声明写入权限，现代 GitHub Actions 在创建 Release 时必须拥有 contents: write 权限
+# 显式声明写入权限，确保能够正常创建 Release 并上传资源
 permissions:
   contents: write
 
@@ -38,7 +38,15 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 4. 核心优化：缓存 Android NDK 和 CMake (减少每次构建时的下载耗时)
+      # 4. 准备目录并调整权限（解决 actions/cache 在 /usr/local/lib 下写入导致的 Operation not permitted 报错）
+      - name: Prepare NDK and CMake directories
+        run: |
+          sudo mkdir -p /usr/local/lib/android/sdk/ndk
+          sudo mkdir -p /usr/local/lib/android/sdk/cmake
+          sudo chown -R $USER:$USER /usr/local/lib/android/sdk/ndk
+          sudo chown -R $USER:$USER /usr/local/lib/android/sdk/cmake
+
+      # 5. 核心优化：缓存 Android NDK 和 CMake (减少每次构建时的下载耗时)
       - name: Cache Android NDK and CMake
         uses: actions/cache@v4
         with:
@@ -49,11 +57,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-android-ndk-cmake-
 
-      # 5. 获取依赖
+      # 6. 获取依赖
       - name: Install dependencies
         run: flutter pub get
 
-      # 6. 准备签名文件
+      # 7. 准备签名文件
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.jks
@@ -62,30 +70,30 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
 
-      # 7. 构建 APK
+      # 8. 构建 APK
       - name: Build APK
         run: flutter build apk --release
 
-      # 8. 重命名 APK (方便识别)
+      # 9. 重命名 APK (方便识别)
       - name: Rename APK
         run: |
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/MaiBot-Android-release.apk
 
-      # 9. 上传构建产物到 GitHub Actions 页面的 Artifacts
+      # 10. 上传构建产物到 GitHub Actions 页面的 Artifacts
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MaiBot-Android-APK
           path: build/app/outputs/flutter-apk/MaiBot-Android-release.apk
 
-      # 10. 自动发布到 Release
+      # 11. 自动发布到 Release
       - name: Release APK
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: build/app/outputs/flutter-apk/MaiBot-Android-release.apk
           name: "MaiBot Android ${{ github.ref_name }}"
-          generate_release_notes: true  # 核心优化：自动根据两次 Tag 之间的 Commit 记录生成更新简介，无需手动编写
+          generate_release_notes: true  # 自动根据两次 Tag 之间的 Commit 记录生成更新简介
           draft: false
           prerelease: false
         env:
