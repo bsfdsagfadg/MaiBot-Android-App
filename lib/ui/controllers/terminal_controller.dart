@@ -501,22 +501,6 @@ class HomeController extends GetxController {
   }
 
   // 彻底清理可能的残留进程
-  void _cleanupZombieProcesses() {
-    Log.i('清理残留进程...', 'MaiBot');
-    try {
-      // 通过 pkill -P 杀死应用启动的所有子进程，避免 killall 误杀其他应用（如 Termux）的进程
-      // 获取当前应用进程 ID
-      final myPid = pid;
-
-      // 使用 busybox pkill 杀死当前进程的所有子进程和进程组
-      Process.runSync(
-          '${RuntimeEnvir.binPath}/busybox', ['pkill', '-P', myPid.toString()]);
-      Process.runSync(
-          '${RuntimeEnvir.binPath}/busybox', ['pkill', '-g', myPid.toString()]);
-    } catch (e) {
-      // 忽略错误
-    }
-  }
 
   // 设置是否从最近活动中隐藏自身
   Future<void> setHideFromRecents(bool value) async {
