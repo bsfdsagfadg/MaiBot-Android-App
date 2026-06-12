@@ -425,11 +425,11 @@ class HomeController extends GetxController {
     // 启动干净的后台日志监控
     maibotLogPty!.writeString(
       'source ${RuntimeEnvir.homePath}/common.sh\n'
-      'login_ubuntu "if ! command -v tmux >/dev/null 2>&1 || ! tmux has-session -t maibot 2>/dev/null; then > /root/maibot_clean.log; fi; touch /root/maibot_clean.log && tail -f -n +1 /root/maibot_clean.log"\n'
+      'login_ubuntu "if ! command -v tmux >/dev/null 2>&1 || ! tmux has-session -t maibot 2>/dev/null; then > /root/maibot_clean.log; fi; touch /root/maibot_clean.log && tail -f -n 100 /root/maibot_clean.log"\n'
     );
     napcatLogPty!.writeString(
       'source ${RuntimeEnvir.homePath}/common.sh\n'
-      'login_ubuntu "if ! command -v tmux >/dev/null 2>&1 || ! tmux has-session -t napcat 2>/dev/null; then > /root/napcat_clean.log; fi; touch /root/napcat_clean.log && tail -f -n +1 /root/napcat_clean.log"\n'
+      'login_ubuntu "if ! command -v tmux >/dev/null 2>&1 || ! tmux has-session -t napcat 2>/dev/null; then > /root/napcat_clean.log; fi; touch /root/napcat_clean.log && tail -f -n 100 /root/napcat_clean.log"\n'
     );
 
     initWebviewListener();
@@ -438,6 +438,14 @@ class HomeController extends GetxController {
     initQrcodeListener();
 
     startMaiBot(pseudoTerminal!);
+
+    // Fix: 重连时如果已安装NapCat，直接拉起它的终端，无需等待 progress 信号
+    Future.delayed(const Duration(milliseconds: 500), () {
+      final launcherFile = File('$ubuntuPath/root/launcher.sh');
+      if (launcherFile.existsSync()) {
+        napcatTerminal?.writeString('$command\n');
+      }
+    });
   }
 
   Future<void> startMaiBot(Pty pseudoTerminal) async {

@@ -48,9 +48,9 @@ class NapcatController extends GetxController {
 
     // 捕获 NapCat WebUI Token
     if (cleanEvent.contains('WebUi Token:')) {
-      final match = RegExp(r'WebUi Token:\s+(\w+)').firstMatch(cleanEvent);
-      if (match != null) {
-        final token = match.group(1);
+      final matches = RegExp(r'WebUi Token:\s+(\w+)').allMatches(cleanEvent);
+      if (matches.isNotEmpty) {
+        final token = matches.last.group(1);
         if (token != null) {
           napCatWebUiToken.value = token;
           Log.i('捕获到 NapCat Token: $token', 'MaiBot');
@@ -87,6 +87,13 @@ class NapcatController extends GetxController {
             ),
           ),
         );
+
+        // 检查异步等待期间是否已经触发了登录成功
+        if (isQrcodeProcessed) {
+          _isQrcodeShowing.value = false;
+          _qrcodeDialog = null;
+          return;
+        }
 
         // 使用GetX的导航管理避免上下文问题
         await Get.dialog(
@@ -157,10 +164,10 @@ class NapcatController extends GetxController {
 
     // 适配新版日志：🔑 WebUI 登录 Token: ...
     if (cleanEvent.contains('WebUI 登录 Token:')) {
-        final match =
-            RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)').firstMatch(cleanEvent);
-        if (match != null) {
-          final token = match.group(1);
+        final matches =
+            RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)').allMatches(cleanEvent);
+        if (matches.isNotEmpty) {
+          final token = matches.last.group(1);
           if (token != null) {
             maiBotWebUiToken.value = token;
             Log.i('捕获到 MaiBot Token: $token',  'MaiBot');
