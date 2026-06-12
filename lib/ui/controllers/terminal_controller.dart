@@ -134,8 +134,11 @@ class HomeController extends GetxController {
 
       napcatController.handleMaibotOutput(event);
 
+      // 剥离ANSI颜色代码
+      final cleanEvent = event.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
+
       // 检查是否包含 MaiBot 启动完成的标志
-      if (event.contains('访问地址:')) {
+      if (cleanEvent.contains('访问地址:')) {
         _isLocalhostDetected = true;
         bumpProgress();
 
@@ -422,11 +425,11 @@ class HomeController extends GetxController {
     // 启动干净的后台日志监控
     maibotLogPty!.writeString(
       'source ${RuntimeEnvir.homePath}/common.sh\n'
-      'login_ubuntu "touch /root/maibot_clean.log && tail -f -n +1 /root/maibot_clean.log"\n'
+      'login_ubuntu "if ! command -v tmux >/dev/null 2>&1 || ! tmux has-session -t maibot 2>/dev/null; then > /root/maibot_clean.log; fi; touch /root/maibot_clean.log && tail -f -n +1 /root/maibot_clean.log"\n'
     );
     napcatLogPty!.writeString(
       'source ${RuntimeEnvir.homePath}/common.sh\n'
-      'login_ubuntu "touch /root/napcat_clean.log && tail -f -n +1 /root/napcat_clean.log"\n'
+      'login_ubuntu "if ! command -v tmux >/dev/null 2>&1 || ! tmux has-session -t napcat 2>/dev/null; then > /root/napcat_clean.log; fi; touch /root/napcat_clean.log && tail -f -n +1 /root/napcat_clean.log"\n'
     );
 
     initWebviewListener();
@@ -534,32 +537,14 @@ class HomeController extends GetxController {
     _qrcodeSubscription = null;
     _webviewSubscription = null;
 
-    // 杀死所有终端进程，释放端口
+    // 释放资源，不强制杀死子进程，允许容器后台保活重连
     try {
-      if (pseudoTerminal != null) {
-        Log.i('正在关闭主终端进程...', 'MaiBot');
-        pseudoTerminal?.kill();
-        pseudoTerminal = null;
-      }
-      if (napcatTerminal != null) {
-        Log.i('正在关闭 NapCat 终端进程...', 'MaiBot-Napcat');
-        napcatTerminal?.kill();
-        napcatTerminal = null;
-      }
-      if (maibotLogPty != null) {
-        Log.i('正在关闭主日志监控...', 'MaiBot');
-        maibotLogPty?.kill();
-        maibotLogPty = null;
-      }
-      if (napcatLogPty != null) {
-        Log.i('正在关闭 NapCat 日志监控...', 'MaiBot-Napcat');
-        napcatLogPty?.kill();
-        napcatLogPty = null;
-      }
-      // 彻底清理可能的残留进程
-      _cleanupZombieProcesses();
+      pseudoTerminal = null;
+      napcatTerminal = null;
+      maibotLogPty = null;
+      napcatLogPty = null;
     } catch (e) {
-      Log.e('关闭终端进程时出错: $e', 'MaiBot');
+      Log.e('清理终端引用时出错: $e', 'MaiBot');
     }
 
     // 移除生命周期观察者

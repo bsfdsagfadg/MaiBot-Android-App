@@ -32,8 +32,11 @@ class NapcatController extends GetxController {
   }
 
   void handleNapcatOutput(String event) async {
+    // 剥离ANSI颜色代码，防止颜色字符干扰正则表达式匹配
+    final cleanEvent = event.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
+
     // 检测自动快速登录成功
-    if (event.contains('自动快速登录成功')) {
+    if (cleanEvent.contains('自动快速登录成功')) {
       isQrcodeProcessed = true;
       if (_isQrcodeShowing.value && _qrcodeDialog != null) {
         Get.back();
@@ -44,8 +47,8 @@ class NapcatController extends GetxController {
     }
 
     // 捕获 NapCat WebUI Token
-    if (event.contains('WebUi Token:')) {
-      final match = RegExp(r'WebUi Token:\s+(\w+)').firstMatch(event);
+    if (cleanEvent.contains('WebUi Token:')) {
+      final match = RegExp(r'WebUi Token:\s+(\w+)').firstMatch(cleanEvent);
       if (match != null) {
         final token = match.group(1);
         if (token != null) {
@@ -56,7 +59,7 @@ class NapcatController extends GetxController {
     }
 
     // 检测指令1显示二维码
-    if (event.contains('二维码已保存到') && !_isQrcodeShowing.value) {
+    if (cleanEvent.contains('二维码已保存到') && !_isQrcodeShowing.value) {
       _isQrcodeShowing.value = true;
       final qrcodePath = '$ubuntuPath/root/napcat/cache/qrcode.png';
       final qrcodeFile = File(qrcodePath);
@@ -103,7 +106,7 @@ class NapcatController extends GetxController {
     }
 
     // 检测指令2关闭二维码
-    if (event.contains('配置加载') && _isQrcodeShowing.value) {
+    if (cleanEvent.contains('配置加载') && _isQrcodeShowing.value) {
       // 关闭对话框
       if (_qrcodeDialog != null) {
         Get.back();
@@ -119,7 +122,7 @@ class NapcatController extends GetxController {
     }
 
     // 检测指令3处理登录错误
-    if (event.contains('Login Error') && _isQrcodeShowing.value) {
+    if (cleanEvent.contains('Login Error') && _isQrcodeShowing.value) {
       // 关闭二维码对话框
       if (_qrcodeDialog != null) {
         Get.back();
@@ -129,8 +132,8 @@ class NapcatController extends GetxController {
 
       // 提取错误信息
       String errorMsg = '登录失败';
-      if (event.contains('"message":"')) {
-        final match = RegExp(r'"message":"([^"]+)"').firstMatch(event);
+      if (cleanEvent.contains('"message":"')) {
+        final match = RegExp(r'"message":"([^"]+)"').firstMatch(cleanEvent);
         if (match != null) {
           errorMsg = match.group(1) ?? errorMsg;
         }
@@ -149,10 +152,13 @@ class NapcatController extends GetxController {
   }
   
   void handleMaibotOutput(String event) {
+    // 剥离ANSI颜色代码
+    final cleanEvent = event.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
+
     // 适配新版日志：🔑 WebUI 登录 Token: ...
-    if (event.contains('WebUI 登录 Token:')) {
+    if (cleanEvent.contains('WebUI 登录 Token:')) {
         final match =
-            RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)').firstMatch(event);
+            RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)').firstMatch(cleanEvent);
         if (match != null) {
           final token = match.group(1);
           if (token != null) {
