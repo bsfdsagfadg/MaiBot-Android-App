@@ -18,8 +18,8 @@ dependencies:
   dio: ^5.7.0
   cupertino_icons: ^1.0.2
   get: ^4.6.5
-  device_info_plus: ^12.4.0
-  package_info_plus: ^9.0.1
+  device_info_plus: ^13.1.0
+  package_info_plus: ^10.1.0
   tar: ^2.0.0
   path: ^1.9.1
   webview_flutter: ^4.10.0
@@ -27,7 +27,7 @@ dependencies:
   permission_handler: ^11.3.1
   http: ^1.2.2
   url_launcher: ^6.3.1
-  file_picker: ^11.0.2
+  file_picker: ^12.0.0-beta.5
   flutter_markdown: ^0.7.4+3
 
   # get repo

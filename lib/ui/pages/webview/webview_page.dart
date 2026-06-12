@@ -10,6 +10,7 @@ import '../../controllers/terminal_controller.dart';
 import '../settings/settings_page.dart';
 import '../terminal/terminal_tab_view.dart';
 import '../../navbar/bottom_nav_bar.dart';
+
 class WebViewPage extends StatefulWidget {
   const WebViewPage({super.key});
 
@@ -28,7 +29,6 @@ class _WebViewPageState extends State<WebViewPage> {
   final HomeController homeController = Get.find<HomeController>();
 
   // 标记 MaiBot WebView 是否初始化
-  // Flag for MaiBot WebView initialization
   bool _maiBotInitialized = false;
 
   @override
@@ -239,7 +239,6 @@ class _WebViewPageState extends State<WebViewPage> {
       // 设置文件选择回调
       androidController.setOnShowFileSelector(_handleFileSelection);
     }
-
   }
 
   // 创建自定义 WebView 控制器
@@ -299,18 +298,20 @@ class _WebViewPageState extends State<WebViewPage> {
     return _customControllers[url]!;
   }
 
-  // 处理文件选择
+  // 处理文件选择 (已更新以修复并适配新版 file_picker API)
   Future<List<String>> _handleFileSelection(FileSelectorParams params) async {
     try {
-      // 根据参数配置文件选择器
-      FilePickerResult? result;
+      // 用于存放最终选择的文件列表
+      List<PlatformFile> pickedFiles = [];
 
       // 判断是否接受多个文件
       final bool allowMultiple = params.mode == FileSelectorMode.openMultiple;
 
-      // 判断文件类型
+      // 提取文件类型与允许的扩展名参数
+      FileType pickingType = FileType.any;
+      List<String>? allowedExtensions;
+
       if (params.acceptTypes.isNotEmpty) {
-        // 如果指定了接受的文件类型
         final acceptTypes = params.acceptTypes;
 
         // 检查是否只接受图片
@@ -332,58 +333,56 @@ class _WebViewPageState extends State<WebViewPage> {
         );
 
         if (isImageOnly) {
-          result = await FilePicker.pickFiles(
-            type: FileType.image,
-            allowMultiple: allowMultiple,
-          );
+          pickingType = FileType.image;
         } else if (isVideoOnly) {
-          result = await FilePicker.pickFiles(
-            type: FileType.video,
-            allowMultiple: allowMultiple,
-          );
+          pickingType = FileType.video;
         } else if (isAudioOnly) {
-          result = await FilePicker.pickFiles(
-            type: FileType.audio,
-            allowMultiple: allowMultiple,
-          );
+          pickingType = FileType.audio;
         } else {
           // 提取所有允许的扩展名
-          final List<String> allowedExtensions = [];
+          final List<String> extensions = [];
           for (final type in acceptTypes) {
             // 如果是扩展名格式 (如 .txt, .pdf)
             if (type.startsWith('.')) {
-              allowedExtensions.add(type.substring(1));
+              extensions.add(type.substring(1));
             }
             // 如果是文件扩展名格式 (如 txt, pdf)
             else if (!type.contains('/')) {
-              allowedExtensions.add(type);
+              extensions.add(type);
             }
           }
 
-          if (allowedExtensions.isNotEmpty) {
-            result = await FilePicker.pickFiles(
-              type: FileType.custom,
-              allowedExtensions: allowedExtensions,
-              allowMultiple: allowMultiple,
-            );
-          } else {
-            result = await FilePicker.pickFiles(
-              type: FileType.any,
-              allowMultiple: allowMultiple,
-            );
+          if (extensions.isNotEmpty) {
+            pickingType = FileType.custom;
+            allowedExtensions = extensions;
           }
         }
-      } else {
-        // 没有指定类型，允许选择任何文件
-        result = await FilePicker.pickFiles(
-          type: FileType.any,
-          allowMultiple: allowMultiple,
+      }
+
+      // 根据是否多选，调用相应的 API
+      if (allowMultiple) {
+        // 多选情况：直接使用 pickFiles（不再传递已弃用的 allowMultiple 参数）
+        final FilePickerResult? result = await FilePicker.pickFiles(
+          type: pickingType,
+          allowedExtensions: allowedExtensions,
         );
+        if (result != null) {
+          pickedFiles = result.files;
+        }
+      } else {
+        // 单选情况：使用新 API pickFile()，它返回单个 PlatformFile?
+        final PlatformFile? file = await FilePicker.pickFile(
+          type: pickingType,
+          allowedExtensions: allowedExtensions,
+        );
+        if (file != null) {
+          pickedFiles = [file];
+        }
       }
 
       // 返回选中的文件路径,转换为 file:// URI 格式
-      if (result != null && result.files.isNotEmpty) {
-        final List<String> filePaths = result.files
+      if (pickedFiles.isNotEmpty) {
+        final List<String> filePaths = pickedFiles
             .where((file) => file.path != null)
             .map((file) {
               final path = file.path!;
@@ -464,7 +463,6 @@ class _WebViewPageState extends State<WebViewPage> {
     final text = clipboardData?.text ?? '';
     controller.runJavaScript('window.clipboardText = "$text";');
   }
-
 
   @override
   Widget build(BuildContext context) {
