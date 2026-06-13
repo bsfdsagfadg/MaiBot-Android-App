@@ -44,13 +44,7 @@ install_sudo_curl_git(){
     progress_echo "基础组件已安装"
   fi
 
-  # 配置 tmux 绕过备用屏幕限制，恢复原生滚动
-  echo "配置 tmux 滚动支持..."
-  cat <<EOF > /root/.tmux.conf
-set -g terminal-overrides 'xterm*:smcup@:rmcup@'
-set -g history-limit 50000
-set -g mouse off
-EOF
+
 }
 
 network_test() {
@@ -397,15 +391,9 @@ install_maibot(){
     export PRIVACY_AGREE="9943b855e72199d0f5016ea39052f1b6"
   fi
   
-  # 循环保活模式启动 bot.py
-  echo "正在启动 MaiBot 并进入保活模式..."
+  echo "正在启动 MaiBot..."
   export PYTHONUNBUFFERED=1
-  while true; do
-    echo "MaiBot 正在启动..."
-    $HOME/.local/bin/uv run bot.py 2>&1 | tee /root/maibot_clean.log
-    echo "MaiBot 进程意外退出，3秒后尝试重启..."
-    sleep 3
-  done
+  exec $HOME/.local/bin/uv run bot.py
 }
 
 # 声明全局事务状态标记

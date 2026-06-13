@@ -48,7 +48,7 @@ class _TerminalPageState extends State<TerminalPage> {
                 displayMode = 1;
               } else if (displayMode == 1) {
                 // 如果 NapCat 已经开始启动并创建了 terminal 实例，允许切换到 NapCat 终端
-                if (controller.napcatTerminal != null) {
+                if (controller.napcatSocket != null) {
                   displayMode = 2;
                 } else {
                   // 未启动则直接恢复隐藏

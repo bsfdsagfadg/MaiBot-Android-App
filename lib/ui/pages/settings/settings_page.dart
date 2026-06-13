@@ -139,8 +139,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // 版本号比较
   int _compareVersions(String v1, String v2) {
-    final parts1 = v1.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    final parts2 = v2.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    String clean(String v) {
+      v = v.replaceFirst('v', '').trim();
+      if (v.contains('-')) v = v.split('-')[0];
+      if (v.contains('+')) v = v.split('+')[0];
+      return v;
+    }
+
+    final parts1 = clean(v1).split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final parts2 = clean(v2).split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
     for (int i = 0; i < 3; i++) {
       final p1 = i < parts1.length ? parts1[i] : 0;
@@ -1755,12 +1762,13 @@ class KeepAliveSettingsPage extends StatefulWidget {
 
 class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
   bool _isBatteryOptimizationIgnored = false;
-  final Setting _enableForegroundService = 'enable_foreground_service'.setting;
+
   final Setting _enableWifiLock = 'enable_wifi_lock'.setting;
 
   // Shizuku Keep-Alive 状态
   bool _shizukuDozeWhitelist = false;
   bool _shizukuRunAnyInBackground = false;
+  bool _shizukuPhantomProcessLimit = false;
   bool _shizukuAvailable = false;
   bool _shizukuPermissionGranted = false;
   final ShizukuApi _shizukuApi = ShizukuApi();
@@ -1770,9 +1778,6 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     super.initState();
     _checkBatteryOptimizationStatus();
     _checkShizukuStatus();
-    if (_enableForegroundService.get() == null) {
-      _enableForegroundService.set(true);
-    }
     if (_enableWifiLock.get() == null) {
       _enableWifiLock.set(true);
     }
@@ -1818,9 +1823,14 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
         final appopsOut = await _shizukuApi.runCommand('cmd appops get com.maibot.maibot_android RUN_ANY_IN_BACKGROUND');
         final isRunAnyAllowed = appopsOut != null && appopsOut.toLowerCase().contains('allow');
 
+        // 3. 查询 phantom process
+        final phantomOut = await _shizukuApi.runCommand('dumpsys activity settings');
+        final isPhantomIncreased = phantomOut != null && phantomOut.contains('max_phantom_processes=64');
+
         setState(() {
           _shizukuDozeWhitelist = isDozeWhitelisted;
           _shizukuRunAnyInBackground = isRunAnyAllowed;
+          _shizukuPhantomProcessLimit = isPhantomIncreased;
         });
       }
     } catch (e) {
@@ -1888,6 +1898,30 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
   }
 
   // 3. 无限制后台运行 AppOps 状态切换
+  Future<void> _togglePhantomProcess(bool value) async {
+    if (!await _ensureShizukuPermission()) return;
+    try {
+      if (value) {
+        // 第一步：禁止系统自动同步重置设定
+        await _shizukuApi.runCommand('device_config set_sync_disabled_for_tests persistent');
+        // 第二步：将限制提升到 64
+        await _shizukuApi.runCommand('device_config put activity_manager max_phantom_processes 64');
+        Get.snackbar('设置成功', '已提高幻影进程限制至64', snackPosition: SnackPosition.BOTTOM);
+      } else {
+        // 恢复：启用同步并改回 32
+        await _shizukuApi.runCommand('device_config set_sync_disabled_for_tests none');
+        await _shizukuApi.runCommand('device_config put activity_manager max_phantom_processes 32');
+        Get.snackbar('还原成功', '已恢复默认幻影进程限制', snackPosition: SnackPosition.BOTTOM);
+      }
+      await _checkShizukuStatus();
+    } catch (e) {
+      Get.snackbar('执行失败', e.toString(),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white);
+    }
+  }
+
   Future<void> _toggleRunAnyInBackground(bool value) async {
     if (!await _ensureShizukuPermission()) return;
     try {
@@ -1961,23 +1995,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 : const Icon(Icons.warning, color: Colors.orange),
             onTap: _requestBatteryOptimization,
           ),
-          ListTile(
-            leading: const Icon(Icons.notifications_active),
-            title: const Text('前台服务与通知保活'),
-            subtitle: const Text('开启后将在通知栏常驻，防止系统杀后台'),
-            trailing: Switch(
-              value: _enableForegroundService.get() ?? true,
-              onChanged: (bool value) async {
-                _enableForegroundService.set(value);
-                setState(() {});
-                if (value) {
-                  await ForegroundServiceManager.startService();
-                } else {
-                  await ForegroundServiceManager.stopService();
-                }
-              },
-            ),
-          ),
+
           ListTile(
             leading: const Icon(Icons.wifi_lock),
             title: const Text('保持 Wi-Fi 唤醒 (WLAN 锁)'),
@@ -2042,6 +2060,17 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
               value: _shizukuRunAnyInBackground,
               onChanged: (bool value) {
                 _toggleRunAnyInBackground(value);
+              },
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.memory),
+            title: const Text('提高幻影进程限制'),
+            subtitle: const Text('将最大幻影进程数限制提高至64，避免因进程过多导致子进程被意外杀掉'),
+            trailing: Switch(
+              value: _shizukuPhantomProcessLimit,
+              onChanged: (bool value) {
+                _togglePhantomProcess(value);
               },
             ),
           ),

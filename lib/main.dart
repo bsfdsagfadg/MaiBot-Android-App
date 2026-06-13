@@ -40,11 +40,8 @@ Future<void> main() async {
   // 初始化前台服务
   ForegroundServiceManager.init();
   
-  // 检查是否开启了前台服务保活
-  final enableForegroundService = 'enable_foreground_service'.setting.get() ?? true;
-  if (enableForegroundService) {
-    await ForegroundServiceManager.startService();
-  }
+  // 强制开启前台服务保活
+  await ForegroundServiceManager.startService();
   
   runApp(
     Builder(builder: (context) {
@@ -82,11 +79,9 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
     _serviceMonitorTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       final isRunning = await ForegroundServiceManager.isRunningService();
       final userClickedStop = ForegroundServiceManager.userClickedStopButton;
-      final enableForegroundService = 'enable_foreground_service'.setting.get() ?? true;
-
-      // 只有在开启了保活、服务未运行且用户没有点击停止按钮的情况下才重启
+      // 只有在服务未运行且用户没有点击停止按钮的情况下才重启
       // 这样即使用户从通知栏划掉通知，服务也会被重建
-      if (enableForegroundService && !isRunning && !userClickedStop) {
+      if (!isRunning && !userClickedStop) {
         Log.w('主应用检测到服务未运行，尝试重启...', 'MaiBot');
         try {
           await ForegroundServiceManager.startService();

@@ -1,7 +1,11 @@
 import 'dart:io';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter_pty/flutter_pty.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
+import '../utils/file_utils.dart';
 
 /// 前台服务管理类
 /// Foreground Service Manager
@@ -119,21 +123,83 @@ class KeepAliveTaskHandler extends TaskHandler {
   /// 标记是否是用户主动划掉通知（用于区分系统自动清理）
   static bool _userDismissedNotification = false;
 
+  Pty? _maibotPty;
+  Pty? _napcatPty;
+  ServerSocket? _maibotServer;
+  ServerSocket? _napcatServer;
+  final List<Socket> _maibotSockets = [];
+  final List<Socket> _napcatSockets = [];
+  final List<int> _maibotBuffer = [];
+  final List<int> _napcatBuffer = [];
+
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    // 服务启动时调用
     Log.i('前台服务已启动', 'KeepAliveTaskHandler');
+    RuntimeEnvir.initEnvirWithPackageName('com.maibot.maibot_android');
+    try {
+      _maibotServer ??= await ServerSocket.bind('127.0.0.1', 20001, shared: true);
+      _maibotServer!.listen((socket) {
+        _maibotSockets.add(socket);
+        socket.add(_maibotBuffer);
+        socket.listen((data) => _maibotPty?.write(data), onDone: () => _maibotSockets.remove(socket), onError: (_) => _maibotSockets.remove(socket));
+      });
+
+      _napcatServer ??= await ServerSocket.bind('127.0.0.1', 20002, shared: true);
+      _napcatServer!.listen((socket) {
+        _napcatSockets.add(socket);
+        socket.add(_napcatBuffer);
+        socket.listen((data) => _napcatPty?.write(data), onDone: () => _napcatSockets.remove(socket), onError: (_) => _napcatSockets.remove(socket));
+      });
+    } catch (e) {
+      Log.e('ServerSocket bind error: $e', 'KeepAliveTaskHandler');
+    }
+  }
+
+  @override
+  void onReceiveData(Object data) {
+    if (data == 'start_maibot') {
+      _startMaiBot();
+    } else if (data == 'start_napcat') {
+      _startNapCat();
+    }
+  }
+
+  void _startMaiBot() {
+    if (_maibotPty != null) return;
+    _maibotBuffer.clear();
+    _maibotPty = createPTY(rows: 25, columns: 80);
+    _maibotPty!.output.listen((data) {
+      _maibotBuffer.addAll(data);
+      if (_maibotBuffer.length > 50000) _maibotBuffer.removeRange(0, _maibotBuffer.length - 50000);
+      for (var s in _maibotSockets) { try { s.add(data); } catch(_) {} }
+    }, onDone: () {
+      _maibotPty = null;
+      Log.i('MaiBot exited, restarting in 3s', 'KeepAliveTaskHandler');
+      Future.delayed(const Duration(seconds: 3), _startMaiBot);
+    });
+    _maibotPty!.writeString('source ${RuntimeEnvir.homePath}/common.sh\nstart_maibot\n');
+  }
+
+  void _startNapCat() {
+    if (_napcatPty != null) return;
+    _napcatBuffer.clear();
+    _napcatPty = createPTY(rows: 25, columns: 80);
+    _napcatPty!.output.listen((data) {
+      _napcatBuffer.addAll(data);
+      if (_napcatBuffer.length > 50000) _napcatBuffer.removeRange(0, _napcatBuffer.length - 50000);
+      for (var s in _napcatSockets) { try { s.add(data); } catch(_) {} }
+    }, onDone: () {
+      _napcatPty = null;
+      Log.i('NapCat exited, restarting in 3s', 'KeepAliveTaskHandler');
+      Future.delayed(const Duration(seconds: 3), _startNapCat);
+    });
+    _napcatPty!.writeString('source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash /root/launcher.sh"\n');
   }
 
   @override
   void onRepeatEvent(DateTime timestamp) {
-    // 根据 eventAction 设置的间隔定期调用
-    // 这里执行保活逻辑和自动重建检测
-
-    // 定期检查服务状态，如果发现服务已停止且用户没有点击停止按钮，则重建
     FlutterForegroundTask.isRunningService.then((isRunning) {
-      final enableForegroundService = 'enable_foreground_service'.setting.get() ?? true;
-      if (enableForegroundService && !isRunning && !ForegroundServiceManager.userClickedStopButton) {
+      if (!isRunning && !ForegroundServiceManager.userClickedStopButton) {
         Log.w('检测到服务意外停止，准备重建...',  'KeepAliveTaskHandler');
         _rebuildService();
       }
@@ -142,24 +208,14 @@ class KeepAliveTaskHandler extends TaskHandler {
 
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTaskRemoved) async {
-    // 服务销毁时调用
-    // isTaskRemoved: 用户从最近任务中移除应用（值为true）
     Log.i('前台服务被销毁，isTaskRemoved: $isTaskRemoved, 用户主动划掉: $_userDismissedNotification',  'KeepAliveTaskHandler');
 
-    // 重建场景判断：
-    // 1. 如果是用户主动划掉通知：onNotificationDismissed() 已处理，这里不处理
-    // 2. 如果是系统自动清理通知（如充电完成等）：onNotificationDismissed() 不会被调用，需要在这里重建
-    // 3. 如果是用户点击停止按钮：不重建
-
-    final enableForegroundService = 'enable_foreground_service'.setting.get() ?? true;
-    if (enableForegroundService && !_userDismissedNotification && !ForegroundServiceManager.userClickedStopButton) {
+    if (!_userDismissedNotification && !ForegroundServiceManager.userClickedStopButton) {
       Log.w('检测到系统自动清理通知或服务被终止，准备重建...',  'KeepAliveTaskHandler');
-      // 延迟重建以确保服务完全关闭
       await Future.delayed(const Duration(milliseconds: 500));
       await _rebuildService();
     }
 
-    // 重置用户划掉标记
     _userDismissedNotification = false;
   }
 
@@ -215,22 +271,17 @@ class KeepAliveTaskHandler extends TaskHandler {
 
   @override
   void onNotificationDismissed() {
-    // 用户从通知栏主动划掉通知时调用
     Log.w('用户主动划掉通知，准备重建服务...',  'KeepAliveTaskHandler');
 
-    // 标记为用户主动划掉，避免 onDestroy() 中重复处理
     _userDismissedNotification = true;
 
-    final enableForegroundService = 'enable_foreground_service'.setting.get() ?? true;
-    // 只有开启了保活并且用户没有点击停止按钮，才重建服务
-    if (enableForegroundService && !ForegroundServiceManager.userClickedStopButton) {
+    if (!ForegroundServiceManager.userClickedStopButton) {
       Log.i('检测到用户主动划掉通知，将重建服务',  'KeepAliveTaskHandler');
-      // 延迟一小段时间后重建服务
       Future.delayed(const Duration(milliseconds: 500), () {
         _rebuildService();
       });
     } else {
-      Log.i('不重建服务（功能已关闭或用户手动停止）',  'KeepAliveTaskHandler');
+      Log.i('不重建服务（用户手动停止）',  'KeepAliveTaskHandler');
     }
   }
 }

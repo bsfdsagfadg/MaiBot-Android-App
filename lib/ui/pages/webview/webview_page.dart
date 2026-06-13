@@ -18,7 +18,7 @@ class WebViewPage extends StatefulWidget {
   State<WebViewPage> createState() => _WebViewPageState();
 }
 
-class _WebViewPageState extends State<WebViewPage> {
+class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   int _currentIndex = 0;
   int _previousNavItemCount = 0; // 记录上一次导航栏项目数量
 
@@ -34,6 +34,7 @@ class _WebViewPageState extends State<WebViewPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initSystemUI();
     _initMaiBotController();
     _initNapCatController();
@@ -51,8 +52,33 @@ class _WebViewPageState extends State<WebViewPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _restoreSystemUI();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _maiBotController.clearCache();
+      _maiBotController.loadRequest(Uri.parse('about:blank'));
+      _napCatController.clearCache();
+      _napCatController.loadRequest(Uri.parse('about:blank'));
+      for (var controller in _customControllers.values) {
+        controller.clearCache();
+        controller.loadRequest(Uri.parse('about:blank'));
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      _maiBotController.loadRequest(Uri.parse('http://127.0.0.1:8001'));
+      if (homeController.napcatController.napCatWebUiToken.isNotEmpty) {
+        _napCatController.loadRequest(Uri.parse('http://127.0.0.1:6099/webui?token=\${homeController.napcatController.napCatWebUiToken.value}'));
+      } else {
+        _napCatController.loadRequest(Uri.parse('http://127.0.0.1:6099/webui'));
+      }
+      _customControllers.forEach((url, controller) {
+        controller.loadRequest(Uri.parse(url));
+      });
+    }
   }
 
   void _initSystemUI() {
