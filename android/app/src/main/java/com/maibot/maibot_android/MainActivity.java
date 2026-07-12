@@ -48,36 +48,37 @@ public class MainActivity extends FragmentActivity {
         if (flutterEngine == null) {
             flutterEngine = new FlutterEngine(this, null, false);
             flutterEngine.getDartExecutor().executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault());
-            new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "maibot_channel").setMethodCallHandler((call, result) -> {
-                if ("lib_path".equals(call.method)) {
-                    result.success(mContext.getApplicationContext().getApplicationInfo().nativeLibraryDir);
-                } else if ("hide_from_recents".equals(call.method)) {
-                    boolean hide = call.argument("hide");
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-                        android.app.ActivityManager.AppTask task = null;
-                        android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-                        for (android.app.ActivityManager.AppTask t : am.getAppTasks()) {
-                            if (t.getTaskInfo().id == getTaskId()) {
-                                task = t;
-                                break;
-                            }
-                        }
-                        if (task != null) {
-                            task.setExcludeFromRecents(hide);
-                            result.success(true);
-                        } else {
-                            result.error("ERROR", "Task not found", null);
-                        }
-                    } else {
-                        result.error("UNSUPPORTED", "API level < 21", null);
-                    }
-                } else {
-                    result.notImplemented();
-                }
-            });
             GeneratedPluginRegistrant.registerWith(flutterEngine);
             FlutterEngineCache.getInstance().put("my_engine_id", flutterEngine);
         }
+
+        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "maibot_channel").setMethodCallHandler((call, result) -> {
+            if ("lib_path".equals(call.method)) {
+                result.success(mContext.getApplicationContext().getApplicationInfo().nativeLibraryDir);
+            } else if ("hide_from_recents".equals(call.method)) {
+                boolean hide = call.argument("hide");
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    android.app.ActivityManager.AppTask task = null;
+                    android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                    for (android.app.ActivityManager.AppTask t : am.getAppTasks()) {
+                        if (t.getTaskInfo().id == getTaskId()) {
+                            task = t;
+                            break;
+                        }
+                    }
+                    if (task != null) {
+                        task.setExcludeFromRecents(hide);
+                        result.success(true);
+                    } else {
+                        result.error("ERROR", "Task not found", null);
+                    }
+                } else {
+                    result.error("UNSUPPORTED", "API level < 21", null);
+                }
+            } else {
+                result.notImplemented();
+            }
+        });
         if (flutterFragment == null) {
             flutterFragment = FlutterFragment.withCachedEngine("my_engine_id").build();
         }
@@ -193,6 +194,10 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     protected void onDestroy() {
+        FlutterEngine flutterEngine = FlutterEngineCache.getInstance().get("my_engine_id");
+        if (flutterEngine != null) {
+            new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "maibot_channel").setMethodCallHandler(null);
+        }
         super.onDestroy();
     }
 

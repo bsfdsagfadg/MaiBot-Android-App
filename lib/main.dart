@@ -9,6 +9,7 @@ import 'dart:async';
 import 'generated/l10n.dart';
 import 'core/services/foreground_service.dart';
 import 'ui/routes/app_routes.dart';
+import 'ui/controllers/terminal_controller.dart';
 
 // Notice: behavior will submit Device
 
@@ -109,8 +110,8 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
       Log.i('应用正在退出，清理所有资源...', 'MaiBot');
       try {
         // 尝试获取并清理 HomeController
-        if (Get.isRegistered<dynamic>()) {
-          Get.delete<dynamic>(force: true);
+        if (Get.isRegistered<HomeController>()) {
+          Get.delete<HomeController>(force: true);
         }
       } catch (e) {
         Log.e('清理资源时出错: $e', 'MaiBot');

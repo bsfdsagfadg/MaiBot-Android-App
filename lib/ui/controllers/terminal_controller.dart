@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_pty/flutter_pty.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
@@ -19,7 +18,7 @@ import 'napcat_controller.dart';
 import 'terminal_tab_manager.dart';
 import 'webview_controller.dart';
 
-class HomeController extends GetxController {
+class HomeController extends GetxController with WidgetsBindingObserver {
   // 终端标签页管理器
   late final TerminalTabManager terminalTabManager;
   Setting privacySetting = 'privacy'.setting;
@@ -408,22 +407,28 @@ class HomeController extends GetxController {
     });
 
     // 监听应用生命周期状态变化
-    WidgetsBinding.instance.addObserver(
-      LifecycleObserver(
-        onResume: () {
-          _isAppInForeground = true;
-          // 当应用回到前台且两个条件都满足但webview未打开时，打开webview
-          if (_isLocalhostDetected &&
-              napcatController.isQrcodeProcessed &&
-              !webviewController.webviewHasOpen) {
-            webviewController.navigateToWebview();
-          }
-        },
-        onPause: () {
-          _isAppInForeground = false;
-        },
-      ),
-    );
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppInForeground = true;
+        // 当应用回到前台且两个条件都满足但webview未打开时，打开webview
+        if (_isLocalhostDetected &&
+            napcatController.isQrcodeProcessed &&
+            !webviewController.webviewHasOpen) {
+          webviewController.navigateToWebview();
+        }
+        break;
+      case AppLifecycleState.paused:
+        _isAppInForeground = false;
+        break;
+      default:
+        break;
+    }
   }
 
   // 彻底清理可能的残留进程
@@ -449,35 +454,8 @@ class HomeController extends GetxController {
     }
 
     // 移除生命周期观察者
-    WidgetsBinding.instance.removeObserver(
-      LifecycleObserver(
-        onResume: () {},
-        onPause: () {},
-      ),
-    );
+    WidgetsBinding.instance.removeObserver(this);
     super.onClose();
   }
 }
 
-// 应用生命周期观察者类
-class LifecycleObserver extends WidgetsBindingObserver {
-  final VoidCallback onResume;
-  final VoidCallback onPause;
-
-  LifecycleObserver({required this.onResume, required this.onPause});
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    switch (state) {
-      case AppLifecycleState.resumed:
-        onResume();
-        break;
-      case AppLifecycleState.paused:
-        onPause();
-        break;
-      default:
-        break;
-    }
-  }
-}

@@ -31,6 +31,8 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   // 标记 MaiBot WebView 是否初始化
   bool _maiBotInitialized = false;
 
+  Worker? _customWebViewsWorker;
+  Worker? _napCatTokenWorker;
   @override
   void initState() {
     super.initState();
@@ -40,7 +42,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     _initNapCatController();
 
     // 监听自定义 WebView 列表变化,清理已删除的控制器
-    ever(homeController.webviewController.customWebViews, (List<Map<String, String>> webviews) {
+    _customWebViewsWorker = ever(homeController.webviewController.customWebViews, (List<Map<String, String>> webviews) {
       // 清理不再存在的控制器
       final validUrls = webviews.map((wv) => wv['url'] ?? '').toSet();
       final controllersToRemove = _customControllers.keys.where((key) => !validUrls.contains(key)).toList();
@@ -53,6 +55,8 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _customWebViewsWorker?.dispose();
+    _napCatTokenWorker?.dispose();
     _restoreSystemUI();
     super.dispose();
   }
@@ -237,7 +241,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
       );
 
     // 监听 Token 变化
-    ever(homeController.napcatController.napCatWebUiToken, (String token) {
+    _napCatTokenWorker = ever(homeController.napcatController.napCatWebUiToken, (String token) {
       if (token.isNotEmpty) {
         final url = 'http://127.0.0.1:6099/webui?token=$token';
         _napCatController.loadRequest(Uri.parse(url));

@@ -12,7 +12,6 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:shizuku_api/shizuku_api.dart';
 import 'package:settings/settings.dart';
 import '../../controllers/terminal_controller.dart';
-import '../../../core/services/foreground_service.dart';
 import '../../../core/constants/scripts.dart' as scripts;
 import '../../../core/config/app_config.dart';
 
@@ -1145,7 +1144,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 final maiBotPath = '${scripts.ubuntuPath}/root/MaiBot';
                 final maiBotDir = Directory(maiBotPath);
                 if (await maiBotDir.exists()) {
-                  await maiBotDir.delete(recursive: true);
+                  try {
+                    await Process.run('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
+                  } catch (_) {}
+                  await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', maiBotPath]);
                   Log.i('已删除 MaiBot 目录: $maiBotPath',  'MaiBot');
                 }
 
@@ -1332,7 +1334,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 final dataDir = Directory(dataPath);
 
                 if (await dataDir.exists()) {
-                  await dataDir.delete(recursive: true);
+                  try {
+                    await Process.run('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
+                  } catch (_) {}
+                  await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', dataPath]);
                   Log.i('已清除 MaiBot 数据目录: $dataPath',  'MaiBot');
 
                   Get.snackbar(
@@ -1400,7 +1405,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 final venvDir = Directory(venvPath);
 
                 if (await venvDir.exists()) {
-                  await venvDir.delete(recursive: true);
+                  try {
+                    await Process.run('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
+                  } catch (_) {}
+                  await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', venvPath]);
                   Log.i('已删除 Python 虚拟环境: $venvPath',  'MaiBot');
 
                   Get.snackbar(
