@@ -23,6 +23,7 @@ import io.flutter.embedding.engine.dart.DartExecutor;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugins.GeneratedPluginRegistrant;
 
+@SuppressWarnings("deprecation")
 public class MainActivity extends FragmentActivity {
     FlutterFragment flutterFragment;
     private static final String TAG_FLUTTER_FRAGMENT = "flutter_fragment";
