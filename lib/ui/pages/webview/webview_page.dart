@@ -18,7 +18,7 @@ class WebViewPage extends StatefulWidget {
   State<WebViewPage> createState() => _WebViewPageState();
 }
 
-class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
+class _WebViewPageState extends State<WebViewPage> {
   int _currentIndex = 0;
   int _previousNavItemCount = 0; // 记录上一次导航栏项目数量
 
@@ -33,10 +33,10 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
   Worker? _customWebViewsWorker;
   Worker? _napCatTokenWorker;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _initSystemUI();
     _initMaiBotController();
     _initNapCatController();
@@ -54,35 +54,10 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _customWebViewsWorker?.dispose();
     _napCatTokenWorker?.dispose();
     _restoreSystemUI();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      _maiBotController.clearCache();
-      _maiBotController.loadRequest(Uri.parse('about:blank'));
-      _napCatController.clearCache();
-      _napCatController.loadRequest(Uri.parse('about:blank'));
-      for (var controller in _customControllers.values) {
-        controller.clearCache();
-        controller.loadRequest(Uri.parse('about:blank'));
-      }
-    } else if (state == AppLifecycleState.resumed) {
-      _maiBotController.loadRequest(Uri.parse('http://127.0.0.1:8001'));
-      if (homeController.napcatController.napCatWebUiToken.isNotEmpty) {
-        _napCatController.loadRequest(Uri.parse('http://127.0.0.1:6099/webui?token=\${homeController.napcatController.napCatWebUiToken.value}'));
-      } else {
-        _napCatController.loadRequest(Uri.parse('http://127.0.0.1:6099/webui'));
-      }
-      _customControllers.forEach((url, controller) {
-        controller.loadRequest(Uri.parse(url));
-      });
-    }
   }
 
   void _initSystemUI() {
@@ -328,7 +303,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     return _customControllers[url]!;
   }
 
-  // 处理文件选择 (已更新以修复并适配新版 file_picker API)
+  // 处理文件选择
   Future<List<String>> _handleFileSelection(FileSelectorParams params) async {
     try {
       // 用于存放最终选择的文件列表
@@ -372,11 +347,9 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
           // 提取所有允许的扩展名
           final List<String> extensions = [];
           for (final type in acceptTypes) {
-            // 如果是扩展名格式 (如 .txt, .pdf)
             if (type.startsWith('.')) {
               extensions.add(type.substring(1));
             }
-            // 如果是文件扩展名格式 (如 txt, pdf)
             else if (!type.contains('/')) {
               extensions.add(type);
             }
@@ -391,7 +364,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
 
       // 根据是否多选，调用相应的 API
       if (allowMultiple) {
-        // 多选情况：直接使用 pickFiles（不再传递已弃用的 allowMultiple 参数）
         final FilePickerResult? result = await FilePicker.pickFiles(
           type: pickingType,
           allowedExtensions: allowedExtensions,
@@ -400,7 +372,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
           pickedFiles = result.files;
         }
       } else {
-        // 单选情况：使用新 API pickFile()，它返回单个 PlatformFile?
         final PlatformFile? file = await FilePicker.pickFile(
           type: pickingType,
           allowedExtensions: allowedExtensions,
@@ -416,12 +387,9 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
             .where((file) => file.path != null)
             .map((file) {
               final path = file.path!;
-              // 如果路径已经是 file:// 开头,直接返回
               if (path.startsWith('file://')) {
                 return path;
               }
-              // 否则转换为 file:// URI
-              // 在 Windows 上路径可能包含反斜杠,需要替换为正斜杠
               final normalizedPath = path.replaceAll('\\', '/');
               return 'file://$normalizedPath';
             })
@@ -501,11 +469,9 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
     }
 
     return Obx(() {
-      // 检查 NapCat WebUI 是否启用
       final bool napCatEnabled = homeController.napcatController.napCatWebUiEnabledRx.value;
       final customWebViews = homeController.webviewController.customWebViews;
 
-      // 动态构建页面列表
       final List<Widget> pages = [
         // 1. MaiBot 配置页面
         Visibility(
@@ -541,17 +507,13 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
         }),
       ];
 
-      // 计算设置页的索引（终端页在倒数第二，设置页在最后）
       final int settingsIndex = pages.length + 1;
-      final int currentNavItemCount = pages.length + 2; // 总导航项数量
+      final int currentNavItemCount = pages.length + 2;
 
-      // 最简单的逻辑：导航栏数量变化时，直接锁定焦点到最大值（设置页）
       int validCurrentIndex = _currentIndex;
       if (_previousNavItemCount != 0 && _previousNavItemCount != currentNavItemCount) {
-        // 导航栏数量发生变化，锁定到设置页
         validCurrentIndex = settingsIndex;
         _previousNavItemCount = currentNavItemCount;
-        // 异步更新状态
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             setState(() {
@@ -560,7 +522,6 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
           }
         });
       } else if (_previousNavItemCount == 0) {
-        // 首次加载，记录导航栏数量
         _previousNavItemCount = currentNavItemCount;
       }
 
@@ -579,7 +540,7 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
               children: [
                 ...pages,
 
-                // 4. 终端页面（使用新的标签页视图）
+                // 4. 终端页面
                 const TerminalTabView(key: ValueKey('terminal_tab_view')),
 
                 // 5. 软件设置页面
