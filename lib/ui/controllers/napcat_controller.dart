@@ -23,12 +23,35 @@ class NapcatController extends GetxController {
   void onInit() {
     super.onInit();
     napCatWebUiEnabledRx.value = napCatWebUiEnabled.get() ?? false;
+    _loadMaibotTokenFromFile(); // 应用初始化时尝试读取已有 Token 供冷启动直接使用
   }
 
   // 更新 NapCat WebUI 启用状态
   void setNapCatWebUiEnabled(bool value) {
     napCatWebUiEnabled.set(value);
     napCatWebUiEnabledRx.value = value;
+  }
+
+  /// 优先从本地 webui.json 文件直接读取 WebUI 登录凭证 (Token)
+  bool _loadMaibotTokenFromFile() {
+    try {
+      final file = File('$ubuntuPath/root/MaiBot/data/webui.json');
+      if (file.existsSync()) {
+        final content = file.readAsStringSync();
+        final parsed = jsonDecode(content);
+        if (parsed is Map) {
+          final token = parsed['access_token']?.toString() ?? '';
+          if (token.isNotEmpty) {
+            maiBotWebUiToken.value = token;
+            Log.i('成功从 webui.json 读取到 MaiBot Token: $token', 'MaiBot');
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      Log.e('读取 webui.json 失败: $e', 'MaiBot');
+    }
+    return false;
   }
 
   void handleNapcatOutput(String event) async {
@@ -164,16 +187,22 @@ class NapcatController extends GetxController {
 
     // 适配新版日志：🔑 WebUI 登录 Token: ...
     if (cleanEvent.contains('WebUI 登录 Token:')) {
-        final matches =
-            RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)').allMatches(cleanEvent);
-        if (matches.isNotEmpty) {
-          final token = matches.last.group(1);
-          if (token != null) {
-            maiBotWebUiToken.value = token;
-            Log.i('捕获到 MaiBot Token: $token',  'MaiBot');
-          }
+      // 优先从本地 webui.json 读取 Token 凭证
+      if (_loadMaibotTokenFromFile()) {
+        return;
+      }
+
+      // 若文件不存在（如首次配置流程），则尝试通过日志提取
+      final matches =
+          RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)').allMatches(cleanEvent);
+      if (matches.isNotEmpty) {
+        final token = matches.last.group(1);
+        if (token != null) {
+          maiBotWebUiToken.value = token;
+          Log.i('成功从日志中抓取到 MaiBot Token: $token',  'MaiBot');
         }
       }
+    }
   }
 
   // 检测登录并询问是否保存QQ
