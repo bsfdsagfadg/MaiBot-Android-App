@@ -6,9 +6,6 @@ export UV_LINK_MODE=copy
 # 自定义 Git Clone 命令（为空时使用默认逻辑）
 CUSTOM_GIT_CLONE=""
 
-# 重装插件依赖标记（1表示需要重装，执行后自动清除）
-REINSTALL_PLUGINS_FLAG=0
-
 if [ -z "$TMPDIR" ]; then
   echo "错误：未检测到 TMPDIR，请在挂载共享目录时传入 TMPDIR"
   exit 1
@@ -280,7 +277,7 @@ install_maibot(){
     progress_echo "MaiBot $L_INSTALLED"
   fi
 
-  # --- 插件安装逻辑 (缺什么补什么合并) ---
+  # --- 插件恢复与默认适配器克隆 ---
   local ADAPTER_DIR="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter"
   
   if [ ! -d "$INSTALL_DIR/plugins" ] || [ -z "$(ls -A "$INSTALL_DIR/plugins" 2>/dev/null)" ]; then
@@ -316,7 +313,6 @@ install_maibot(){
     if [ "$BACKUP_HAS_MAIBOT_DATA" -eq 1 ]; then
       echo "从备份中恢复 MaiBot 数据..."
       cp -r "$TMPDIR/backup_restore/MaiBot/data"/* "$INSTALL_DIR/data/"
-      REINSTALL_PLUGINS_FLAG=1  # 恢复成功，标记需要重装插件依赖
       rm -rf "$INSTALL_DIR/.venv"
     fi
   fi
@@ -329,8 +325,8 @@ install_maibot(){
       cp -r "$TMPDIR/backup_restore/MaiBot/config"/* "$INSTALL_DIR/config/"
     fi
   fi
+  
   if [ ! -d "$INSTALL_DIR/.venv" ]; then
-
     # 使用 uv sync 同步依赖
     echo "同步 MaiBot 依赖..."
     cd "$INSTALL_DIR"
@@ -338,30 +334,14 @@ install_maibot(){
       echo "依赖同步失败"
       exit 1
     fi
-
-    REINSTALL_PLUGINS_FLAG=1  # .venv 不存在，需要重装插件依赖
   fi
 
-  # 检查是否需要重装插件依赖（根据标记）
-  if [ "$REINSTALL_PLUGINS_FLAG" -eq 1 ]; then
-
-    echo "检测到重装插件依赖标记，开始重装..."
-    # 清除标记（将脚本中的标记重置为0）
-    sed -i 's/^REINSTALL_PLUGINS_FLAG=1$/REINSTALL_PLUGINS_FLAG=0/' /root/maibot-startup.sh
-
-    # 扫描所有插件的 requirements.txt 并安装到 venv
-    echo "扫描插件依赖..."
-    if [ -d "$INSTALL_DIR/plugins" ]; then
-      for plugin_dir in "$INSTALL_DIR/plugins"/*; do
-        if [ -d "$plugin_dir" ] && [ -f "$plugin_dir/requirements.txt" ]; then
-          echo "发现插件依赖: $plugin_dir/requirements.txt"
-          if [ -f "$HOME/.local/bin/uv" ]; then
-            cd "$INSTALL_DIR"
-            echo "安装插件依赖: $(basename "$plugin_dir")..."
-            $HOME/.local/bin/uv pip install -r "$plugin_dir/requirements.txt" 2>/dev/null || echo "警告: 插件依赖安装失败，将在启动时重试"
-          fi
-        fi
-      done
+  # 确保 .venv 内部装有 pip 兼容层，供 MaiBot 自身的内置插件依赖管理器调用
+  if [ -f "$HOME/.local/bin/uv" ]; then
+    if ! "$INSTALL_DIR/.venv/bin/pip" --version >/dev/null 2>&1; then
+      echo "虚拟环境未检测到 pip 兼容层，正在通过 uv 补齐安装..."
+      cd "$INSTALL_DIR"
+      $HOME/.local/bin/uv pip install pip
     fi
   fi
 

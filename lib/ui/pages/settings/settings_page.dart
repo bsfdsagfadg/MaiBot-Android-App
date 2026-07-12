@@ -1244,53 +1244,6 @@ class _SettingsPageState extends State<SettingsPage> {
           },
         ),
         ListTile(
-          leading: const Icon(Icons.build),
-          title: const Text('覆盖安装插件依赖'),
-          subtitle: const Text('下次启动时重新扫描并安装所有插件依赖'),
-          onTap: () async {
-            try {
-              final scriptPath =
-                  '${scripts.ubuntuPath}/root/maibot-startup.sh';
-              final scriptFile = File(scriptPath);
-
-              if (await scriptFile.exists()) {
-                String content = await scriptFile.readAsString();
-
-                // 将 REINSTALL_PLUGINS_FLAG=0 修改为 REINSTALL_PLUGINS_FLAG=1
-                content = content.replaceFirst(
-                  RegExp(r'^REINSTALL_PLUGINS_FLAG=0$', multiLine: true),
-                  'REINSTALL_PLUGINS_FLAG=1',
-                );
-
-                await scriptFile.writeAsString(content);
-                Log.i('已设置插件依赖重装标记',  'MaiBot');
-
-                Get.snackbar(
-                  '设置成功',
-                  '下次启动时将重新安装所有插件依赖',
-                  snackPosition: SnackPosition.BOTTOM,
-                  duration: const Duration(seconds: 2),
-                );
-              } else {
-                Get.snackbar(
-                  '提示',
-                  '启动脚本文件不存在，请先启动一次应用',
-                  snackPosition: SnackPosition.BOTTOM,
-                  duration: const Duration(seconds: 2),
-                );
-              }
-            } catch (e) {
-              Log.e('设置重装标记失败: $e',  'MaiBot');
-              Get.snackbar(
-                '操作失败',
-                '设置重装标记失败: $e',
-                snackPosition: SnackPosition.BOTTOM,
-                duration: const Duration(seconds: 3),
-              );
-            }
-          },
-        ),
-        ListTile(
           leading: const Icon(Icons.backup),
           title: const Text('备份 MaiBot 数据'),
           subtitle: const Text('备份 MaiBot 配置和数据到手机存储'),
@@ -1301,15 +1254,15 @@ class _SettingsPageState extends State<SettingsPage> {
         ListTile(
           leading: const Icon(Icons.delete),
           title: const Text('清除 MaiBot 数据'),
-          subtitle: const Text('清除 MaiBot 配置和数据，\n重启时自动从备份恢复或重新初始化'),
+          subtitle: const Text('彻底清除 MaiBot 所有数据和本地配置，\n重启时自动从备份恢复或全新干净初始化'),
           onTap: () async {
             // 显示确认对话框
             final confirmed = await Get.dialog<bool>(
               AlertDialog(
                 title: const Text('确认清除数据'),
                 content: const Text(
-                  '此操作将删除所有 MaiBot 数据和配置，\n'
-                  '重启后将自动从备份恢复或重新初始化。\n\n'
+                  '此操作将深度删除所有 MaiBot 数据、系统配置以及适配器配置，\n'
+                  '重启后将自动从最近备份恢复或进行全新干净的零参数初始化。\n\n'
                   '是否继续？',
                 ),
                 actions: [
@@ -1330,19 +1283,41 @@ class _SettingsPageState extends State<SettingsPage> {
 
             if (confirmed == true) {
               try {
-                final dataPath = '${scripts.ubuntuPath}/root/MaiBot/data';
-                final dataDir = Directory(dataPath);
+                // 先尝试强制终止正在后台运行的所有子进程
+                try {
+                  await Process.run('${RuntimeEnvir.binPath}/busybox', [
+                    'killall',
+                    '-9',
+                    'node',
+                    'python',
+                    'python3',
+                    'bash',
+                    'sh'
+                  ]);
+                } catch (_) {}
 
-                if (await dataDir.exists()) {
-                  try {
-                    await Process.run('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
-                  } catch (_) {}
-                  await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', dataPath]);
-                  Log.i('已清除 MaiBot 数据目录: $dataPath',  'MaiBot');
+                // 定义需要彻底清理的 MaiBot 数据与配置相关路径
+                final List<String> pathsToDelete = [
+                  '${scripts.ubuntuPath}/root/MaiBot/data',                             // 运行持久化数据
+                  '${scripts.ubuntuPath}/root/MaiBot/config',                           // 系统底层配置文件
+                  '${scripts.ubuntuPath}/root/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml', // 适配器当前生效配置
+                  '${scripts.ubuntuPath}/root/config.toml',                             // 拷贝在根目录的配置模板
+                ];
 
+                bool deletedAny = false;
+                for (final path in pathsToDelete) {
+                  final entityType = FileSystemEntity.typeSync(path);
+                  if (entityType != FileSystemEntityType.notFound) {
+                    await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', path]);
+                    Log.i('已彻底清除路径: $path', 'MaiBot');
+                    deletedAny = true;
+                  }
+                }
+
+                if (deletedAny) {
                   Get.snackbar(
                     '清除成功',
-                    'MaiBot 数据已清除，应用即将退出',
+                    'MaiBot 数据与配置已彻底清除，应用即将自动退出',
                     snackPosition: SnackPosition.BOTTOM,
                     duration: const Duration(seconds: 2),
                   );
@@ -1353,13 +1328,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 } else {
                   Get.snackbar(
                     '提示',
-                    '数据目录不存在，无需清除',
+                    '未检测到本地有任何 MaiBot 相关的旧数据或配置文件',
                     snackPosition: SnackPosition.BOTTOM,
                     duration: const Duration(seconds: 2),
                   );
                 }
               } catch (e) {
-                Log.e('清除 MaiBot 数据失败: $e',  'MaiBot');
+                Log.e('清除 MaiBot 数据失败: $e', 'MaiBot');
                 Get.snackbar(
                   '操作失败',
                   '清除数据失败: $e',
