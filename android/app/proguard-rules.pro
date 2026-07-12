@@ -8,3 +8,6 @@
 
 # Keep App custom native bridging classes
 -keep class com.maibot.maibot_android.** { *; }
+
+# Ignore missing Play Core classes referenced by Flutter's deferred components
+-dontwarn com.google.android.play.core.**
