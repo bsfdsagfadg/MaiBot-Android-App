@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:xterm/xterm.dart';
 
 class ManjaroTerminalTheme extends TerminalTheme {
-  ManjaroTerminalTheme({
+  const ManjaroTerminalTheme({
     super.cursor = const Color(0xaaf6f5f4),
     super.selection = const Color(0XAAAEAFAD),
     super.foreground = const Color(0xffe5e5e5),

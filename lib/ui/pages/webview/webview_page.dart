@@ -509,17 +509,19 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
       final List<Widget> pages = [
         // 1. MaiBot 配置页面
         Visibility(
+          key: const ValueKey('maibot_webview_visibility'),
           visible: _currentIndex == 0,
           maintainState: true,
-          child: WebViewWidget(controller: _maiBotController),
+          child: WebViewWidget(key: const ValueKey('maibot_webview'), controller: _maiBotController),
         ),
 
         // 2. NapCat 配置页面（仅在启用时添加）
         if (napCatEnabled)
           Visibility(
+            key: const ValueKey('napcat_webview_visibility'),
             visible: _currentIndex == 1,
             maintainState: true,
-            child: WebViewWidget(controller: _napCatController),
+            child: WebViewWidget(key: const ValueKey('napcat_webview'), controller: _napCatController),
           ),
 
         // 3. 自定义 WebView 页面
@@ -528,9 +530,11 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
           final url = webview['url'] ?? '';
           final int pageIndex = index + (napCatEnabled ? 2 : 1);
           return Visibility(
+            key: ValueKey('custom_webview_visibility_$url'),
             visible: _currentIndex == pageIndex,
             maintainState: true,
             child: WebViewWidget(
+              key: ValueKey('custom_webview_$url'),
               controller: _getCustomController(url),
             ),
           );
@@ -576,10 +580,11 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
                 ...pages,
 
                 // 4. 终端页面（使用新的标签页视图）
-                const TerminalTabView(),
+                const TerminalTabView(key: ValueKey('terminal_tab_view')),
 
                 // 5. 软件设置页面
                 SettingsPage(
+                  key: const ValueKey('settings_page'),
                   maiBotController: _maiBotController,
                   napCatController: _napCatController,
                   onNavigate: (index) {

@@ -39,6 +39,8 @@ class TerminalTabManager extends GetxController {
   // 当前激活的标签页索引
   final RxInt activeTabIndex = 0.obs;
 
+  // 未注册的挂起系统终端 PTY 列表，防止提前销毁或流中断泄露
+  final Set<Pty> _pendingPtys = {};
   /// 初始化固定的终端标签页
   void initializeFixedTabs(Terminal maibotTerminal, Terminal napcatTerminal) {
     // 清空现有标签页
@@ -86,7 +88,7 @@ class TerminalTabManager extends GetxController {
         rows: newTerminal.viewHeight,
         columns: newTerminal.viewWidth,
       );
-
+      _pendingPtys.add(newPty);
       // 标志：是否已经创建了标签页
       var tabCreated = false;
 
@@ -107,7 +109,7 @@ class TerminalTabManager extends GetxController {
         // 检测是否包含 root@localhost 提示符
         if (!tabCreated && event.contains('root@localhost')) {
           tabCreated = true;
-
+          _pendingPtys.remove(newPty);
           // 创建新标签页
           final newTab = TerminalTab(
             id: tabId,
@@ -218,6 +220,17 @@ class TerminalTabManager extends GetxController {
 
   @override
   void onClose() {
+    // 清理未注册完成的挂起 PTY，防止僵尸进程泄露
+    for (var pty in _pendingPtys) {
+      try {
+        pty.kill();
+        Log.i('清理未就绪系统终端 PTY', 'TerminalTabManager');
+      } catch (e) {
+        Log.e('清理未就绪 PTY 失败: $e', 'TerminalTabManager');
+      }
+    }
+    _pendingPtys.clear();
+
     // 关闭所有系统终端的PTY
     for (var tab in tabs) {
       if (tab.type == TerminalTabType.system && tab.pty != null) {

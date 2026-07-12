@@ -180,7 +180,7 @@ class _TerminalTabViewState extends State<TerminalTabView> {
         tab.terminal,
         readOnly: tab.type == TerminalTabType.fixed, // 固定终端只读
         backgroundOpacity: 1,
-        theme: ManjaroTerminalTheme(),
+        theme: const ManjaroTerminalTheme(),
       ),
     );
   }

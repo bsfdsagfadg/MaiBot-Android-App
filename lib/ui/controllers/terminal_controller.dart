@@ -27,7 +27,10 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   
   Socket? maibotSocket;
   Socket? napcatSocket;
-
+  String _maibotLineBuffer = '';
+  String _napcatLineBuffer = '';
+  StreamSubscription? _progressSubscription;
+  StreamSubscription? _progressDesSubscription;
   late Terminal terminal = Terminal(
     maxLines: 5000,
     onOutput: (data) {
@@ -88,6 +91,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     if (maibotSocket != null) return;
     try {
       maibotSocket = await Socket.connect('127.0.0.1', 20001);
+      _maibotLineBuffer = '';
       maibotSocket!.listen((data) {
         final event = utf8.decode(data, allowMalformed: true);
         terminal.write(event);
@@ -95,13 +99,20 @@ class HomeController extends GetxController with WidgetsBindingObserver {
           terminal.buffer.clear();
           terminal.buffer.setCursor(0, 0);
         }
-        napcatController.handleMaibotOutput(event);
-        final cleanEvent = event.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
-        if (cleanEvent.contains('访问地址:')) {
-          _isLocalhostDetected = true;
-          bumpProgress();
-          _checkAndNavigateToWebview();
-          Future.delayed(const Duration(milliseconds: 2000), () => update());
+        
+        _maibotLineBuffer += event;
+        final lines = _maibotLineBuffer.split('\n');
+        _maibotLineBuffer = lines.removeLast();
+
+        for (final line in lines) {
+          napcatController.handleMaibotOutput(line);
+          final cleanLine = line.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
+          if (cleanLine.contains('访问地址:')) {
+            _isLocalhostDetected = true;
+            bumpProgress();
+            _checkAndNavigateToWebview();
+            Future.delayed(const Duration(milliseconds: 2000), () => update());
+          }
         }
       }, onDone: () {
         maibotSocket = null;
@@ -119,6 +130,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     if (napcatSocket != null) return;
     try {
       napcatSocket = await Socket.connect('127.0.0.1', 20002);
+      _napcatLineBuffer = '';
       napcatSocket!.listen((data) {
         final event = utf8.decode(data, allowMalformed: true);
         napcatShowTerminal.write(event);
@@ -126,7 +138,14 @@ class HomeController extends GetxController with WidgetsBindingObserver {
           napcatShowTerminal.buffer.clear();
           napcatShowTerminal.buffer.setCursor(0, 0);
         }
-        napcatController.handleNapcatOutput(event);
+        
+        _napcatLineBuffer += event;
+        final lines = _napcatLineBuffer.split('\n');
+        _napcatLineBuffer = lines.removeLast();
+
+        for (final line in lines) {
+          napcatController.handleNapcatOutput(line);
+        }
         _checkAndNavigateToWebview();
       }, onDone: () {
         napcatSocket = null;
@@ -196,7 +215,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   void syncProgress() {
     progressFile.createSync(recursive: true);
     progressFile.writeAsStringSync('0');
-    progressFile.watch(events: FileSystemEvent.all).listen((event) async {
+    _progressSubscription = progressFile.watch(events: FileSystemEvent.all).listen((event) async {
       if (event.type == FileSystemEvent.modify) {
         String content = await progressFile.readAsString();
         Log.e('content -> $content');
@@ -210,7 +229,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     });
     progressDesFile.createSync(recursive: true);
     progressDesFile.writeAsStringSync('');
-    progressDesFile.watch(events: FileSystemEvent.all).listen((event) async {
+    _progressDesSubscription = progressDesFile.watch(events: FileSystemEvent.all).listen((event) async {
       if (event.type == FileSystemEvent.modify) {
         String content = await progressDesFile.readAsString();
         if (currentProgress == content) return;
@@ -444,9 +463,10 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  @override
   void onClose() {
     try {
+      _progressSubscription?.cancel();
+      _progressDesSubscription?.cancel();
       maibotSocket?.close();
       napcatSocket?.close();
     } catch (e) {

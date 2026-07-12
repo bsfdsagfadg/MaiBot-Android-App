@@ -169,7 +169,9 @@ class KeepAliveTaskHandler extends TaskHandler {
     _maibotPty = createPTY(rows: 25, columns: 80);
     _maibotPty!.output.listen((data) {
       _maibotBuffer.addAll(data);
-      if (_maibotBuffer.length > 50000) _maibotBuffer.removeRange(0, _maibotBuffer.length - 50000);
+      if (_maibotBuffer.length > 70000) {
+        _maibotBuffer.removeRange(0, _maibotBuffer.length - 50000);
+      }
       for (var s in _maibotSockets) { try { s.add(data); } catch(_) {} }
     }, onDone: () {
       _maibotPty = null;
@@ -185,7 +187,9 @@ class KeepAliveTaskHandler extends TaskHandler {
     _napcatPty = createPTY(rows: 25, columns: 80);
     _napcatPty!.output.listen((data) {
       _napcatBuffer.addAll(data);
-      if (_napcatBuffer.length > 50000) _napcatBuffer.removeRange(0, _napcatBuffer.length - 50000);
+      if (_napcatBuffer.length > 70000) {
+        _napcatBuffer.removeRange(0, _napcatBuffer.length - 50000);
+      }
       for (var s in _napcatSockets) { try { s.add(data); } catch(_) {} }
     }, onDone: () {
       _napcatPty = null;
