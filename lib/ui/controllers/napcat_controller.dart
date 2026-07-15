@@ -38,11 +38,11 @@ class NapcatController extends GetxController {
   }
 
   /// 优先从本地 webui.json 文件直接读取 WebUI 登录凭证 (Token)
-  bool _loadMaibotTokenFromFile() {
+  Future<bool> _loadMaibotTokenFromFile() async {
     try {
       final file = File('$ubuntuPath/root/MaiBot/data/webui.json');
-      if (file.existsSync()) {
-        final content = file.readAsStringSync();
+      if (await file.exists()) {
+        final content = await file.readAsString();
         final parsed = jsonDecode(content);
         if (parsed is Map) {
           final token = parsed['access_token']?.toString() ?? '';
@@ -186,14 +186,14 @@ class NapcatController extends GetxController {
     }
   }
   
-  void handleMaibotOutput(String event) {
+  void handleMaibotOutput(String event) async {
     // 剥离ANSI颜色代码
     final cleanEvent = event.replaceAll(_ansiColorRegExp, '');
 
     // 适配新版日志：🔑 WebUI 登录 Token: ...
     if (cleanEvent.contains('WebUI 登录 Token:')) {
       // 优先从本地 webui.json 读取 Token 凭证
-      if (_loadMaibotTokenFromFile()) {
+      if (await _loadMaibotTokenFromFile()) {
         return;
       }
 
@@ -215,10 +215,10 @@ class NapcatController extends GetxController {
     try {
       final String configPath = '$ubuntuPath/root/napcat/config';
       final Directory configDir = Directory(configPath);
-      if (!configDir.existsSync()) return;
+      if (!await configDir.exists()) return;
 
       // 扫描 onebot11_QQ.json 文件
-      final List<FileSystemEntity> files = configDir.listSync();
+      final List<FileSystemEntity> files = await configDir.list().toList();
       String? loggedInQQ;
 
       for (var file in files) {
@@ -239,7 +239,7 @@ class NapcatController extends GetxController {
 
       // 读取 webui.json
       final File webuiFile = File('$configPath/webui.json');
-      if (!webuiFile.existsSync()) return;
+      if (!await webuiFile.exists()) return;
 
       final Map<String, dynamic> webuiConfig =
           jsonDecode(await webuiFile.readAsString());

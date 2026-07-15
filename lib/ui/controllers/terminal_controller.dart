@@ -58,24 +58,29 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   final WebviewController webviewController = Get.put(WebviewController());
   final NapcatController napcatController = Get.put(NapcatController());
 
+  Future<void> _bumpProgressLock = Future.value();
+
   // 进度 +1
   // Progress +1
-  void bumpProgress() {
-    try {
-      int current = 0;
-      if (progressFile.existsSync()) {
-        final content = progressFile.readAsStringSync().trim();
-        if (content.isNotEmpty) {
-          current = int.tryParse(content) ?? 0;
+  Future<void> bumpProgress() async {
+    _bumpProgressLock = _bumpProgressLock.then((_) async {
+      try {
+        int current = 0;
+        if (await progressFile.exists()) {
+          final content = (await progressFile.readAsString()).trim();
+          if (content.isNotEmpty) {
+            current = int.tryParse(content) ?? 0;
+          }
+        } else {
+          await progressFile.create(recursive: true);
         }
-      } else {
-        progressFile.createSync(recursive: true);
+        await progressFile.writeAsString('${current + 1}');
+      } catch (e) {
+        await progressFile.writeAsString('1');
       }
-      progressFile.writeAsStringSync('${current + 1}');
-    } catch (e) {
-      progressFile.writeAsStringSync('1');
-    }
-    update();
+      update();
+    }).catchError((_) {});
+    return _bumpProgressLock;
   }
 
   // 检查两个条件是否都满足，如果满足则触发跳转
@@ -94,7 +99,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     try {
       maibotSocket = await Socket.connect('127.0.0.1', 20001);
       _maibotLineBuffer = '';
-      maibotSocket!.listen((data) {
+      maibotSocket!.listen((data) async {
         final event = utf8.decode(data, allowMalformed: true);
         terminal.write(event);
         
@@ -107,7 +112,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
           final cleanLine = line.replaceAll(_ansiColorRegExp, '');
           if (cleanLine.contains('访问地址:')) {
             _isLocalhostDetected = true;
-            bumpProgress();
+            await bumpProgress();
             _checkAndNavigateToWebview();
             Future.delayed(const Duration(milliseconds: 2000), () => update());
           }
@@ -185,30 +190,30 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         await file.delete();
       }
       Link link = Link(filePath);
-      if (link.existsSync()) {
+      if (await link.exists()) {
         try {
-          link.deleteSync();
+          await link.delete();
         } catch (e) {
           Log.e('delete link error -> $e');
         }
       }
       try {
         Log.i('create link -> $fileName ${link.path}');
-        link.createSync(sourcePath);
+        await link.create(sourcePath);
       } catch (e) {
         Log.e('installAdbToEnvir error -> $e');
       }
     }
 
     // 处理 busybox 相关的符号链接，确保 proot 依赖的命令可用
-    createBusyboxLink();
+    await createBusyboxLink();
   }
 
   // 同步当前进度
   // Sync the current progress
-  void syncProgress() {
-    progressFile.createSync(recursive: true);
-    progressFile.writeAsStringSync('0');
+  Future<void> syncProgress() async {
+    await progressFile.create(recursive: true);
+    await progressFile.writeAsString('0');
     _progressSubscription = progressFile.watch(events: FileSystemEvent.all).listen((event) async {
       if (event.type == FileSystemEvent.modify) {
         String content = await progressFile.readAsString();
@@ -221,8 +226,8 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         update();
       }
     });
-    progressDesFile.createSync(recursive: true);
-    progressDesFile.writeAsStringSync('');
+    await progressDesFile.create(recursive: true);
+    await progressDesFile.writeAsString('');
     _progressDesSubscription = progressDesFile.watch(events: FileSystemEvent.all).listen((event) async {
       if (event.type == FileSystemEvent.modify) {
         String content = await progressDesFile.readAsString();
@@ -232,7 +237,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         // 当进度到达 "Napcat 已安装" 时，启动 NapCat 终端
         if (content.contains('Napcat ${S.current.installed}')) {
           FlutterForegroundTask.sendDataToTask('start_napcat');
-          bumpProgress();
+          await bumpProgress();
           Log.i('检测到 Napcat 已安装，发送指令启动 NapCat 容器', 'MaiBot');
         }
 
@@ -251,7 +256,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
 
   // 创建 busybox 的软连接，来确保 proot 会用到的命令正常运行
   // create busybox symlinks, to ensure proot can use the commands normally
-  void createBusyboxLink() {
+  Future<void> createBusyboxLink() async {
     try {
       List<String> links = [
         ...[
@@ -293,15 +298,15 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       for (String linkName in links) {
         String linkPath = '${RuntimeEnvir.binPath}/$linkName';
         Link link = Link(linkPath);
-        if (link.existsSync()) {
+        if (await link.exists()) {
           try {
-            link.deleteSync();
+            await link.delete();
           } catch (e) {
             Log.e('delete busybox link error -> $e');
           }
         }
         try {
-          link.createSync('${RuntimeEnvir.binPath}/busybox');
+          await link.create('${RuntimeEnvir.binPath}/busybox');
         } catch (e) {
           Log.e('create busybox link error -> $e');
         }
@@ -309,15 +314,15 @@ class HomeController extends GetxController with WidgetsBindingObserver {
 
       String fileLinkPath = '${RuntimeEnvir.binPath}/file';
       Link fileLink = Link(fileLinkPath);
-      if (fileLink.existsSync()) {
+      if (await fileLink.exists()) {
         try {
-          fileLink.deleteSync();
+          await fileLink.delete();
         } catch (e) {
           Log.e('delete file link error -> $e');
         }
       }
       try {
-        fileLink.createSync('/system/bin/file');
+        await fileLink.create('/system/bin/file');
       } catch (e) {
         Log.e('create file link error -> $e');
       }
@@ -332,15 +337,15 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> loadMaiBot() async {
-    syncProgress();
+    await syncProgress();
 
     // 创建相关文件夹
-    Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
-    Directory(RuntimeEnvir.homePath).createSync(recursive: true);
-    Directory(RuntimeEnvir.binPath).createSync(recursive: true);
+    await Directory(RuntimeEnvir.tmpPath).create(recursive: true);
+    await Directory(RuntimeEnvir.homePath).create(recursive: true);
+    await Directory(RuntimeEnvir.binPath).create(recursive: true);
 
     await initEnvir();
-    createBusyboxLink();
+    await createBusyboxLink();
 
     setProgress('复制 Ubuntu 系统镜像...');
     await AssetsUtils.copyAssetToPath('assets/${Config.ubuntuFileName}',
@@ -349,7 +354,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         '${RuntimeEnvir.homePath}/maibot-startup.sh');
     await AssetsUtils.copyAssetToPath(
         'assets/config.toml', '${RuntimeEnvir.homePath}/config.toml');
-    bumpProgress();
+    await bumpProgress();
 
     // 获取当前应用版本号
     final appVersion = await getAppVersion();
@@ -364,10 +369,10 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     }
 
     // 写入 common.sh 脚本
-    File('${RuntimeEnvir.homePath}/common.sh')
-        .writeAsStringSync(getCommonScript(appVersion));
+    await File('${RuntimeEnvir.homePath}/common.sh')
+        .writeAsString(getCommonScript(appVersion));
 
-    bumpProgress();
+    await bumpProgress();
 
     // 触发前台服务拉起容器
     setProgress('开始拉起 MaiBot 容器...');
@@ -376,9 +381,9 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     _connectNapCatSocket();
 
     // 重连时如果已安装NapCat，直接拉起它的终端，无需等待 progress 信号
-    Future.delayed(const Duration(milliseconds: 500), () {
+    Future.delayed(const Duration(milliseconds: 500), () async {
       final launcherFile = File('$ubuntuPath/root/launcher.sh');
-      if (launcherFile.existsSync()) {
+      if (await launcherFile.exists()) {
         FlutterForegroundTask.sendDataToTask('start_napcat');
       }
     });

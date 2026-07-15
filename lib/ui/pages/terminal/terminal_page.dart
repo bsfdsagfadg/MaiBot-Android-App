@@ -75,13 +75,13 @@ class _TerminalPageState extends State<TerminalPage> {
                             controller.napcatShowTerminal,
                             readOnly: false,
                             backgroundOpacity: 1,
-                            theme: ManjaroTerminalTheme(),
+                            theme: terminalTheme,
                           )
                         : TerminalView(
                             controller.terminal,
                             readOnly: false,
                             backgroundOpacity: 1,
-                            theme: ManjaroTerminalTheme(),
+                            theme: terminalTheme,
                           ),
                   ),
                 ),

@@ -135,7 +135,7 @@ extension PTYExt on Pty {
     shellFile.watch(events: FileSystemEvent.delete).listen((event) {
       defineFunctionLock.complete();
     });
-    File('${tmpDir.path}/shell${shortHash}backup').writeAsStringSync(function);
+    await File('${tmpDir.path}/shell${shortHash}backup').writeAsString(function);
     // writeString('printf "\\033[?1049h"\n');
     writeString('source ${shellFile.path} &&');
     writeString('rm -rf ${shellFile.path} \n');
