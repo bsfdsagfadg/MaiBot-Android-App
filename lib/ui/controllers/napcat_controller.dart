@@ -9,6 +9,11 @@ import 'package:settings/settings.dart';
 import '../../core/constants/scripts.dart';
 
 class NapcatController extends GetxController {
+  static final _ansiColorRegExp = RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]');
+  static final _napcatTokenRegExp = RegExp(r'WebUi Token:\s+(\w+)');
+  static final _maibotTokenRegExp = RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)');
+  static final _errorMsgRegExp = RegExp(r'"message":"([^"]+)"');
+  static final _qqNumRegExp = RegExp(r'^\d+$');
   final RxString napCatWebUiToken = ''.obs; // 存储 NapCat WebUI Token
   final RxString maiBotWebUiToken = ''.obs; // 存储 MaiBot WebUI Token
   final RxBool _isQrcodeShowing = false.obs;
@@ -56,7 +61,7 @@ class NapcatController extends GetxController {
 
   void handleNapcatOutput(String event) async {
     // 剥离ANSI颜色代码，防止颜色字符干扰正则表达式匹配
-    final cleanEvent = event.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
+    final cleanEvent = event.replaceAll(_ansiColorRegExp, '');
 
     // 检测自动快速登录成功
     if (cleanEvent.contains('自动快速登录成功')) {
@@ -71,7 +76,7 @@ class NapcatController extends GetxController {
 
     // 捕获 NapCat WebUI Token
     if (cleanEvent.contains('WebUi Token:')) {
-      final matches = RegExp(r'WebUi Token:\s+(\w+)').allMatches(cleanEvent);
+      final matches = _napcatTokenRegExp.allMatches(cleanEvent);
       if (matches.isNotEmpty) {
         final token = matches.last.group(1);
         if (token != null) {
@@ -163,7 +168,7 @@ class NapcatController extends GetxController {
       // 提取错误信息
       String errorMsg = '登录失败';
       if (cleanEvent.contains('"message":"')) {
-        final match = RegExp(r'"message":"([^"]+)"').firstMatch(cleanEvent);
+        final match = _errorMsgRegExp.firstMatch(cleanEvent);
         if (match != null) {
           errorMsg = match.group(1) ?? errorMsg;
         }
@@ -183,7 +188,7 @@ class NapcatController extends GetxController {
   
   void handleMaibotOutput(String event) {
     // 剥离ANSI颜色代码
-    final cleanEvent = event.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
+    final cleanEvent = event.replaceAll(_ansiColorRegExp, '');
 
     // 适配新版日志：🔑 WebUI 登录 Token: ...
     if (cleanEvent.contains('WebUI 登录 Token:')) {
@@ -194,7 +199,7 @@ class NapcatController extends GetxController {
 
       // 若文件不存在（如首次配置流程），则尝试通过日志提取
       final matches =
-          RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)').allMatches(cleanEvent);
+          _maibotTokenRegExp.allMatches(cleanEvent);
       if (matches.isNotEmpty) {
         final token = matches.last.group(1);
         if (token != null) {
@@ -222,7 +227,7 @@ class NapcatController extends GetxController {
           loggedInQQ = fileName.substring(
               'onebot11_'.length, fileName.length - '.json'.length);
           // 确保是纯数字QQ号
-          if (RegExp(r'^\d+$').hasMatch(loggedInQQ)) {
+          if (_qqNumRegExp.hasMatch(loggedInQQ)) {
             break;
           } else {
             loggedInQQ = null;

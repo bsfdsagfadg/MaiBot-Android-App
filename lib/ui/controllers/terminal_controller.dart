@@ -19,6 +19,8 @@ import 'terminal_tab_manager.dart';
 import 'webview_controller.dart';
 
 class HomeController extends GetxController with WidgetsBindingObserver {
+  static final _ansiColorRegExp = RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]');
+  static final _libSoRegExp = RegExp(r'^lib|\.so$');
   // 终端标签页管理器
   late final TerminalTabManager terminalTabManager;
   Setting privacySetting = 'privacy'.setting;
@@ -95,10 +97,6 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       maibotSocket!.listen((data) {
         final event = utf8.decode(data, allowMalformed: true);
         terminal.write(event);
-        if (terminal.buffer.lines.length >= 5000) {
-          terminal.buffer.clear();
-          terminal.buffer.setCursor(0, 0);
-        }
         
         _maibotLineBuffer += event;
         final lines = _maibotLineBuffer.split('\n');
@@ -106,7 +104,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
 
         for (final line in lines) {
           napcatController.handleMaibotOutput(line);
-          final cleanLine = line.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
+          final cleanLine = line.replaceAll(_ansiColorRegExp, '');
           if (cleanLine.contains('访问地址:')) {
             _isLocalhostDetected = true;
             bumpProgress();
@@ -134,10 +132,6 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       napcatSocket!.listen((data) {
         final event = utf8.decode(data, allowMalformed: true);
         napcatShowTerminal.write(event);
-        if (napcatShowTerminal.buffer.lines.length >= 5000) {
-          napcatShowTerminal.buffer.clear();
-          napcatShowTerminal.buffer.setCursor(0, 0);
-        }
         
         _napcatLineBuffer += event;
         final lines = _napcatLineBuffer.split('\n');
@@ -178,7 +172,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       // cannot execute file in /data/data/com.xxx/files/usr/bin
       // so we need create a link to /data/data/com.xxx/files/usr/bin
       final sourcePath = '$libPath/${androidFiles[i]}';
-      String fileName = androidFiles[i].replaceAll(RegExp('^lib|\\.so\$'), '');
+      String fileName = androidFiles[i].replaceAll(_libSoRegExp, '');
       String filePath = '${RuntimeEnvir.binPath}/$fileName';
       // custom path, termux-api will invoke
       File file = File(filePath);

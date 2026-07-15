@@ -128,8 +128,10 @@ class KeepAliveTaskHandler extends TaskHandler {
   ServerSocket? _napcatServer;
   final List<Socket> _maibotSockets = [];
   final List<Socket> _napcatSockets = [];
-  final List<int> _maibotBuffer = [];
-  final List<int> _napcatBuffer = [];
+  final List<List<int>> _maibotBufferChunks = [];
+  int _maibotBufferLength = 0;
+  final List<List<int>> _napcatBufferChunks = [];
+  int _napcatBufferLength = 0;
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -139,14 +141,14 @@ class KeepAliveTaskHandler extends TaskHandler {
       _maibotServer ??= await ServerSocket.bind('127.0.0.1', 20001, shared: true);
       _maibotServer!.listen((socket) {
         _maibotSockets.add(socket);
-        socket.add(_maibotBuffer);
+        for (var chunk in _maibotBufferChunks) socket.add(chunk);
         socket.listen((data) => _maibotPty?.write(data), onDone: () => _maibotSockets.remove(socket), onError: (_) => _maibotSockets.remove(socket));
       });
 
       _napcatServer ??= await ServerSocket.bind('127.0.0.1', 20002, shared: true);
       _napcatServer!.listen((socket) {
         _napcatSockets.add(socket);
-        socket.add(_napcatBuffer);
+        for (var chunk in _napcatBufferChunks) socket.add(chunk);
         socket.listen((data) => _napcatPty?.write(data), onDone: () => _napcatSockets.remove(socket), onError: (_) => _napcatSockets.remove(socket));
       });
     } catch (e) {
@@ -165,12 +167,14 @@ class KeepAliveTaskHandler extends TaskHandler {
 
   void _startMaiBot() {
     if (_maibotPty != null) return;
-    _maibotBuffer.clear();
+    _maibotBufferChunks.clear();
+    _maibotBufferLength = 0;
     _maibotPty = createPTY(rows: 25, columns: 80);
     _maibotPty!.output.listen((data) {
-      _maibotBuffer.addAll(data);
-      if (_maibotBuffer.length > 70000) {
-        _maibotBuffer.removeRange(0, _maibotBuffer.length - 50000);
+      _maibotBufferChunks.add(data);
+      _maibotBufferLength += data.length;
+      while (_maibotBufferLength > 70000 && _maibotBufferChunks.length > 1) {
+        _maibotBufferLength -= _maibotBufferChunks.removeAt(0).length;
       }
       for (var s in _maibotSockets) { try { s.add(data); } catch(_) {} }
     }, onDone: () {
@@ -183,12 +187,14 @@ class KeepAliveTaskHandler extends TaskHandler {
 
   void _startNapCat() {
     if (_napcatPty != null) return;
-    _napcatBuffer.clear();
+    _napcatBufferChunks.clear();
+    _napcatBufferLength = 0;
     _napcatPty = createPTY(rows: 25, columns: 80);
     _napcatPty!.output.listen((data) {
-      _napcatBuffer.addAll(data);
-      if (_napcatBuffer.length > 70000) {
-        _napcatBuffer.removeRange(0, _napcatBuffer.length - 50000);
+      _napcatBufferChunks.add(data);
+      _napcatBufferLength += data.length;
+      while (_napcatBufferLength > 70000 && _napcatBufferChunks.length > 1) {
+        _napcatBufferLength -= _napcatBufferChunks.removeAt(0).length;
       }
       for (var s in _napcatSockets) { try { s.add(data); } catch(_) {} }
     }, onDone: () {
