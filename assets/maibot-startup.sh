@@ -2,6 +2,7 @@
 
 MAIBOT_APP_VERSION="{{VERSION}}"
 export UV_LINK_MODE=copy
+trap 'RET=$?; rm -rf "$TMPDIR/backup_restore"; if [ $RET -ne 0 ]; then echo "安装失败，请查看日志" > "$TMPDIR/progress_des"; fi' EXIT
 
 # 自定义 Git Clone 命令（为空时使用默认逻辑）
 CUSTOM_GIT_CLONE=""
@@ -34,9 +35,9 @@ bump_progress(){
 install_sudo_curl_git(){
   if ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v sudo >/dev/null 2>&1; then
     progress_echo "正在安装基础组件..."
-    apt-get update
-    apt --fix-broken install -y
-    apt-get install -y sudo wget git curl
+    apt-get update || exit 1
+    apt --fix-broken install -y || exit 1
+    apt-get install -y sudo wget git curl || exit 1
   else
     progress_echo "基础组件已安装"
   fi
@@ -77,7 +78,8 @@ network_test() {
             echo "直连Github成功，将不使用代理"
             target_proxy=""
         else
-            echo "警告: 无法连接到Github，请检查网络。将继续尝试安装，但可能会失败。"
+            echo "警告: 无法连接到Github，请检查网络。" > "$TMPDIR/progress_des"
+            exit 1
         fi
     fi
 }
@@ -144,7 +146,7 @@ install_uv(){
 
 install_napcat(){
   # 检查是否已安装
-  if [ ! -f "$HOME/launcher.sh" ]; then
+  if [ ! -f "$HOME/launcher.sh" ] || [ ! -f "/opt/QQ/qq" ]; then
     progress_echo "Napcat $L_NOT_INSTALLED，$L_INSTALLING..."
     
     apt --fix-broken install -y
@@ -165,6 +167,7 @@ install_napcat(){
       exit 1
     fi
     bash napcat.sh
+    if ! dpkg -l linuxqq >/dev/null 2>&1; then echo "NapCat 安装失败：QQ 未正确安装" > "$TMPDIR/progress_des"; exit 1; fi
     
     # 恢复配置目录
     if [ -d "$HOME/napcat_config_backup" ]; then
@@ -271,7 +274,7 @@ install_maibot(){
     fi
 
     # 原子性重命名
-    mv "$CLONE_TEMP_DIR" "$INSTALL_DIR"
+    mv "$CLONE_TEMP_DIR" "$INSTALL_DIR" || exit 1
 
   else
     progress_echo "MaiBot $L_INSTALLED"
@@ -373,13 +376,13 @@ install_maibot(){
   if [ -f "EULA.md" ]; then
     export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}')
   else
-    export EULA_AGREE="1b662741904d7155d1ce1c00b3530d0d"
+    export EULA_AGREE="8e6e7d647f7f82d6ea98456b73908656"
   fi
 
   if [ -f "PRIVACY.md" ]; then
     export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}')
   else
-    export PRIVACY_AGREE="9943b855e72199d0f5016ea39052f1b6"
+    export PRIVACY_AGREE="91e5db7659c560bc3545e63859b6ebc0"
   fi
   
   echo "正在启动 MaiBot..."

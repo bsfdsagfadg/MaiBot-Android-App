@@ -119,6 +119,7 @@ install_ubuntu(){
     progress_echo "Ubuntu $L_NOT_INSTALLED, $L_INSTALLING..."
 
     echo "[cmd] busybox tar $TAR_ARGS ~/$UBUNTU -C $UBUNTU_PATH/"
+    set -o pipefail
     if busybox tar $TAR_ARGS ~/$UBUNTU -C $UBUNTU_PATH/ | while read line; do
       # echo -ne "\033[2K\0337\r$line\0338"
       echo -ne "\033[2K\r$line"
@@ -129,6 +130,7 @@ install_ubuntu(){
       echo
       echo "[result] tar failed with exit code $?"
     fi
+    set +o pipefail
     if [ -d "$UBUNTU_PATH/$UBUNTU_NAME" ]; then
       mv "$UBUNTU_PATH/$UBUNTU_NAME/"* "$UBUNTU_PATH/"
       rm -rf "$UBUNTU_PATH/$UBUNTU_NAME"
