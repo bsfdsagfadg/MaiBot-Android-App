@@ -138,6 +138,11 @@ class KeepAliveTaskHandler extends TaskHandler {
   void _schedulePtyRestart(String name, void Function() startFn, int attempt, void Function(int) updateAttempt) {
     if (attempt >= 10) {
       Log.e('$name exited, max retries (10) reached. Stopping restarts.', 'KeepAliveTaskHandler');
+      try {
+        File('${RuntimeEnvir.tmpPath}/progress_des').writeAsStringSync('组件 $name 连续启动失败，请点按屏幕查看终端日志');
+      } catch (e) {
+        Log.e('Failed to write error to progress_des: $e', 'KeepAliveTaskHandler');
+      }
       return;
     }
     int delay = 3 * (1 << attempt);
