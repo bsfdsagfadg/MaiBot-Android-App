@@ -290,25 +290,23 @@ install_maibot(){
   # --- 插件恢复与默认适配器克隆 ---
   local ADAPTER_DIR="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter"
   
-  if [ ! -d "$INSTALL_DIR/plugins" ] || [ -z "$(ls -A "$INSTALL_DIR/plugins" 2>/dev/null)" ]; then
-    if [ "$BACKUP_HAS_MAIBOT_PLUGINS" -eq 1 ]; then
-      echo "检测到插件目录不存在或为空，正在从备份中恢复插件..."
+  if [ "$BACKUP_HAS_MAIBOT_PLUGINS" -eq 1 ]; then
+    echo "检测到备份的自定义插件，正在从备份中恢复插件..."
+    mkdir -p "$INSTALL_DIR/plugins"
+    cp -r "$TMPDIR/backup_restore/MaiBot/plugins"/* "$INSTALL_DIR/plugins/"
+    echo "插件恢复完成，跳过安装默认适配器"
+  else
+    # 如果没有备份插件，才进行默认适配器的下载
+    if [ ! -d "$ADAPTER_DIR" ]; then
+      progress_echo "安装默认适配器插件..."
       mkdir -p "$INSTALL_DIR/plugins"
-      cp -r "$TMPDIR/backup_restore/MaiBot/plugins"/* "$INSTALL_DIR/plugins/"
-      echo "插件恢复完成，跳过安装默认适配器"
-    else
-      # 如果没有备份插件，才进行默认适配器的下载
-      if [ ! -d "$ADAPTER_DIR" ]; then
-        progress_echo "安装默认适配器插件..."
-        mkdir -p "$INSTALL_DIR/plugins"
-        network_test
-        if ! git clone --depth=1 --branch main ${target_proxy:+${target_proxy}/}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git "$ADAPTER_DIR"; then
-          echo "适配器插件克隆失败"
-          exit 1
-        fi
-        # 刚克隆下来删掉默认配置
-        rm -f "$ADAPTER_DIR/config.toml"
+      network_test
+      if ! git clone --depth=1 --branch main ${target_proxy:+${target_proxy}/}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git "$ADAPTER_DIR"; then
+        echo "适配器插件克隆失败"
+        exit 1
       fi
+      # 刚克隆下来删掉默认配置
+      rm -f "$ADAPTER_DIR/config.toml"
     fi
   fi
 

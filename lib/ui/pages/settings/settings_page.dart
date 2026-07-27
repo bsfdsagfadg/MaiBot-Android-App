@@ -608,6 +608,7 @@ class _SettingsPageState extends State<SettingsPage> {
         'tar',
         '-czf',
         backupPath,
+        '--exclude=MaiBot/plugins/hello_world_plugin',
         '-C',
         '${scripts.ubuntuPath}/root',
         'MaiBot/data',
