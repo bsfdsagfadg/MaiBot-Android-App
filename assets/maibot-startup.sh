@@ -188,8 +188,8 @@ install_napcat(){
       cp -r "$TMPDIR/backup_restore/napcat/config"/* "$HOME/napcat/config/"
     fi
     
-  # 写入 onebot11.json 默认配置文件 (如果 napcat/config 目录为空或不存在才写入默认值)
-  if [ ! -d "$HOME/napcat/config" ] || [ -z "$(ls -A "$HOME/napcat/config" 2>/dev/null)" ]; then
+  # 写入 onebot11.json 默认配置文件 (如果 onebot11.json 不存在才写入默认值)
+  if [ ! -f "$HOME/napcat/config/onebot11.json" ]; then
     echo "写入 onebot11.json 默认配置文件"
     mkdir -p "$HOME/napcat/config"
     cat > "$HOME/napcat/config/onebot11.json" <<'EOF'
@@ -221,8 +221,8 @@ EOF
   fi
 fi
 
-  # 即使已经安装了 NapCat，如果配置目录缺失或为空，也尝试从备份进行补齐（缺什么补什么）
-  if [ ! -d "$HOME/napcat/config" ] || [ -z "$(ls -A "$HOME/napcat/config" 2>/dev/null)" ]; then
+  # 即使已经安装了 NapCat，如果 onebot11.json 缺失，也尝试从备份进行补齐（缺什么补什么）
+  if [ ! -f "$HOME/napcat/config/onebot11.json" ]; then
     if [ "$BACKUP_HAS_NAPCAT_CONFIG" -eq 1 ]; then
       echo "检测到 NapCat 配置目录缺失且备份可用，正在从备份中补齐配置..."
       mkdir -p "$HOME/napcat/config"
@@ -419,7 +419,7 @@ stage_and_restore_backup(){
   
   # 检查当前系统是否缺少任何关键目录或文件（缺什么补什么）
   local NEED_RESTORE=0
-  if [ ! -d "$HOME/napcat/config" ] || [ -z "$(ls -A "$HOME/napcat/config" 2>/dev/null)" ]; then
+  if [ ! -f "$HOME/napcat/config/onebot11.json" ]; then
     NEED_RESTORE=1
   fi
   if [ ! -d "$HOME/MaiBot/data" ] || [ -z "$(ls -A "$HOME/MaiBot/data" 2>/dev/null)" ]; then
