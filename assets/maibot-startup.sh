@@ -372,20 +372,14 @@ install_maibot(){
   fi
 
   # 启动 MaiBot Core (自动处理配置生成)
-  progress_echo "MaiBot Core 配置中"
-  
-  # 拷贝适配器插件配置 (仅在未使用备份插件，且目标配置不存在时复制)
+  # 拷贝适配器插件配置（目标不存在时才从预设拷贝，已有配置/备份恢复的不动）
   local TARGET_CONFIG="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter/config.toml"
-  if [ "$BACKUP_HAS_MAIBOT_PLUGINS" -eq 0 ]; then
-    if [ -f "/root/config.toml" ] && [ ! -f "$TARGET_CONFIG" ]; then
+  if [ -f "/root/config.toml" ] && [ ! -f "$TARGET_CONFIG" ]; then
       echo "正在拷贝适配器插件配置..."
       mkdir -p "$(dirname "$TARGET_CONFIG")"
       cp /root/config.toml "$TARGET_CONFIG"
-    fi
-  else
-    echo "检测到备份插件，跳过默认适配器配置拷贝"
   fi
-
+  
   cd "$INSTALL_DIR"
   
   # 动态计算 EULA 和 PRIVACY 的 MD5
