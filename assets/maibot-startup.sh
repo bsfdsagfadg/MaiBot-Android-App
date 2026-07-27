@@ -387,6 +387,11 @@ install_maibot(){
   
   echo "正在启动 MaiBot..."
   export PYTHONUNBUFFERED=1
+
+  # 进程替换前：清理 apt 缓存与临时解压目录
+  apt-get clean >/dev/null 2>&1 || true
+  rm -rf "$TMPDIR/backup_restore"
+  
   exec $HOME/.local/bin/uv run bot.py
 }
 
@@ -470,5 +475,3 @@ install_napcat
 bump_progress
 install_maibot
 
-# 整体安装完后，清理备份临时解压目录
-rm -rf "$TMPDIR/backup_restore"
