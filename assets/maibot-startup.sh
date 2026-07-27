@@ -290,7 +290,18 @@ install_maibot(){
   # --- 插件恢复与默认适配器克隆 ---
   local ADAPTER_DIR="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter"
   
-  if [ "$BACKUP_HAS_MAIBOT_PLUGINS" -eq 1 ]; then
+  # 避免覆盖用户现有的插件：只有当当前插件目录为空，或仅有官方初始文件时，才执行恢复
+  local SHOULD_RESTORE=0
+  if [ ! -d "$INSTALL_DIR/plugins" ]; then
+    SHOULD_RESTORE=1
+  else
+    local OTHER_FILES=$(ls -A "$INSTALL_DIR/plugins" 2>/dev/null | grep -Ev "^(hello_world_plugin|__pycache__|__init__\.py)$" || true)
+    if [ -z "$OTHER_FILES" ]; then
+      SHOULD_RESTORE=1
+    fi
+  fi
+
+  if [ "$BACKUP_HAS_MAIBOT_PLUGINS" -eq 1 ] && [ "$SHOULD_RESTORE" -eq 1 ]; then
     echo "检测到备份的自定义插件，正在从备份中恢复插件..."
     mkdir -p "$INSTALL_DIR/plugins"
     cp -r "$TMPDIR/backup_restore/MaiBot/plugins"/* "$INSTALL_DIR/plugins/"
