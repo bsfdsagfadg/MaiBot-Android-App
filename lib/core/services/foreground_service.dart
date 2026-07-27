@@ -132,6 +132,21 @@ class KeepAliveTaskHandler extends TaskHandler {
   int _maibotBufferLength = 0;
   final List<List<int>> _napcatBufferChunks = [];
   int _napcatBufferLength = 0;
+  int _maibotRestartCount = 0;
+  int _napcatRestartCount = 0;
+
+  void _schedulePtyRestart(String name, void Function() startFn, int attempt, void Function(int) updateAttempt) {
+    if (attempt >= 10) {
+      Log.e('$name exited, max retries (10) reached. Stopping restarts.', 'KeepAliveTaskHandler');
+      return;
+    }
+    int delay = 3 * (1 << attempt);
+    if (delay > 60) delay = 60;
+    updateAttempt(attempt + 1);
+    Log.i('$name exited, restarting in ${delay}s (Retry ${attempt + 1}/10)', 'KeepAliveTaskHandler');
+    Future.delayed(Duration(seconds: delay), startFn);
+  }
+
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -159,8 +174,10 @@ class KeepAliveTaskHandler extends TaskHandler {
   @override
   void onReceiveData(Object data) {
     if (data == 'start_maibot') {
+      _maibotRestartCount = 0;
       _startMaiBot();
     } else if (data == 'start_napcat') {
+      _napcatRestartCount = 0;
       _startNapCat();
     }
   }
@@ -179,8 +196,7 @@ class KeepAliveTaskHandler extends TaskHandler {
       for (var s in _maibotSockets) { try { s.add(data); } catch(_) {} }
     }, onDone: () {
       _maibotPty = null;
-      Log.i('MaiBot exited, restarting in 3s', 'KeepAliveTaskHandler');
-      Future.delayed(const Duration(seconds: 3), _startMaiBot);
+      _schedulePtyRestart('MaiBot', _startMaiBot, _maibotRestartCount, (val) => _maibotRestartCount = val);
     });
     _maibotPty!.writeString('source ${RuntimeEnvir.homePath}/common.sh\nstart_maibot\n');
   }
@@ -199,11 +215,12 @@ class KeepAliveTaskHandler extends TaskHandler {
       for (var s in _napcatSockets) { try { s.add(data); } catch(_) {} }
     }, onDone: () {
       _napcatPty = null;
-      Log.i('NapCat exited, restarting in 3s', 'KeepAliveTaskHandler');
-      Future.delayed(const Duration(seconds: 3), _startNapCat);
+      _schedulePtyRestart('NapCat', _startNapCat, _napcatRestartCount, (val) => _napcatRestartCount = val);
     });
     _napcatPty!.writeString('source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash /root/launcher.sh"\n');
   }
+
+
 
   @override
   void onRepeatEvent(DateTime timestamp) {
