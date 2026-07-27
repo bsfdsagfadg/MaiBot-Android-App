@@ -166,6 +166,13 @@ install_napcat(){
       echo "设置 napcat.sh 执行权限失败"
       exit 1
     fi
+    # [HOTFIX] 动态修复 NapCat 上游安装器 Bug：
+    # 1. 替换已经 404 失效的官方 QQ 下载直链
+    # 2. 为 curl 添加 -f 参数，防止 404 时下载 0 字节文件仍返回 exit 0
+    sed -i 's|https://dldir1.qq.com/.*_arm64.deb|https://qqdl.gtimg.cn/qqfile/QQNT/9.9.32/release/c390e792/QQ_3.2.31_260710_arm64_01.deb|g' napcat.sh
+    sed -i 's|https://dldir1.qq.com/.*_amd64.deb|https://qqdl.gtimg.cn/qqfile/QQNT/9.9.32/release/c390e792/QQ_3.2.31_260710_amd64_01.deb|g' napcat.sh
+    sed -i 's|sudo curl -k -L -#|sudo curl -f -k -L -#|g' napcat.sh
+
     bash napcat.sh
     if ! dpkg -l linuxqq >/dev/null 2>&1; then echo "NapCat 安装失败：QQ 未正确安装" > "$TMPDIR/progress_des"; exit 1; fi
     
