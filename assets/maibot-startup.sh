@@ -396,6 +396,15 @@ install_maibot(){
       # 刚克隆下来删掉默认配置
       rm -f "$ADAPTER_DIR/config.toml"
     fi
+    
+    # [Fix] 插件目录存在但适配器配置缺失时，尝试从备份恢复（不覆盖已有配置）
+    if [ "$BACKUP_HAS_MAIBOT_PLUGINS" -eq 1 ] && [ -d "$ADAPTER_DIR" ] && [ ! -f "$ADAPTER_DIR/config.toml" ]; then
+      local BK_ADAPTER_CONFIG="$TMPDIR/backup_restore/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml"
+      if [ -f "$BK_ADAPTER_CONFIG" ]; then
+        echo "检测到适配器配置缺失且备份可用，正在从备份中恢复配置..."
+        cp "$BK_ADAPTER_CONFIG" "$ADAPTER_DIR/config.toml"
+      fi
+    fi
   fi
 
   progress_echo "MaiBot 初始化中"

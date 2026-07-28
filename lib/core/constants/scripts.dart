@@ -139,7 +139,6 @@ install_ubuntu(){
     fi
     # 注释掉 code-server 相关的 PATH 设置
     # echo 'export PATH=/opt/code-server-$CSVERSION-linux-arm64/bin:$PATH' >> $UBUNTU_PATH/root/.bashrc
-    echo 'export ANDROID_DATA=/home/' >> $UBUNTU_PATH/root/.bashrc
     
     # 恢复用户数据
     if [ -d "$PERSISTENT_BACKUP/root_backup" ]; then
@@ -148,6 +147,9 @@ install_ubuntu(){
       cp -r "$PERSISTENT_BACKUP/root_backup"/* "$UBUNTU_PATH/root/"
       rm -rf "$PERSISTENT_BACKUP"
     fi
+    
+    # 在数据恢复后附加环境变量，防止被旧 .bashrc 覆盖
+    echo 'export ANDROID_DATA=/home/' >> "$UBUNTU_PATH/root/.bashrc"
   else
     VERSION=`cat $UBUNTU_PATH/etc/issue.net 2>/dev/null`
     # VERSION=`cat $UBUNTU_PATH/etc/issue 2>/dev/null | sed 's/\\n//g' | sed 's/\\l//g'`

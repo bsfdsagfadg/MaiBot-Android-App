@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1306,10 +1306,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
                 // 定义需要彻底清理的 MaiBot 数据与配置相关路径
                 final List<String> pathsToDelete = [
-                  '${scripts.ubuntuPath}/root/MaiBot/data',                             // 运行持久化数据
-                  '${scripts.ubuntuPath}/root/MaiBot/config',                           // 系统底层配置文件
-                  '${scripts.ubuntuPath}/root/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml', // 适配器当前生效配置
+                  '${scripts.ubuntuPath}/root/MaiBot',                                 // 整个 MaiBot 目录（含 data/config/plugins）
                   '${scripts.ubuntuPath}/root/config.toml',                             // 拷贝在根目录的配置模板
+                  '${RuntimeEnvir.tmpPath}/.restore_complete',                          // 备份恢复标记
                 ];
 
                 bool deletedAny = false;
