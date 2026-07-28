@@ -2,7 +2,23 @@
 
 MAIBOT_APP_VERSION="{{VERSION}}"
 export UV_LINK_MODE=copy
-trap 'RET=$?; rm -rf "$TMPDIR/backup_restore"; if [ $RET -ne 0 ]; then echo "安装失败，请查看日志" > "$TMPDIR/progress_des"; fi' EXIT
+
+# 网络重试计数器（持久化到文件，跨 PTY 重启保持计数）
+NET_RETRY_FILE="$TMPDIR/.network_retry_count"
+MAX_NETWORK_RETRY=3
+
+# 事务完成标记（用于原子性恢复判断）
+RESTORE_MARKER="$TMPDIR/.restore_complete"
+
+# 正常退出清理临时解压目录；失败时写错误描述
+cleanup_on_exit(){
+  RET=$?
+  rm -rf "$TMPDIR/backup_restore"
+  if [ $RET -ne 0 ]; then
+    echo "安装失败，请查看日志" > "$TMPDIR/progress_des"
+  fi
+}
+trap cleanup_on_exit EXIT
 
 # 自定义 Git Clone 命令（为空时使用默认逻辑）
 CUSTOM_GIT_CLONE=""
@@ -46,11 +62,18 @@ install_sudo_curl_git(){
 }
 
 network_test() {
-    local timeout=10
+    local timeout=5
     local status=0
     local found=0
     target_proxy=""
     echo "开始网络测试: Github..."
+
+    read_retry
+    local count=$?
+    if [ $count -ge $MAX_NETWORK_RETRY ]; then
+      echo "网络测试已失败 $count 次（上限 $MAX_NETWORK_RETRY），暂停重试。请检查网络后重启应用。" > "$TMPDIR/progress_des"
+      exit 1
+    fi
 
     proxy_arr=("https://ghfast.top" "https://gh.wuliya.xin" "https://gh-proxy.com" "https://github.moeyy.xyz")
     check_url="https://raw.githubusercontent.com/NapNeko/NapCatQQ/main/package.json"
@@ -78,10 +101,28 @@ network_test() {
             echo "直连Github成功，将不使用代理"
             target_proxy=""
         else
-            echo "警告: 无法连接到Github，请检查网络。" > "$TMPDIR/progress_des"
+            bump_retry
+            echo "警告: 无法连接到Github，请检查网络。（尝试 $((count+1))/$MAX_NETWORK_RETRY）" > "$TMPDIR/progress_des"
             exit 1
         fi
     fi
+    # 成功时重置计数
+    rm -f "$NET_RETRY_FILE"
+}
+
+# 网络重试计数器
+read_retry(){
+  if [ -f "$NET_RETRY_FILE" ]; then
+    return $(cat "$NET_RETRY_FILE" 2>/dev/null || echo 0)
+  fi
+  return 0
+}
+bump_retry(){
+  local c=0
+  if [ -f "$NET_RETRY_FILE" ]; then
+    c=$(cat "$NET_RETRY_FILE" 2>/dev/null || echo 0)
+  fi
+  echo $((c+1)) > "$NET_RETRY_FILE"
 }
 
 install_uv(){
@@ -170,6 +211,12 @@ install_napcat(){
     bash napcat.sh
     if ! dpkg -l linuxqq >/dev/null 2>&1; then echo "NapCat 安装失败：QQ 未正确安装" > "$TMPDIR/progress_des"; exit 1; fi
     
+    # 防止 napcat 安装器自动启动的进程与前台服务的独立 PTY 冲突
+    echo "停止 NapCat 安装器自动启动的进程..."
+    pkill -f "napcat" 2>/dev/null || true
+    pkill -f "QQ" 2>/dev/null || true
+    sleep 1
+    
     # 恢复配置目录
     if [ -d "$HOME/napcat_config_backup" ]; then
       echo "恢复 NapCat 配置目录..."
@@ -224,6 +271,22 @@ fi
     fi
   fi
 
+  # --- [Fix 1.1] 将 onebot11.json 的 token/port 同步到适配器 config.toml ---
+  local ONEBOT11="$HOME/napcat/config/onebot11.json"
+  local ADAPTER_CONFIG="$HOME/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml"
+  if [ -f "$ONEBOT11" ] && [ -f "$ADAPTER_CONFIG" ]; then
+    local OB_TOKEN=$(python3 -c "import json; d=json.load(open('$ONEBOT11')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('token',''))" 2>/dev/null)
+    local OB_PORT=$(python3 -c "import json; d=json.load(open('$ONEBOT11')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('port',8095))" 2>/dev/null)
+    if [ -n "$OB_TOKEN" ]; then
+      sed -i "s|^token = \".*\"|token = \"$OB_TOKEN\"|" "$ADAPTER_CONFIG"
+      echo "✓ 已同步 onebot11.json token 到适配器 config.toml"
+    fi
+    if [ -n "$OB_PORT" ]; then
+      sed -i "s|^port = [0-9]*|port = $OB_PORT|" "$ADAPTER_CONFIG"
+      echo "✓ 已同步 onebot11.json port 到适配器 config.toml"
+    fi
+  fi
+
   progress_echo "Napcat $L_INSTALLED"
 }
 
@@ -235,8 +298,9 @@ install_maibot(){
 
   killall uv 2>/dev/null
 
-  # 检查是否已安装
+  # [Fix 1.2] 全新安装时清除恢复标记
   if [ ! -d "$INSTALL_DIR" ]; then
+    rm -f "$RESTORE_MARKER"
     cd $HOME
     progress_echo "MaiBot $L_NOT_INSTALLED，$L_INSTALLING..."
 
@@ -365,6 +429,9 @@ install_maibot(){
     exit 1
   fi
 
+  # [Fix 1.2] 标记事务完成（所有恢复操作已完成）
+  echo "done" > "$RESTORE_MARKER"
+
   # 启动 MaiBot Core (自动处理配置生成)
   # 拷贝适配器插件配置（目标不存在时才从预设拷贝，已有配置/备份恢复的不动）
   local TARGET_CONFIG="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter/config.toml"
@@ -374,27 +441,47 @@ install_maibot(){
       cp /root/config.toml "$TARGET_CONFIG"
   fi
   
+  # [Fix 1.1] 从 onebot11.json 同步 token/port 覆盖到适配器 config.toml
+  local ONEBOT11_SYNC="$HOME/napcat/config/onebot11.json"
+  if [ -f "$ONEBOT11_SYNC" ] && [ -f "$TARGET_CONFIG" ]; then
+    local OB_TOKEN=$(python3 -c "import json; d=json.load(open('$ONEBOT11_SYNC')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('token',''))" 2>/dev/null)
+    local OB_PORT=$(python3 -c "import json; d=json.load(open('$ONEBOT11_SYNC')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('port',8095))" 2>/dev/null)
+    if [ -n "$OB_TOKEN" ]; then
+      sed -i "s|^token = \".*\"|token = \"$OB_TOKEN\"|" "$TARGET_CONFIG"
+      echo "✓ 同步 onebot11.json token 到适配器 config.toml"
+    fi
+    if [ -n "$OB_PORT" ]; then
+      sed -i "s|^port = [0-9]*|port = $OB_PORT|" "$TARGET_CONFIG"
+      echo "✓ 同步 onebot11.json port 到适配器 config.toml"
+    fi
+  fi
+  
   cd "$INSTALL_DIR"
   
-  # 动态计算 EULA 和 PRIVACY 的 MD5
+  # [Fix 3.3] 动态计算 EULA 和 PRIVACY 的 MD5；文件不存在时自动同意
   if [ -f "EULA.md" ]; then
     export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}')
   else
-    export EULA_AGREE="8e6e7d647f7f82d6ea98456b73908656"
+    export EULA_AGREE="agreed"
   fi
 
   if [ -f "PRIVACY.md" ]; then
     export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}')
   else
-    export PRIVACY_AGREE="91e5db7659c560bc3545e63859b6ebc0"
+    export PRIVACY_AGREE="agreed"
   fi
   
   echo "正在启动 MaiBot..."
   export PYTHONUNBUFFERED=1
 
-  # 进程替换前：清理 apt 缓存与临时解压目录
+  # [Fix 2.3] exec 前清理：apt 缓存、临时解压目录、网络重试计数器
   apt-get clean >/dev/null 2>&1 || true
   rm -rf "$TMPDIR/backup_restore"
+  rm -f "$NET_RETRY_FILE"
+  rm -f "$RESTORE_MARKER"
+  
+  # 陷阱函数不再需要清理这些（exec 替换了进程）
+  trap '' EXIT
   
   exec $HOME/.local/bin/uv run bot.py
 }
@@ -406,6 +493,11 @@ BACKUP_HAS_MAIBOT_PLUGINS=0
 
 # 备份预先解压与资产检验函数
 stage_and_restore_backup(){
+  # [Fix 1.2] 事务标记检查：若已完成则不重复执行
+  if [ -f "$RESTORE_MARKER" ]; then
+    echo "系统已标记为完整初始化，跳过备份恢复扫描"
+    return
+  fi
   local BACKUP_DIR="/sdcard/Download/MaiBot"
   local TEMP_RESTORE="$TMPDIR/backup_restore"
   
@@ -451,7 +543,6 @@ stage_and_restore_backup(){
           fi
           
           # 3. 检查 plugins 目录
-          # 通过查找子文件夹（不限制是否为空），判断用户在备份中是否定制了插件（包含默认测试插件等）
           if [ -d "$TEMP_RESTORE/MaiBot/plugins" ] && [ -n "$(find "$TEMP_RESTORE/MaiBot/plugins" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)" ]; then
             BACKUP_HAS_MAIBOT_PLUGINS=1
             echo "✓ 备份检验：包含自定义插件目录"

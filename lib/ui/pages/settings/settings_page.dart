@@ -14,6 +14,7 @@ import 'package:settings/settings.dart';
 import '../../controllers/terminal_controller.dart';
 import '../../../core/constants/scripts.dart' as scripts;
 import '../../../core/config/app_config.dart';
+import '../../../core/services/foreground_service.dart';
 
 class SettingsPage extends StatefulWidget {
   final WebViewController maiBotController;
@@ -1141,6 +1142,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
             if (finalConfirm == true) {
               try {
+                ForegroundServiceManager.setReinstallInProgress(true);
+                await ForegroundServiceManager.stopService();
                 // 删除 MaiBot 目录（~/MaiBot）
                 final maiBotPath = '${scripts.ubuntuPath}/root/MaiBot';
                 final maiBotDir = Directory(maiBotPath);
@@ -1208,6 +1211,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
             if (confirm == true) {
               try {
+                ForegroundServiceManager.setReinstallInProgress(true);
+                await ForegroundServiceManager.stopService();
                 // 删除 launcher.sh 文件，这是安装判断的依据
                 final launcherPath = '${scripts.ubuntuPath}/root/launcher.sh';
                 final launcherFile = File(launcherPath);
@@ -1285,6 +1290,8 @@ class _SettingsPageState extends State<SettingsPage> {
             if (confirmed == true) {
               try {
                 // 先尝试强制终止正在后台运行的所有子进程
+                ForegroundServiceManager.setReinstallInProgress(true);
+                await ForegroundServiceManager.stopService();
                 try {
                   await Process.run('${RuntimeEnvir.binPath}/busybox', [
                     'killall',

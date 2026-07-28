@@ -11,6 +11,15 @@ import '../utils/file_utils.dart';
 class ForegroundServiceManager {
   /// 标记用户是否点击了停止按钮（只有这种情况才不重建）
   static bool _userClickedStopButton = false;
+  /// [Fix 2.1] 标记是否正在重装/清除数据（暂停 PTY 自动重启）
+  static bool _reinstallInProgress = false;
+  /// [Fix 2.1] 设置重装/清除数据状态
+  static void setReinstallInProgress(bool value) {
+    _reinstallInProgress = value;
+    Log.i('重装/清除数据状态: $_reinstallInProgress', 'ForegroundService');
+  }
+  /// [Fix 2.1] 获取重装/清除数据状态
+  static bool get reinstallInProgress => _reinstallInProgress;
   /// 初始化前台服务
   /// Initialize foreground service
   static void init() {
@@ -136,6 +145,10 @@ class KeepAliveTaskHandler extends TaskHandler {
   int _napcatRestartCount = 0;
 
   void _schedulePtyRestart(String name, void Function() startFn, int attempt, void Function(int) updateAttempt) {
+    if (ForegroundServiceManager.reinstallInProgress) {
+      Log.i('$name exited, 重装/清除数据中，暂停重启', 'KeepAliveTaskHandler');
+      return;
+    }
     if (attempt >= 10) {
       Log.e('$name exited, max retries (10) reached. Stopping restarts.', 'KeepAliveTaskHandler');
       try {
@@ -161,14 +174,21 @@ class KeepAliveTaskHandler extends TaskHandler {
       _maibotServer ??= await ServerSocket.bind('127.0.0.1', 20001, shared: true);
       _maibotServer!.listen((socket) {
         _maibotSockets.add(socket);
-        for (var chunk in _maibotBufferChunks) socket.add(chunk);
+        if (_maibotBufferChunks.isNotEmpty) {
+          socket.add(utf8.encode('\x02__HIST_START__\x03'));
+          for (var chunk in _maibotBufferChunks) socket.add(chunk);
+          socket.add(utf8.encode('\x02__HIST_END__\x03'));
+        }
         socket.listen((data) => _maibotPty?.write(data), onDone: () => _maibotSockets.remove(socket), onError: (_) => _maibotSockets.remove(socket));
       });
 
-      _napcatServer ??= await ServerSocket.bind('127.0.0.1', 20002, shared: true);
       _napcatServer!.listen((socket) {
         _napcatSockets.add(socket);
-        for (var chunk in _napcatBufferChunks) socket.add(chunk);
+        if (_napcatBufferChunks.isNotEmpty) {
+          socket.add(utf8.encode('\x02__HIST_START__\x03'));
+          for (var chunk in _napcatBufferChunks) socket.add(chunk);
+          socket.add(utf8.encode('\x02__HIST_END__\x03'));
+        }
         socket.listen((data) => _napcatPty?.write(data), onDone: () => _napcatSockets.remove(socket), onError: (_) => _napcatSockets.remove(socket));
       });
     } catch (e) {
@@ -230,7 +250,7 @@ class KeepAliveTaskHandler extends TaskHandler {
   @override
   void onRepeatEvent(DateTime timestamp) {
     FlutterForegroundTask.isRunningService.then((isRunning) {
-      if (!isRunning && !ForegroundServiceManager.userClickedStopButton) {
+      if (!isRunning && !ForegroundServiceManager.userClickedStopButton && !ForegroundServiceManager.reinstallInProgress) {
         Log.w('检测到服务意外停止，准备重建...',  'KeepAliveTaskHandler');
         _rebuildService();
       }

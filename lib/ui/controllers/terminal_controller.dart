@@ -48,6 +48,9 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   );
   bool _isLocalhostDetected = false; // localhost:6185 检测标志
   bool _isAppInForeground = true; // 应用是否在前台
+  bool _isMaiBotReplaying = false; // [Fix 4.1] 历史缓冲区回放标记
+  Timer? _localhostProbeTimer; // [Fix 4.2 / 5.1] 本地端口主动探测定时器
+  Timer? _progressPollTimer; // [Fix 5.2] 进度文件轮询定时器
 
   File progressFile = File('${RuntimeEnvir.tmpPath}/progress');
   File progressDesFile = File('${RuntimeEnvir.tmpPath}/progress_des');
@@ -93,14 +96,25 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       webviewController.navigateToWebview();
     }
   }
-
   void _connectMaiBotSocket() async {
     if (maibotSocket != null) return;
     try {
       maibotSocket = await Socket.connect('127.0.0.1', 20001);
       _maibotLineBuffer = '';
+      _isMaiBotReplaying = false;
       maibotSocket!.listen((data) async {
-        final event = utf8.decode(data, allowMalformed: true);
+        var event = utf8.decode(data, allowMalformed: true);
+        
+        // [Fix 4.1] 处理历史缓冲区回放标记
+        if (event.contains('\x02__HIST_START__\x03')) {
+          _isMaiBotReplaying = true;
+          event = event.replaceAll('\x02__HIST_START__\x03', '');
+        }
+        if (event.contains('\x02__HIST_END__\x03')) {
+          event = event.replaceAll('\x02__HIST_END__\x03', '');
+          _isMaiBotReplaying = false;
+        }
+
         terminal.write(event);
         
         _maibotLineBuffer += event;
@@ -109,10 +123,14 @@ class HomeController extends GetxController with WidgetsBindingObserver {
 
         for (final line in lines) {
           napcatController.handleMaibotOutput(line);
+          napcatController.handleNapcatOutput(line);
           final cleanLine = line.replaceAll(_ansiColorRegExp, '');
           if (cleanLine.contains('访问地址:')) {
             _isLocalhostDetected = true;
-            await bumpProgress();
+            // 仅在非历史回放（实时流数据）时增加进度计数，防止重连重放触发
+            if (!_isMaiBotReplaying) {
+              await bumpProgress();
+            }
             _checkAndNavigateToWebview();
             Future.delayed(const Duration(milliseconds: 2000), () => update());
           }
@@ -135,7 +153,13 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       napcatSocket = await Socket.connect('127.0.0.1', 20002);
       _napcatLineBuffer = '';
       napcatSocket!.listen((data) {
-        final event = utf8.decode(data, allowMalformed: true);
+        var event = utf8.decode(data, allowMalformed: true);
+        if (event.contains('\x02__HIST_START__\x03')) {
+          event = event.replaceAll('\x02__HIST_START__\x03', '');
+        }
+        if (event.contains('\x02__HIST_END__\x03')) {
+          event = event.replaceAll('\x02__HIST_END__\x03', '');
+        }
         napcatShowTerminal.write(event);
         
         _napcatLineBuffer += event;
@@ -233,12 +257,8 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         String content = await progressDesFile.readAsString();
         if (currentProgress == content) return;
         currentProgress = content;
-
-        // 当进度到达 "Napcat 已安装" 时，启动 NapCat 终端
         if (content.contains('Napcat ${S.current.installed}')) {
-          FlutterForegroundTask.sendDataToTask('start_napcat');
           await bumpProgress();
-          Log.i('检测到 Napcat 已安装，发送指令启动 NapCat 容器', 'MaiBot');
         }
 
         // 当进度到达 "MaiBot Core 配置中" 时，清除终端
@@ -251,6 +271,36 @@ class HomeController extends GetxController with WidgetsBindingObserver {
 
         update();
       }
+    });
+    // [Fix 5.2] 针对部分 Android OEM 系统 (MIUI/HarmonyOS) inotify 事件丢失添加 1 秒轮询兜底
+    _progressPollTimer?.cancel();
+    _progressPollTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+      try {
+        if (await progressFile.exists()) {
+          String content = (await progressFile.readAsString()).trim();
+          if (content.isNotEmpty) {
+            double p = (int.tryParse(content) ?? 0) / step;
+            if (progress != p) {
+              progress = p;
+              update();
+            }
+          }
+        }
+        if (await progressDesFile.exists()) {
+          String content = await progressDesFile.readAsString();
+          if (currentProgress != content) {
+            currentProgress = content;
+            if (content.contains('Napcat ${S.current.installed}')) {
+              await bumpProgress();
+            }
+            if (content.trim().contains('MaiBot Core 配置中')) {
+              terminal.buffer.clear();
+              terminal.buffer.setCursor(0, 0);
+            }
+            update();
+          }
+        }
+      } catch (_) {}
     });
   }
 
@@ -380,13 +430,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     _connectMaiBotSocket();
     _connectNapCatSocket();
 
-    // 重连时如果已安装NapCat，直接拉起它的终端，无需等待 progress 信号
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      final launcherFile = File('$ubuntuPath/root/launcher.sh');
-      if (await launcherFile.exists()) {
-        FlutterForegroundTask.sendDataToTask('start_napcat');
-      }
-    });
+    // 重连时不需要单独拉起Napcat终端，统一由MaiBot管理
   }
 
   @override
@@ -424,6 +468,23 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       });
     });
 
+    // [Fix 4.2 / 5.1] 定时主动探测本地 8001 端口并检查跳转条件，解开多重 AND 条件跳转死锁并兜底日志丢失
+    _localhostProbeTimer?.cancel();
+    _localhostProbeTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (webviewController.webviewHasOpen) {
+        timer.cancel();
+        return;
+      }
+      if (!_isLocalhostDetected) {
+        try {
+          final socket = await Socket.connect('127.0.0.1', 8001, timeout: const Duration(milliseconds: 1000));
+          await socket.close();
+          _isLocalhostDetected = true;
+          Log.i('主动探测 127.0.0.1:8001 成功，设置 _isLocalhostDetected = true', 'MaiBot');
+        } catch (_) {}
+      }
+      _checkAndNavigateToWebview();
+    });
     // 监听应用生命周期状态变化
     WidgetsBinding.instance.addObserver(this);
   }
@@ -466,6 +527,8 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     try {
       _progressSubscription?.cancel();
       _progressDesSubscription?.cancel();
+      _localhostProbeTimer?.cancel();
+      _progressPollTimer?.cancel();
       maibotSocket?.close();
       napcatSocket?.close();
     } catch (e) {
