@@ -476,12 +476,15 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         return;
       }
       if (!_isLocalhostDetected) {
-        try {
-          final socket = await Socket.connect('127.0.0.1', 8001, timeout: const Duration(milliseconds: 1000));
-          await socket.close();
-          _isLocalhostDetected = true;
-          Log.i('主动探测 127.0.0.1:8001 成功，设置 _isLocalhostDetected = true', 'MaiBot');
-        } catch (_) {}
+        for (final port in [8001, 6185]) {
+          try {
+            final socket = await Socket.connect('127.0.0.1', port, timeout: const Duration(milliseconds: 800));
+            await socket.close();
+            _isLocalhostDetected = true;
+            Log.i('主动探测 127.0.0.1:$port 成功，设置 _isLocalhostDetected = true', 'MaiBot');
+            break;
+          } catch (_) {}
+        }
       }
       _checkAndNavigateToWebview();
     });

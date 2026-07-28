@@ -112,17 +112,49 @@ network_test() {
 
 # 网络重试计数器
 read_retry(){
+  local c=0
   if [ -f "$NET_RETRY_FILE" ]; then
-    return $(cat "$NET_RETRY_FILE" 2>/dev/null || echo 0)
+    c=$(cat "$NET_RETRY_FILE" 2>/dev/null | tr -cd '0-9')
   fi
-  return 0
+  [ -z "$c" ] && c=0
+  return $c
 }
 bump_retry(){
   local c=0
   if [ -f "$NET_RETRY_FILE" ]; then
-    c=$(cat "$NET_RETRY_FILE" 2>/dev/null || echo 0)
+    c=$(cat "$NET_RETRY_FILE" 2>/dev/null | tr -cd '0-9')
   fi
+  [ -z "$c" ] && c=0
   echo $((c+1)) > "$NET_RETRY_FILE"
+}
+
+# 从 onebot11.json 同步 token/port 至 MaiBot 适配器 config.toml
+sync_onebot_to_adapter_config(){
+  local ONEBOT_PATH="$1"
+  local ADAPTER_CFG="$2"
+  if [ -f "$ONEBOT_PATH" ] && [ -f "$ADAPTER_CFG" ]; then
+    local OB_TOKEN=""
+    local OB_PORT=""
+    if command -v python3 >/dev/null 2>&1; then
+      OB_TOKEN=$(python3 -c "import json; d=json.load(open('$ONEBOT_PATH')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('token',''))" 2>/dev/null || true)
+      OB_PORT=$(python3 -c "import json; d=json.load(open('$ONEBOT_PATH')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('port',8095))" 2>/dev/null || true)
+    fi
+    if [ -z "$OB_TOKEN" ]; then
+      OB_TOKEN=$(grep -o '"token"[[:space:]]*:[[:space:]]*"[^"]*"' "$ONEBOT_PATH" 2>/dev/null | head -n 1 | cut -d'"' -f4 || true)
+    fi
+    if [ -z "$OB_PORT" ]; then
+      OB_PORT=$(grep -o '"port"[[:space:]]*:[[:space:]]*[0-9]*' "$ONEBOT_PATH" 2>/dev/null | head -n 1 | awk -F':' '{print $2}' | tr -d '[:space:]' || true)
+    fi
+    if [ -n "$OB_TOKEN" ]; then
+      local ESCAPED_TOKEN=$(echo "$OB_TOKEN" | sed 's/[&\]/\\&/g')
+      sed -i "s|^token = \".*\"|token = \"$ESCAPED_TOKEN\"|" "$ADAPTER_CFG"
+      echo "✓ 已同步 onebot11.json token 到适配器 config.toml"
+    fi
+    if [ -n "$OB_PORT" ]; then
+      sed -i "s|^port = [0-9]*|port = $OB_PORT|" "$ADAPTER_CFG"
+      echo "✓ 已同步 onebot11.json port ($OB_PORT) 到适配器 config.toml"
+    fi
+  fi
 }
 
 install_uv(){
@@ -272,20 +304,7 @@ fi
   fi
 
   # --- [Fix 1.1] 将 onebot11.json 的 token/port 同步到适配器 config.toml ---
-  local ONEBOT11="$HOME/napcat/config/onebot11.json"
-  local ADAPTER_CONFIG="$HOME/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml"
-  if [ -f "$ONEBOT11" ] && [ -f "$ADAPTER_CONFIG" ]; then
-    local OB_TOKEN=$(python3 -c "import json; d=json.load(open('$ONEBOT11')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('token',''))" 2>/dev/null)
-    local OB_PORT=$(python3 -c "import json; d=json.load(open('$ONEBOT11')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('port',8095))" 2>/dev/null)
-    if [ -n "$OB_TOKEN" ]; then
-      sed -i "s|^token = \".*\"|token = \"$OB_TOKEN\"|" "$ADAPTER_CONFIG"
-      echo "✓ 已同步 onebot11.json token 到适配器 config.toml"
-    fi
-    if [ -n "$OB_PORT" ]; then
-      sed -i "s|^port = [0-9]*|port = $OB_PORT|" "$ADAPTER_CONFIG"
-      echo "✓ 已同步 onebot11.json port 到适配器 config.toml"
-    fi
-  fi
+  sync_onebot_to_adapter_config "$HOME/napcat/config/onebot11.json" "$HOME/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml"
 
   progress_echo "Napcat $L_INSTALLED"
 }
@@ -442,19 +461,7 @@ install_maibot(){
   fi
   
   # [Fix 1.1] 从 onebot11.json 同步 token/port 覆盖到适配器 config.toml
-  local ONEBOT11_SYNC="$HOME/napcat/config/onebot11.json"
-  if [ -f "$ONEBOT11_SYNC" ] && [ -f "$TARGET_CONFIG" ]; then
-    local OB_TOKEN=$(python3 -c "import json; d=json.load(open('$ONEBOT11_SYNC')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('token',''))" 2>/dev/null)
-    local OB_PORT=$(python3 -c "import json; d=json.load(open('$ONEBOT11_SYNC')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('port',8095))" 2>/dev/null)
-    if [ -n "$OB_TOKEN" ]; then
-      sed -i "s|^token = \".*\"|token = \"$OB_TOKEN\"|" "$TARGET_CONFIG"
-      echo "✓ 同步 onebot11.json token 到适配器 config.toml"
-    fi
-    if [ -n "$OB_PORT" ]; then
-      sed -i "s|^port = [0-9]*|port = $OB_PORT|" "$TARGET_CONFIG"
-      echo "✓ 同步 onebot11.json port 到适配器 config.toml"
-    fi
-  fi
+  sync_onebot_to_adapter_config "$HOME/napcat/config/onebot11.json" "$TARGET_CONFIG"
   
   cd "$INSTALL_DIR"
   
