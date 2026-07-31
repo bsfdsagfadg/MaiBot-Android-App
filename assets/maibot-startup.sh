@@ -217,9 +217,17 @@ install_uv(){
   fi
 }
 
+# NapCat 真实安装判定：launcher.sh、QQ 主程序（非空且可执行）、napcat 运行目录（package.json）三者在位。
+# 仅检查 launcher.sh 会在用户删除 ~/napcat 或 QQ 安装损坏时误判为已安装，跳过重装。
+napcat_installed(){
+  [ -f "$HOME/launcher.sh" ] && \
+  [ -s "/opt/QQ/qq" ] && [ -x "/opt/QQ/qq" ] && \
+  [ -f "$HOME/napcat/package.json" ]
+}
+
 install_napcat(){
-  # 检查是否已安装
-  if [ ! -f "$HOME/launcher.sh" ] || [ ! -f "/opt/QQ/qq" ]; then
+  # 检查是否已安装（真实可用性判定）
+  if ! napcat_installed; then
     progress_echo "Napcat $L_NOT_INSTALLED，$L_INSTALLING..."
     
     apt --fix-broken install -y
@@ -241,7 +249,12 @@ install_napcat(){
     fi
 
     bash napcat.sh
-    if ! dpkg -l linuxqq >/dev/null 2>&1; then echo "NapCat 安装失败：QQ 未正确安装" > "$TMPDIR/progress_des"; exit 1; fi
+    # 安装后校验：dpkg 状态必须为 install ok installed（dpkg -l 对 rc/iU 等残留状态同样返回 0），
+    # 且安装判定三要素真实在位（QQ deb 下载损坏/apt 安装失败时安装器仍可能自报成功）
+    if ! dpkg -s linuxqq 2>/dev/null | grep -q 'Status: install ok installed' || ! napcat_installed; then
+      echo "NapCat 安装失败：QQ 未正确安装" > "$TMPDIR/progress_des"
+      exit 1
+    fi
     
     # 防止 napcat 安装器自动启动的进程与前台服务的独立 PTY 冲突
     echo "停止 NapCat 安装器自动启动的进程..."
@@ -303,9 +316,8 @@ fi
     fi
   fi
 
-  # --- [Fix 1.1] 将 onebot11.json 的 token/port 同步到适配器 config.toml ---
-  sync_onebot_to_adapter_config "$HOME/napcat/config/onebot11.json" "$HOME/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml"
-
+  # 适配器 token/port 同步统一在 install_maibot 启动前执行一次，
+  # 避免每次启动出现两条重复的同步日志
   progress_echo "Napcat $L_INSTALLED"
 }
 

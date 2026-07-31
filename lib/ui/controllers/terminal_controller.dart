@@ -145,8 +145,14 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     // [Fix] 重构回归修复：start_napcat 控制消息曾失去发送方，导致 NapCat PTY 永不拉起、终端空白。
     // 已安装（launcher.sh 存在）时直接拉起 NapCat PTY；
     // 未安装（首次初始化）时由 ProgressTracker 在 "Napcat 已安装" 进度处触发。
+    // 与容器内 install_napcat 的安装判定保持一致：
+    // launcher.sh + QQ 主程序 + napcat 运行目录（package.json）三者齐备才视为已安装
     final launcherFile = File('$ubuntuPath/root/launcher.sh');
-    if (await launcherFile.exists()) {
+    final qqBinary = File('$ubuntuPath/opt/QQ/qq');
+    final napcatPackage = File('$ubuntuPath/root/napcat/package.json');
+    if (await launcherFile.exists() &&
+        await qqBinary.exists() &&
+        await napcatPackage.exists()) {
       Log.i('检测到 NapCat 已安装，直接拉起 NapCat 容器', 'MaiBot');
       FlutterForegroundTask.sendDataToTask(TaskMessages.startNapcat);
     }
