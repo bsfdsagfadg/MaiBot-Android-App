@@ -18,7 +18,6 @@ class PtySocketBridge {
     required this.name,
     required this.port,
     required this.command,
-    this.pauseRestartCheck,
   });
 
   /// 组件名称（用于日志）
@@ -29,9 +28,6 @@ class PtySocketBridge {
 
   /// PTY 启动时写入的命令
   final String command;
-
-  /// 返回 true 时暂停自动重启（如重装/清除数据中）
-  final bool Function()? pauseRestartCheck;
 
   static const int maxBufferLength = 70000;
   static const int maxRestartAttempts = 10;
@@ -95,10 +91,6 @@ class PtySocketBridge {
   }
 
   void _schedulePtyRestart() {
-    if (pauseRestartCheck?.call() ?? false) {
-      Log.i('$name exited, 重装/清除数据中，暂停重启', 'KeepAliveTaskHandler');
-      return;
-    }
     if (_restartCount >= maxRestartAttempts) {
       Log.e('$name exited, max retries ($maxRestartAttempts) reached. Stopping restarts.',
           'KeepAliveTaskHandler');

@@ -16,6 +16,9 @@ void startCallback() {
 }
 
 /// 前台任务处理器
+///
+/// 运行在独立 Isolate（与 UI Isolate 静态变量不共享），因此所有状态
+/// （用户主动停止、启动指令）都通过 [TaskMessages] 控制消息维护在本类内。
 /// Foreground task handler
 class KeepAliveTaskHandler extends TaskHandler {
   /// 服务重建计数器
@@ -24,8 +27,15 @@ class KeepAliveTaskHandler extends TaskHandler {
   /// 标记是否是用户主动划掉通知（用于区分系统自动清理）
   static bool _userDismissedNotification = false;
 
-  late final PtySocketBridge _maibotBridge;
-  late final PtySocketBridge _napcatBridge;
+  /// 用户主动停止标记（经 [TaskMessages.userStop] 消息在本 Isolate 内维护）
+  bool _userStopped = false;
+
+  /// onStart 完成前到达的启动指令排队标记（如备份恢复后立即拉起容器）
+  bool _startMaibotPending = false;
+  bool _startNapcatPending = false;
+
+  PtySocketBridge? _maibotBridge;
+  PtySocketBridge? _napcatBridge;
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -36,37 +46,48 @@ class KeepAliveTaskHandler extends TaskHandler {
       name: 'MaiBot',
       port: Ports.maibotPtySocket,
       command: 'source ${RuntimeEnvir.homePath}/common.sh\nstart_maibot\n',
-      pauseRestartCheck: () => ForegroundServiceManager.reinstallInProgress,
     );
     _napcatBridge = PtySocketBridge(
       name: 'NapCat',
       port: Ports.napcatPtySocket,
       command:
           'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash /root/launcher.sh"\n',
-      pauseRestartCheck: () => ForegroundServiceManager.reinstallInProgress,
     );
 
-    await _maibotBridge.startServer();
-    await _napcatBridge.startServer();
+    await _maibotBridge!.startServer();
+    await _napcatBridge!.startServer();
+
+    // 补发 onStart 完成前已到达的启动指令，避免消息被吞导致容器永不启动
+    if (_startMaibotPending) {
+      _maibotBridge!.resetRestartCount();
+      _maibotBridge!.start();
+    }
+    if (_startNapcatPending) {
+      _napcatBridge!.resetRestartCount();
+      _napcatBridge!.start();
+    }
   }
 
   @override
   void onReceiveData(Object data) {
-    if (data == 'start_maibot') {
-      _maibotBridge.resetRestartCount();
-      _maibotBridge.start();
-    } else if (data == 'start_napcat') {
-      _napcatBridge.resetRestartCount();
-      _napcatBridge.start();
+    if (data == TaskMessages.startMaibot) {
+      _startMaibotPending = true;
+      _maibotBridge?.resetRestartCount();
+      _maibotBridge?.start();
+    } else if (data == TaskMessages.startNapcat) {
+      _startNapcatPending = true;
+      _napcatBridge?.resetRestartCount();
+      _napcatBridge?.start();
+    } else if (data == TaskMessages.userStop) {
+      _userStopped = true;
+      Log.i('收到用户停止指令，停止自动重建', 'KeepAliveTaskHandler');
     }
   }
 
   @override
   void onRepeatEvent(DateTime timestamp) {
     FlutterForegroundTask.isRunningService.then((isRunning) {
-      if (!isRunning &&
-          !ForegroundServiceManager.userClickedStopButton &&
-          !ForegroundServiceManager.reinstallInProgress) {
+      if (!isRunning && !_userStopped) {
         Log.w('检测到服务意外停止，准备重建...', 'KeepAliveTaskHandler');
         _rebuildService();
       }
@@ -78,7 +99,7 @@ class KeepAliveTaskHandler extends TaskHandler {
     Log.i('前台服务被销毁，isTaskRemoved: $isTaskRemoved, 用户主动划掉: $_userDismissedNotification',
         'KeepAliveTaskHandler');
 
-    if (!_userDismissedNotification && !ForegroundServiceManager.userClickedStopButton) {
+    if (!_userDismissedNotification && !_userStopped) {
       Log.w('检测到系统自动清理通知或服务被终止，准备重建...', 'KeepAliveTaskHandler');
       await Future.delayed(const Duration(milliseconds: 500));
       await _rebuildService();
@@ -124,6 +145,8 @@ class KeepAliveTaskHandler extends TaskHandler {
     } else if (id == 'btn_stop') {
       Log.i('用户点击停止按钮', 'KeepAliveTaskHandler');
       // 用户点击停止运行按钮，先标记为手动停止，然后退出应用
+      // （stopService 内的 user_stop 消息为冗余保险，本 Isolate 内直接标记）
+      _userStopped = true;
       ForegroundServiceManager.stopService().then((_) {
         exit(0);
       });
@@ -143,7 +166,7 @@ class KeepAliveTaskHandler extends TaskHandler {
 
     _userDismissedNotification = true;
 
-    if (!ForegroundServiceManager.userClickedStopButton) {
+    if (!_userStopped) {
       Log.i('检测到用户主动划掉通知，将重建服务', 'KeepAliveTaskHandler');
       Future.delayed(const Duration(milliseconds: 500), () {
         _rebuildService();

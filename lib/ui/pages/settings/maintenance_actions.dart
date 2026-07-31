@@ -45,9 +45,12 @@ class MaintenanceActions {
       return;
     }
 
-    // 如果选择备份，先执行备份
+    // 如果选择备份，先执行备份（保持容器停止，若用户取消重装则由下方恢复）
     if (backupChoice == 'backup') {
-      bool backupSuccess = await BackupService.performBackup(showLoadingDialog: true);
+      bool backupSuccess = await BackupService.performBackup(
+        showLoadingDialog: true,
+        restoreService: false,
+      );
 
       if (!backupSuccess) {
         // 备份失败，询问是否继续
@@ -72,6 +75,8 @@ class MaintenanceActions {
         );
 
         if (continueAnyway != true) {
+          // 取消：恢复被暂停的前台服务（restartContainer 内部有运行态守卫）
+          await ForegroundServiceManager.restartContainer();
           return;
         }
       }
@@ -98,42 +103,45 @@ class MaintenanceActions {
       ),
     );
 
-    if (finalConfirm == true) {
-      try {
-        ForegroundServiceManager.setReinstallInProgress(true);
-        await ForegroundServiceManager.stopService();
-        // 删除 MaiBot 目录（~/MaiBot）
-        final maiBotPath = '${scripts.ubuntuPath}/root/MaiBot';
-        final maiBotDir = Directory(maiBotPath);
-        if (await maiBotDir.exists()) {
-          try {
-            await Process.run('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
-          } catch (_) {}
-          await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', maiBotPath]);
-          Log.i('已删除 MaiBot 目录: $maiBotPath', 'MaiBot');
-        }
+    if (finalConfirm != true) {
+      // 取消：恢复被暂停的前台服务（restartContainer 内部有运行态守卫）
+      await ForegroundServiceManager.restartContainer();
+      return;
+    }
 
-        Get.snackbar(
-          '重装成功',
-          '应用将自动退出，请重新启动',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(seconds: 2),
-        );
-
-        // 2秒后自动退出应用
-        Future.delayed(const Duration(seconds: 2), () {
-          exit(0);
-        });
-      } catch (e) {
-        Log.e('重新安装 MaiBot 失败: $e', 'MaiBot');
-        Get.snackbar(
-          '重新安装失败',
-          e.toString(),
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+    try {
+      await ForegroundServiceManager.stopService();
+      // 删除 MaiBot 目录（~/MaiBot）
+      final maiBotPath = '${scripts.ubuntuPath}/root/MaiBot';
+      final maiBotDir = Directory(maiBotPath);
+      if (await maiBotDir.exists()) {
+        try {
+          await Process.run('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
+        } catch (_) {}
+        await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', maiBotPath]);
+        Log.i('已删除 MaiBot 目录: $maiBotPath', 'MaiBot');
       }
+
+      Get.snackbar(
+        '重装成功',
+        '应用将自动退出，请重新启动',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 2),
+      );
+
+      // 2秒后自动退出应用
+      Future.delayed(const Duration(seconds: 2), () {
+        exit(0);
+      });
+    } catch (e) {
+      Log.e('重新安装 MaiBot 失败: $e', 'MaiBot');
+      Get.snackbar(
+        '重新安装失败',
+        e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 
@@ -162,7 +170,6 @@ class MaintenanceActions {
 
     if (confirm == true) {
       try {
-        ForegroundServiceManager.setReinstallInProgress(true);
         await ForegroundServiceManager.stopService();
         // 删除 launcher.sh 文件，这是安装判断的依据
         final launcherPath = '${scripts.ubuntuPath}/root/launcher.sh';
@@ -225,8 +232,7 @@ class MaintenanceActions {
 
     if (confirmed == true) {
       try {
-        // 先尝试强制终止正在后台运行的所有子进程
-        ForegroundServiceManager.setReinstallInProgress(true);
+        // 先暂停服务并终止正在后台运行的所有子进程，再删除数据
         await ForegroundServiceManager.stopService();
         try {
           await Process.run('${RuntimeEnvir.binPath}/busybox', [
@@ -316,6 +322,8 @@ class MaintenanceActions {
     );
     if (confirmed == true) {
       try {
+        // 先暂停服务，避免 PTY 自动重启与删除竞态
+        await ForegroundServiceManager.stopService();
         final venvPath = '${scripts.ubuntuPath}/root/MaiBot/.venv';
         final venvDir = Directory(venvPath);
 

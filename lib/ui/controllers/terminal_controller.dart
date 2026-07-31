@@ -13,6 +13,7 @@ import 'package:xterm/xterm.dart';
 import '../../core/config/app_config.dart';
 import '../../core/constants/scripts.dart';
 import '../../core/services/env_bootstrapper.dart';
+import '../../core/services/foreground_service.dart';
 import '../../core/services/progress_tracker.dart';
 import '../../core/services/socket_stream_client.dart';
 import '../../core/utils/version_utils.dart';
@@ -132,7 +133,14 @@ class HomeController extends GetxController with WidgetsBindingObserver {
 
     // 触发前台服务拉起容器
     progressTracker.setProgress('开始拉起 MaiBot 容器...');
-    FlutterForegroundTask.sendDataToTask('start_maibot');
+    // 确保前台服务在运行（系统可能已回收服务进程），否则 start_maibot 消息会被丢弃
+    if (!await ForegroundServiceManager.isRunningService()) {
+      final result = await ForegroundServiceManager.startService();
+      if (result is ServiceRequestFailure) {
+        Log.e('前台服务未运行且启动失败: ${result.error}', 'MaiBot');
+      }
+    }
+    FlutterForegroundTask.sendDataToTask(TaskMessages.startMaibot);
     maibotClient.connect();
     napcatClient.connect();
 

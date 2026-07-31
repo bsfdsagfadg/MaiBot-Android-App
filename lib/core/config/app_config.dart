@@ -56,6 +56,14 @@ class Config {
   ];
 }
 
+/// 与前台服务 TaskHandler（独立 Isolate）通信的控制消息协议。
+/// 跨 Isolate 的静态标志不可见，必须经 FlutterForegroundTask.sendDataToTask 传递。
+class TaskMessages {
+  static const String startMaibot = 'start_maibot';
+  static const String startNapcat = 'start_napcat';
+  static const String userStop = 'user_stop';
+}
+
 /// 本地服务端口常量
 class Ports {
   // PTY 输出转发 Socket（前台服务监听，UI 侧连接）

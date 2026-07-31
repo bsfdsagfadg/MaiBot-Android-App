@@ -2,22 +2,16 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
 
+import '../config/app_config.dart';
 import 'keep_alive_task_handler.dart';
 
 /// 前台服务管理类
 /// Foreground Service Manager
 class ForegroundServiceManager {
-  /// 标记用户是否点击了停止按钮（只有这种情况才不重建）
+  /// 标记用户是否点击了停止按钮（仅 UI Isolate 内有效，供主界面监控使用）
+  /// KeepAliveTaskHandler 运行在独立 Isolate，无法读取此静态字段，
+  /// 其停止意图通过 [TaskMessages.userStop] 控制消息传递。
   static bool _userClickedStopButton = false;
-  /// [Fix 2.1] 标记是否正在重装/清除数据（暂停 PTY 自动重启）
-  static bool _reinstallInProgress = false;
-  /// [Fix 2.1] 设置重装/清除数据状态
-  static void setReinstallInProgress(bool value) {
-    _reinstallInProgress = value;
-    Log.i('重装/清除数据状态: $_reinstallInProgress', 'ForegroundService');
-  }
-  /// [Fix 2.1] 获取重装/清除数据状态
-  static bool get reinstallInProgress => _reinstallInProgress;
   /// 初始化前台服务
   /// Initialize foreground service
   static void init() {
@@ -74,12 +68,34 @@ class ForegroundServiceManager {
     }
   }
 
-  /// 停止前台服务（仅在用户点击停止按钮时调用）
+  /// 停止前台服务（仅在用户点击停止按钮/维护操作时调用）
   /// Stop foreground service (only called when user clicks stop button)
+  ///
+  /// TaskHandler 运行在独立 Isolate，静态标志不可见；停止前先经任务通道
+  /// 送达 [TaskMessages.userStop]，防止 onDestroy 将主动停止误判为意外死亡而重建。
   static Future<ServiceRequestResult> stopService() async {
-    _userClickedStopButton = true; // 标记为用户点击了停止按钮
+    _userClickedStopButton = true; // 标记为用户点击了停止按钮（UI Isolate 监控用）
     Log.i('用户点击停止按钮，停止前台服务', 'ForegroundService');
+    FlutterForegroundTask.sendDataToTask(TaskMessages.userStop);
+    // 等待控制消息送达后台 Isolate，再执行停止，避免重建竞态
+    await Future.delayed(const Duration(milliseconds: 300));
     return FlutterForegroundTask.stopService();
+  }
+
+  /// 恢复前台服务并重新拉起 MaiBot 容器（备份/取消维护后调用）。
+  /// 服务已在运行时只补发启动消息（PTY 已在运行则为幂等空操作），
+  /// 避免 restartService 触发 onDestroy 重建竞态形成无限重启循环。
+  static Future<void> restartContainer() async {
+    if (await FlutterForegroundTask.isRunningService) {
+      FlutterForegroundTask.sendDataToTask(TaskMessages.startMaibot);
+      return;
+    }
+    final result = await startService();
+    if (result is ServiceRequestFailure) {
+      Log.e('恢复前台服务失败: ${result.error}', 'ForegroundService');
+      return;
+    }
+    FlutterForegroundTask.sendDataToTask(TaskMessages.startMaibot);
   }
 
   /// 获取用户是否点击了停止按钮
