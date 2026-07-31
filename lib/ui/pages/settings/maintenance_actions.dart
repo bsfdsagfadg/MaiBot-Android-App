@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 
-import '../../../core/constants/scripts.dart';
+import '../../../core/constants/scripts.dart' as scripts;
 import '../../../core/services/backup_service.dart';
 import '../../../core/services/foreground_service.dart';
 

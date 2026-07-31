@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 
-import '../../../../core/constants/scripts.dart';
+import '../../../../core/constants/scripts.dart' as scripts;
 
 // 显示自定义 Git Clone 对话框
 Future<void> showCustomGitCloneDialog() async {

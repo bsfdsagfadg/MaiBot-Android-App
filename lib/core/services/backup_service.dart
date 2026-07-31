@@ -1,9 +1,10 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 
-import '../constants/scripts.dart';
+import '../constants/scripts.dart' as scripts;
 
 /// 备份服务：将 MaiBot 数据打包到手机下载目录
 class BackupService {

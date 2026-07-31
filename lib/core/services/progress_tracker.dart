@@ -5,6 +5,7 @@ import 'package:global_repository/global_repository.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../generated/l10n.dart';
+import '../utils/file_utils.dart';
 
 /// 安装进度跟踪器。
 ///
