@@ -1,14 +1,6 @@
 import 'package:global_repository/global_repository.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import '../config/app_config.dart';
 import '../../generated/l10n.dart';
-
-// 获取应用版本号（从 pubspec.yaml）
-// Get app version from pubspec.yaml
-Future<String> getAppVersion() async {
-  final packageInfo = await PackageInfo.fromPlatform();
-  return packageInfo.version;
-}
 
 // ubuntu path (保持原有路径结构，但不再使用 proot-distro)
 // ubuntu path (keep original path structure, but no longer use proot-distro)

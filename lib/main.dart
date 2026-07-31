@@ -7,6 +7,7 @@ import 'package:settings/settings.dart';
 import 'dart:async';
 
 import 'generated/l10n.dart';
+import 'core/config/app_config.dart';
 import 'core/services/foreground_service.dart';
 import 'ui/routes/app_routes.dart';
 import 'ui/controllers/terminal_controller.dart';
@@ -35,7 +36,7 @@ Future<void> main() async {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
   ));
-  RuntimeEnvir.initEnvirWithPackageName('com.maibot.maibot_android');
+  RuntimeEnvir.initEnvirWithPackageName(Config.packageName);
   await initSettingStore(RuntimeEnvir.configPath);
   
   // 初始化前台服务

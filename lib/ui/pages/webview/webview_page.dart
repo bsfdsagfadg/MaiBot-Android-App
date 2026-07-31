@@ -10,6 +10,7 @@ import '../../controllers/terminal_controller.dart';
 import '../settings/settings_page.dart';
 import '../terminal/terminal_tab_view.dart';
 import '../../navbar/bottom_nav_bar.dart';
+import '../../../core/config/app_config.dart';
 
 class WebViewPage extends StatefulWidget {
   const WebViewPage({super.key});
@@ -135,6 +136,29 @@ class _WebViewPageState extends State<WebViewPage> {
     }
   }
 
+  // 配置 Android 平台 WebView 公共选项（混合内容/本地文件访问/文件选择）
+  void _configureAndroidPlatform(
+    WebViewController controller, {
+    bool enableDebugging = false,
+  }) {
+    if (controller.platform is AndroidWebViewController) {
+      if (enableDebugging) {
+        AndroidWebViewController.enableDebugging(true);
+      }
+      final androidController =
+          controller.platform as AndroidWebViewController;
+      androidController
+        ..setMediaPlaybackRequiresUserGesture(false)
+        // 设置混合内容模式以提高兼容性（Android 9+ 需要）
+        ..setMixedContentMode(MixedContentMode.compatibilityMode)
+        // 允许访问本地文件和内容
+        ..setAllowFileAccess(true)
+        ..setAllowContentAccess(true)
+        // 设置文件选择回调
+        ..setOnShowFileSelector(_handleFileSelection);
+    }
+  }
+
   void _initMaiBotController() {
     _maiBotController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -159,23 +183,9 @@ class _WebViewPageState extends State<WebViewPage> {
           },
         ),
       )
-      ..loadRequest(Uri.parse('http://127.0.0.1:8001'));
+      ..loadRequest(Uri.parse('http://127.0.0.1:${Ports.maibotWeb}'));
 
-    if (_maiBotController.platform is AndroidWebViewController) {
-      if (kDebugMode) {
-        AndroidWebViewController.enableDebugging(true);
-      }
-      final androidController = _maiBotController.platform as AndroidWebViewController;
-      androidController
-          .setMediaPlaybackRequiresUserGesture(false);
-      // 设置混合内容模式以提高兼容性（Android 9+ 需要）
-      androidController.setMixedContentMode(MixedContentMode.compatibilityMode);
-      // 允许访问本地文件和内容
-      androidController.setAllowFileAccess(true);
-      androidController.setAllowContentAccess(true);
-      // 设置文件选择回调
-      androidController.setOnShowFileSelector(_handleFileSelection);
-    }
+    _configureAndroidPlatform(_maiBotController, enableDebugging: kDebugMode);
 
     _maiBotController.addJavaScriptChannel(
       'Android',
@@ -218,32 +228,20 @@ class _WebViewPageState extends State<WebViewPage> {
     // 监听 Token 变化
     _napCatTokenWorker = ever(homeController.napcatController.napCatWebUiToken, (String token) {
       if (token.isNotEmpty) {
-        final url = 'http://127.0.0.1:6099/webui?token=$token';
+        final url = 'http://127.0.0.1:${Ports.napcatWebUi}/webui?token=$token';
         _napCatController.loadRequest(Uri.parse(url));
       }
     });
 
     // 初始加载
     if (homeController.napcatController.napCatWebUiToken.isNotEmpty) {
-      final url = 'http://127.0.0.1:6099/webui?token=${homeController.napcatController.napCatWebUiToken.value}';
+      final url = 'http://127.0.0.1:${Ports.napcatWebUi}/webui?token=${homeController.napcatController.napCatWebUiToken.value}';
       _napCatController.loadRequest(Uri.parse(url));
     } else {
-      _napCatController.loadRequest(Uri.parse('http://127.0.0.1:6099/webui'));
+      _napCatController.loadRequest(Uri.parse('http://127.0.0.1:${Ports.napcatWebUi}/webui'));
     }
 
-    if (_napCatController.platform is AndroidWebViewController) {
-      AndroidWebViewController.enableDebugging(true);
-      final androidController = _napCatController.platform as AndroidWebViewController;
-      androidController
-          .setMediaPlaybackRequiresUserGesture(false);
-      // 设置混合内容模式以提高兼容性（Android 9+ 需要）
-      androidController.setMixedContentMode(MixedContentMode.compatibilityMode);
-      // 允许访问本地文件和内容
-      androidController.setAllowFileAccess(true);
-      androidController.setAllowContentAccess(true);
-      // 设置文件选择回调
-      androidController.setOnShowFileSelector(_handleFileSelection);
-    }
+    _configureAndroidPlatform(_napCatController, enableDebugging: true);
   }
 
   // 创建自定义 WebView 控制器
@@ -277,16 +275,7 @@ class _WebViewPageState extends State<WebViewPage> {
       )
       ..loadRequest(Uri.parse(url));
 
-    if (controller.platform is AndroidWebViewController) {
-      AndroidWebViewController.enableDebugging(true);
-      final androidController = controller.platform as AndroidWebViewController;
-      androidController.setMediaPlaybackRequiresUserGesture(false);
-      androidController.setMixedContentMode(MixedContentMode.compatibilityMode);
-      androidController.setAllowFileAccess(true);
-      androidController.setAllowContentAccess(true);
-      // 设置文件选择回调
-      androidController.setOnShowFileSelector(_handleFileSelection);
-    }
+    _configureAndroidPlatform(controller, enableDebugging: true);
 
     return controller;
   }

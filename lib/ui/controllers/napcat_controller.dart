@@ -7,23 +7,19 @@ import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
 
 import '../../core/constants/scripts.dart';
+import 'napcat_log_parser.dart';
 
 class NapcatController extends GetxController {
-  static final _ansiColorRegExp = RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]');
-  static final _napcatTokenRegExp = RegExp(r'WebUi Token:\s+(\w+)');
-  static final _maibotTokenRegExp = RegExp(r'WebUI 登录 Token:\s+([a-f0-9]+)');
-  static final _errorMsgRegExp = RegExp(r'"message":"([^"]+)"');
-  static final _qqNumRegExp = RegExp(r'^\d+$');
   final RxString napCatWebUiToken = ''.obs; // 存储 NapCat WebUI Token
   final RxString maiBotWebUiToken = ''.obs; // 存储 MaiBot WebUI Token
   final RxBool _isQrcodeShowing = false.obs;
-  
+
   Setting napCatWebUiEnabled = 'napcat_webui_enabled'.setting;
   final RxBool napCatWebUiEnabledRx = false.obs;
 
   Dialog? _qrcodeDialog;
   bool isQrcodeProcessed = false;
-  
+
   @override
   void onInit() {
     super.onInit();
@@ -61,152 +57,145 @@ class NapcatController extends GetxController {
 
   void handleNapcatOutput(String event) async {
     // 剥离ANSI颜色代码，防止颜色字符干扰正则表达式匹配
-    final cleanEvent = event.replaceAll(_ansiColorRegExp, '');
+    final cleanEvent = NapcatLogParser.stripAnsi(event);
 
-    // 检测自动快速登录成功
-    if (cleanEvent.contains('自动快速登录成功')) {
-      isQrcodeProcessed = true;
-      if (_isQrcodeShowing.value && _qrcodeDialog != null) {
-        Get.back();
-        _isQrcodeShowing.value = false;
-        _qrcodeDialog = null;
+    for (final parsed in NapcatLogParser.parseNapcat(cleanEvent)) {
+      switch (parsed.type) {
+        case NapcatLogEventType.autoLoginSuccess:
+          isQrcodeProcessed = true;
+          if (_isQrcodeShowing.value && _qrcodeDialog != null) {
+            Get.back();
+            _isQrcodeShowing.value = false;
+            _qrcodeDialog = null;
+          }
+          Log.i('检测到 NapCat 自动快速登录成功，准备进入主页面...', 'MaiBot');
+          break;
+
+        case NapcatLogEventType.napcatToken:
+          final token = parsed.payload;
+          if (token != null) {
+            napCatWebUiToken.value = token;
+            Log.i('捕获到 NapCat Token: $token', 'MaiBot');
+          }
+          break;
+
+        case NapcatLogEventType.qrcodeSaved:
+          if (!_isQrcodeShowing.value) {
+            await _showQrcodeDialog();
+          }
+          break;
+
+        case NapcatLogEventType.configLoaded:
+          if (_isQrcodeShowing.value) {
+            // 关闭对话框
+            if (_qrcodeDialog != null) {
+              Get.back();
+              _isQrcodeShowing.value = false;
+              _qrcodeDialog = null;
+            }
+
+            // 标记二维码处理完成
+            isQrcodeProcessed = true;
+
+            // 检测登录并询问是否保存QQ
+            _checkAndPromptSaveQQ();
+          }
+          break;
+
+        case NapcatLogEventType.loginError:
+          if (_isQrcodeShowing.value) {
+            // 关闭二维码对话框
+            if (_qrcodeDialog != null) {
+              Get.back();
+              _isQrcodeShowing.value = false;
+              _qrcodeDialog = null;
+            }
+
+            // 显示错误提示
+            Get.snackbar(
+              'NapCat 登录失败',
+              parsed.payload ?? '登录失败',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.red.withValues(alpha: 0.8),
+              colorText: Colors.white,
+              duration: const Duration(seconds: 5),
+            );
+          }
+          break;
       }
-      Log.i('检测到 NapCat 自动快速登录成功，准备进入主页面...', 'MaiBot');
-    }
-
-    // 捕获 NapCat WebUI Token
-    if (cleanEvent.contains('WebUi Token:')) {
-      final matches = _napcatTokenRegExp.allMatches(cleanEvent);
-      if (matches.isNotEmpty) {
-        final token = matches.last.group(1);
-        if (token != null) {
-          napCatWebUiToken.value = token;
-          Log.i('捕获到 NapCat Token: $token', 'MaiBot');
-        }
-      }
-    }
-
-    // 检测指令1显示二维码
-    if (cleanEvent.contains('二维码已保存到') && !_isQrcodeShowing.value) {
-      _isQrcodeShowing.value = true;
-      final qrcodePath = '$ubuntuPath/root/napcat/cache/qrcode.png';
-      final qrcodeFile = File(qrcodePath);
-
-      if (await qrcodeFile.exists()) {
-        _qrcodeDialog = Dialog(
-          backgroundColor: Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '请用手机QQ扫码登录',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                Image.file(
-                  qrcodeFile,
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.contain,
-                ),
-              ],
-            ),
-          ),
-        );
-
-        // 检查异步等待期间是否已经触发了登录成功
-        if (isQrcodeProcessed) {
-          _isQrcodeShowing.value = false;
-          _qrcodeDialog = null;
-          return;
-        }
-
-        // 使用GetX的导航管理避免上下文问题
-        await Get.dialog(
-          _qrcodeDialog!,
-          barrierDismissible: false,
-        );
-
-        _isQrcodeShowing.value = false;
-        _qrcodeDialog = null;
-      } else {
-        Get.showSnackbar(GetSnackBar(
-          message: '二维码图片不存在：$qrcodePath',
-          duration: const Duration(seconds: 3),
-        ));
-        _isQrcodeShowing.value = false;
-      }
-    }
-
-    // 检测指令2关闭二维码
-    if (cleanEvent.contains('配置加载') && _isQrcodeShowing.value) {
-      // 关闭对话框
-      if (_qrcodeDialog != null) {
-        Get.back();
-        _isQrcodeShowing.value = false;
-        _qrcodeDialog = null;
-      }
-
-      // 标记二维码处理完成
-      isQrcodeProcessed = true;
-
-      // 检测登录并询问是否保存QQ
-      _checkAndPromptSaveQQ();
-    }
-
-    // 检测指令3处理登录错误
-    if (cleanEvent.contains('Login Error') && _isQrcodeShowing.value) {
-      // 关闭二维码对话框
-      if (_qrcodeDialog != null) {
-        Get.back();
-        _isQrcodeShowing.value = false;
-        _qrcodeDialog = null;
-      }
-
-      // 提取错误信息
-      String errorMsg = '登录失败';
-      if (cleanEvent.contains('"message":"')) {
-        final match = _errorMsgRegExp.firstMatch(cleanEvent);
-        if (match != null) {
-          errorMsg = match.group(1) ?? errorMsg;
-        }
-      }
-
-      // 显示错误提示
-      Get.snackbar(
-        'NapCat 登录失败',
-        errorMsg,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.withValues(alpha: 0.8),
-        colorText: Colors.white,
-        duration: const Duration(seconds: 5),
-      );
     }
   }
-  
+
+  // 展示二维码登录对话框
+  Future<void> _showQrcodeDialog() async {
+    _isQrcodeShowing.value = true;
+    final qrcodePath = '$ubuntuPath/root/napcat/cache/qrcode.png';
+    final qrcodeFile = File(qrcodePath);
+
+    if (!await qrcodeFile.exists()) {
+      Get.showSnackbar(GetSnackBar(
+        message: '二维码图片不存在：$qrcodePath',
+        duration: const Duration(seconds: 3),
+      ));
+      _isQrcodeShowing.value = false;
+      return;
+    }
+
+    _qrcodeDialog = Dialog(
+      backgroundColor: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '请用手机QQ扫码登录',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Image.file(
+              qrcodeFile,
+              width: 200,
+              height: 200,
+              fit: BoxFit.contain,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // 检查异步等待期间是否已经触发了登录成功
+    if (isQrcodeProcessed) {
+      _isQrcodeShowing.value = false;
+      _qrcodeDialog = null;
+      return;
+    }
+
+    // 使用GetX的导航管理避免上下文问题
+    await Get.dialog(
+      _qrcodeDialog!,
+      barrierDismissible: false,
+    );
+
+    _isQrcodeShowing.value = false;
+    _qrcodeDialog = null;
+  }
+
   void handleMaibotOutput(String event) async {
     // 剥离ANSI颜色代码
-    final cleanEvent = event.replaceAll(_ansiColorRegExp, '');
+    final cleanEvent = NapcatLogParser.stripAnsi(event);
 
     // 适配新版日志：🔑 WebUI 登录 Token: ...
-    if (cleanEvent.contains('WebUI 登录 Token:')) {
+    final token = NapcatLogParser.parseMaibotToken(cleanEvent);
+    if (token != null) {
       // 优先从本地 webui.json 读取 Token 凭证
       if (await _loadMaibotTokenFromFile()) {
         return;
       }
 
       // 若文件不存在（如首次配置流程），则尝试通过日志提取
-      final matches =
-          _maibotTokenRegExp.allMatches(cleanEvent);
-      if (matches.isNotEmpty) {
-        final token = matches.last.group(1);
-        if (token != null) {
-          maiBotWebUiToken.value = token;
-          Log.i('成功从日志中抓取到 MaiBot Token: $token',  'MaiBot');
-        }
-      }
+      maiBotWebUiToken.value = token;
+      Log.i('成功从日志中抓取到 MaiBot Token: $token', 'MaiBot');
     }
   }
 
@@ -227,7 +216,7 @@ class NapcatController extends GetxController {
           loggedInQQ = fileName.substring(
               'onebot11_'.length, fileName.length - '.json'.length);
           // 确保是纯数字QQ号
-          if (_qqNumRegExp.hasMatch(loggedInQQ)) {
+          if (NapcatLogParser.isQQNumber(loggedInQQ)) {
             break;
           } else {
             loggedInQQ = null;

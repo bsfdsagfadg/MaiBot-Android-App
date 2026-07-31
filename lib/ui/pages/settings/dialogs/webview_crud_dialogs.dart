@@ -1,0 +1,185 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../../../core/config/app_config.dart';
+import '../../../controllers/webview_controller.dart';
+
+// 显示添加自定义 WebView 对话框
+void showAddWebViewDialog(WebviewController controller) {
+  final titleController = TextEditingController();
+  final urlController = TextEditingController();
+
+  Get.dialog(
+    AlertDialog(
+      title: const Text('添加自定义 WebView'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: titleController,
+            decoration: const InputDecoration(
+              labelText: '标题',
+              hintText: '例如：我的仪表盘',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: urlController,
+            decoration: InputDecoration(
+              labelText: 'URL',
+              hintText: '例如：${Ports.napcatWebUi}/webui?token=***',
+              helperText: '自动添加前缀 http://127.0.0.1: \n若需使用https，请手动输入完整URL',
+              border: const OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.url,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text('取消')),
+        TextButton(
+          onPressed: () {
+            final title = titleController.text.trim();
+            var url = urlController.text.trim();
+
+            if (title.isEmpty || url.isEmpty) {
+              Get.snackbar(
+                '输入错误',
+                '标题和 URL 不能为空',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+              );
+              return;
+            }
+
+            // 如果URL不包含协议前缀,自动添加 http://127.0.0.1:
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              url = 'http://127.0.0.1:$url';
+            }
+
+            controller.addCustomWebView(title, url);
+            Get.back();
+
+            Get.snackbar(
+              '添加成功',
+              '自定义 WebView "$title" 已添加',
+              snackPosition: SnackPosition.BOTTOM,
+              duration: const Duration(seconds: 2),
+            );
+          },
+          child: const Text('添加'),
+        ),
+      ],
+    ),
+  );
+}
+
+// 显示编辑自定义 WebView 对话框
+void showEditWebViewDialog(
+    WebviewController controller, int index, Map<String, String> webview) {
+  final titleController = TextEditingController(text: webview['title']);
+
+  // 将完整URL转换为简化格式用于编辑
+  String displayUrl = webview['url'] ?? '';
+  if (displayUrl.startsWith('https://127.0.0.1:')) {
+    displayUrl = displayUrl.substring('https://127.0.0.1:'.length);
+  } else if (displayUrl.startsWith('http://127.0.0.1:')) {
+    displayUrl = displayUrl.substring('http://127.0.0.1:'.length);
+  }
+
+  final urlController = TextEditingController(text: displayUrl);
+
+  Get.dialog(
+    AlertDialog(
+      title: const Text('编辑自定义 WebView'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: titleController,
+            decoration: const InputDecoration(
+              labelText: '标题',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: urlController,
+            decoration: const InputDecoration(
+              labelText: 'URL',
+              helperText: '自动添加前缀 http://127.0.0.1: \n若需使用https,请手动输入完整URL',
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.url,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text('取消')),
+        TextButton(
+          onPressed: () {
+            final title = titleController.text.trim();
+            var url = urlController.text.trim();
+
+            if (title.isEmpty || url.isEmpty) {
+              Get.snackbar(
+                '输入错误',
+                '标题和 URL 不能为空',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+              );
+              return;
+            }
+
+            // 如果URL不包含协议前缀,自动添加 http://127.0.0.1:
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              url = 'http://127.0.0.1:$url';
+            }
+
+            controller.updateCustomWebView(index, title, url);
+            Get.back();
+
+            Get.snackbar(
+              '更新成功',
+              '自定义 WebView 已更新',
+              snackPosition: SnackPosition.BOTTOM,
+              duration: const Duration(seconds: 2),
+            );
+          },
+          child: const Text('保存'),
+        ),
+      ],
+    ),
+  );
+}
+
+// 确认删除自定义 WebView
+void showConfirmDeleteWebView(
+    WebviewController controller, int index, String title) {
+  Get.dialog(
+    AlertDialog(
+      title: const Text('确认删除'),
+      content: Text('确定要删除自定义 WebView "$title" 吗？'),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text('取消')),
+        TextButton(
+          onPressed: () {
+            controller.removeCustomWebView(index);
+            Get.back();
+
+            Get.snackbar(
+              '删除成功',
+              '自定义 WebView "$title" 已删除',
+              snackPosition: SnackPosition.BOTTOM,
+              duration: const Duration(seconds: 2),
+            );
+          },
+          child: const Text('删除', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    ),
+  );
+}

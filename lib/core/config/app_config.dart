@@ -1,6 +1,12 @@
 const bool product = bool.fromEnvironment('dart.vm.product');
 
 class Config {
+  // 应用包名
+  static const String packageName = 'com.maibot.maibot_android';
+
+  // 与原生侧通信的 MethodChannel 名称
+  static const String methodChannel = 'maibot_channel';
+
   // Ubuntu系统镜像文件名
   static const String ubuntuFileName = 'ubuntu-noble-aarch64-pd-v4.18.0.tar.xz';
 
@@ -48,4 +54,18 @@ class Config {
       'url': 'https://hub.gitmirror.com',
     },
   ];
+}
+
+/// 本地服务端口常量
+class Ports {
+  // PTY 输出转发 Socket（前台服务监听，UI 侧连接）
+  static const int maibotPtySocket = 20001;
+  static const int napcatPtySocket = 20002;
+
+  // Web 服务端口
+  static const int maibotWeb = 8001;
+  static const int napcatWebUi = 6099;
+
+  // 就绪探测端口（MaiBot 启动完成后任一端口可连即视为就绪）
+  static const List<int> localhostProbePorts = [8001, 6185];
 }
