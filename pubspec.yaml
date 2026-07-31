@@ -1,7 +1,7 @@
 name: maibot_android
 description: MaiBot Android App
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
-version: 1.3.1-maibot+137
+version: 1.3.2-maibot+138
 environment:
   sdk: ">=3.3.0 <4.0.0"
 
