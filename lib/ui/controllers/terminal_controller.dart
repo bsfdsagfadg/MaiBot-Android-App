@@ -141,10 +141,17 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       }
     }
     FlutterForegroundTask.sendDataToTask(TaskMessages.startMaibot);
+
+    // [Fix] 重构回归修复：start_napcat 控制消息曾失去发送方，导致 NapCat PTY 永不拉起、终端空白。
+    // 已安装（launcher.sh 存在）时直接拉起 NapCat PTY；
+    // 未安装（首次初始化）时由 ProgressTracker 在 "Napcat 已安装" 进度处触发。
+    final launcherFile = File('$ubuntuPath/root/launcher.sh');
+    if (await launcherFile.exists()) {
+      Log.i('检测到 NapCat 已安装，直接拉起 NapCat 容器', 'MaiBot');
+      FlutterForegroundTask.sendDataToTask(TaskMessages.startNapcat);
+    }
     maibotClient.connect();
     napcatClient.connect();
-
-    // 重连时不需要单独拉起Napcat终端，统一由MaiBot管理
   }
 
   @override
@@ -168,7 +175,14 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     );
 
     // 初始化进度跟踪器（terminal 尚未访问，延迟注入）
-    progressTracker = ProgressTracker(onChanged: () => update());
+    progressTracker = ProgressTracker(
+      onChanged: () => update(),
+      // NapCat 安装完成时拉起其 PTY
+      onNapcatInstalled: () {
+        Log.i('检测到 Napcat 已安装，发送指令启动 NapCat 容器', 'MaiBot');
+        FlutterForegroundTask.sendDataToTask(TaskMessages.startNapcat);
+      },
+    );
     progressTracker.terminal = terminal;
 
     // 初始化隐藏最近活动状态

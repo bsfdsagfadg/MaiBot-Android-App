@@ -14,10 +14,17 @@ import '../utils/file_utils.dart';
 /// 针对部分 Android OEM (MIUI/HarmonyOS) inotify 事件丢失，
 /// 额外提供 1 秒轮询兜底（[Fix 5.2]）。
 class ProgressTracker {
-  ProgressTracker({required this.onChanged});
+  ProgressTracker({
+    required this.onChanged,
+    this.onNapcatInstalled,
+  });
 
   /// 进度变化时回调（通常为 GetX 的 update）
   final void Function() onChanged;
+
+  /// NapCat 安装完成（progress_des 出现 "Napcat 已安装"）时回调，
+  /// 用于通知前台服务拉起 NapCat 容器 PTY。
+  final void Function()? onNapcatInstalled;
 
   final File progressFile = File('${RuntimeEnvir.tmpPath}/progress');
   final File progressDesFile = File('${RuntimeEnvir.tmpPath}/progress_des');
@@ -87,6 +94,7 @@ class ProgressTracker {
         currentProgress = content;
         if (content.contains('Napcat ${S.current.installed}')) {
           await bump();
+          onNapcatInstalled?.call();
         }
 
         // 当进度到达 "MaiBot Core 配置中" 时，清除终端
@@ -120,6 +128,7 @@ class ProgressTracker {
             currentProgress = content;
             if (content.contains('Napcat ${S.current.installed}')) {
               await bump();
+              onNapcatInstalled?.call();
             }
             if (content.trim().contains('MaiBot Core 配置中')) {
               terminal?.buffer.clear();
