@@ -8,6 +8,7 @@ import 'dart:async';
 
 import 'generated/l10n.dart';
 import 'core/config/app_config.dart';
+import 'core/services/env_bootstrapper.dart';
 import 'core/services/foreground_service.dart';
 import 'ui/routes/app_routes.dart';
 import 'ui/controllers/terminal_controller.dart';
@@ -16,12 +17,6 @@ import 'ui/controllers/terminal_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 检查并请求通知权限
-  var status = await Permission.notification.status;
-  if (status.isDenied || status.isPermanentlyDenied) {
-    await Permission.notification.request();
-  }
 
   // 隐藏系统 UI
   // Hide system UI
@@ -38,6 +33,9 @@ Future<void> main() async {
   ));
   RuntimeEnvir.initEnvirWithPackageName(Config.packageName);
   await initSettingStore(RuntimeEnvir.configPath);
+
+  // 初始化运行环境（释放原生二进制链接，防止由于拉起服务过快导致无 proot 可执行）
+  await EnvBootstrapper.initEnvir();
 
   // 初始化前台服务
   ForegroundServiceManager.init();
@@ -64,41 +62,14 @@ class MaiBot extends StatefulWidget {
 }
 
 class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
-  Timer? _serviceMonitorTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
-    // 启动服务状态监听器，定期检查服务是否运行
-    _startServiceMonitor();
   }
-
-  /// 启动服务状态监听器
-  void _startServiceMonitor() {
-    // 每10秒检查一次服务状态
-    _serviceMonitorTimer =
-        Timer.periodic(const Duration(seconds: 10), (timer) async {
-      final isRunning = await ForegroundServiceManager.isRunningService();
-      final userClickedStop = ForegroundServiceManager.userClickedStopButton;
-      // 只有在服务未运行且用户没有点击停止按钮的情况下才重启
-      // 这样即使用户从通知栏划掉通知，服务也会被重建
-      if (!isRunning && !userClickedStop) {
-        Log.w('主应用检测到服务未运行，尝试重启...', 'MaiBot');
-        try {
-          await ForegroundServiceManager.startService();
-          Log.i('服务重启成功', 'MaiBot');
-        } catch (e) {
-          Log.e('服务重启失败: $e', 'MaiBot');
-        }
-      }
-    });
-  }
-
   @override
   void dispose() {
-    _serviceMonitorTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

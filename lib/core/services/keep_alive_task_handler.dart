@@ -21,8 +21,6 @@ void startCallback() {
 /// （用户主动停止、启动指令）都通过 [TaskMessages] 控制消息维护在本类内。
 /// Foreground task handler
 class KeepAliveTaskHandler extends TaskHandler {
-  /// 服务重建计数器
-  int _rebuildCount = 0;
 
   /// 标记是否是用户主动划掉通知（用于区分系统自动清理）
   static bool _userDismissedNotification = false;
@@ -106,16 +104,9 @@ class KeepAliveTaskHandler extends TaskHandler {
     }
   }
 
-  @override
-  void onRepeatEvent(DateTime timestamp) {
-    FlutterForegroundTask.isRunningService.then((isRunning) {
-      if (!isRunning && !_userStopped) {
-        Log.w('检测到服务意外停止，准备重建...', 'KeepAliveTaskHandler');
-        _rebuildService();
-      }
-    });
-  }
 
+  @override
+  void onRepeatEvent(DateTime timestamp) {}
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTaskRemoved) async {
     Log.i(
@@ -129,41 +120,12 @@ class KeepAliveTaskHandler extends TaskHandler {
     _napcatBridge = null;
 
     if (!_userDismissedNotification && !_userStopped) {
-      Log.w('检测到系统自动清理通知或服务被终止，准备重建...', 'KeepAliveTaskHandler');
-      await Future.delayed(const Duration(milliseconds: 500));
-      await _rebuildService();
+      Log.w('检测到服务被终止，将依赖系统 START_STICKY 机制进行原生自启...', 'KeepAliveTaskHandler');
     }
 
     _userDismissedNotification = false;
   }
 
-  /// 重建服务
-  Future<void> _rebuildService() async {
-    try {
-      _rebuildCount++;
-      Log.i('正在重建服务（第 $_rebuildCount 次）...', 'KeepAliveTaskHandler');
-
-      final result = await ForegroundServiceManager.startService();
-
-      if (result is ServiceRequestSuccess) {
-        Log.i('服务重建成功', 'KeepAliveTaskHandler');
-        _rebuildCount = 0; // 重置计数器
-      } else if (result is ServiceRequestFailure) {
-        Log.e('服务重建失败: ${result.error}', 'KeepAliveTaskHandler');
-
-        // 如果重建失败，等待更长时间后再次尝试
-        if (_rebuildCount < 5) {
-          await Future.delayed(Duration(seconds: _rebuildCount * 2));
-          await _rebuildService();
-        } else {
-          Log.e('服务重建失败次数过多，停止尝试', 'KeepAliveTaskHandler');
-          _rebuildCount = 0;
-        }
-      }
-    } catch (e) {
-      Log.e('重建服务时发生异常: $e', 'KeepAliveTaskHandler');
-    }
-  }
 
   @override
   void onNotificationButtonPressed(String id) {
@@ -196,10 +158,7 @@ class KeepAliveTaskHandler extends TaskHandler {
     _userDismissedNotification = true;
 
     if (!_userStopped) {
-      Log.i('检测到用户主动划掉通知，将重建服务', 'KeepAliveTaskHandler');
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _rebuildService();
-      });
+      Log.i('检测到用户主动划掉通知，依赖系统机制处理', 'KeepAliveTaskHandler');
     } else {
       Log.i('不重建服务（用户手动停止）', 'KeepAliveTaskHandler');
     }

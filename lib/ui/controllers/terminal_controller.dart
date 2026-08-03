@@ -12,7 +12,6 @@ import 'package:xterm/xterm.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/constants/scripts.dart';
-import '../../core/services/env_bootstrapper.dart';
 import '../../core/services/foreground_service.dart';
 import '../../core/services/progress_tracker.dart';
 import '../../core/services/socket_stream_client.dart';
@@ -107,8 +106,6 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     await Directory(RuntimeEnvir.homePath).create(recursive: true);
     await Directory(RuntimeEnvir.binPath).create(recursive: true);
 
-    // initEnvir 内部会一并创建 busybox 软链接
-    await EnvBootstrapper.initEnvir();
 
     progressTracker.setProgress('复制 Ubuntu 系统镜像...');
     await AssetsUtils.copyAssetToPath('assets/${Config.ubuntuFileName}',
@@ -201,10 +198,15 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     if (hideFromRecents.get() == true) {
       setHideFromRecents(true);
     }
-
     // 为 Google Play 上架做准备
     // For Google Play
     Future.delayed(Duration.zero, () async {
+      // 请求通知权限
+      var status = await Permission.notification.status;
+      if (status.isDenied || status.isPermanentlyDenied) {
+        await Permission.notification.request();
+      }
+
       if (privacySetting.get() == null) {
         await Get.to(PrivacyAgreePage(
           onAgreeTap: () {
