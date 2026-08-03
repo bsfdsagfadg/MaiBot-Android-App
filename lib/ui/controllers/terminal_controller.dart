@@ -18,11 +18,11 @@ import '../../core/services/progress_tracker.dart';
 import '../../core/services/socket_stream_client.dart';
 import '../../core/utils/version_utils.dart';
 import 'napcat_controller.dart';
+import 'napcat_log_parser.dart';
 import 'terminal_tab_manager.dart';
 import 'webview_controller.dart';
 
 class HomeController extends GetxController with WidgetsBindingObserver {
-  static final _ansiColorRegExp = RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]');
   // 终端标签页管理器
   late final TerminalTabManager terminalTabManager;
   Setting privacySetting = 'privacy'.setting;
@@ -38,12 +38,18 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     onOutput: (data) {
       maibotClient.socket?.add(utf8.encode(data));
     },
+    onResize: (width, height, pixelWidth, pixelHeight) {
+      FlutterForegroundTask.sendDataToTask('resize_maibot:$width,$height');
+    },
   );
 
   late Terminal napcatShowTerminal = Terminal(
     maxLines: 5000,
     onOutput: (data) {
       napcatClient.socket?.add(utf8.encode(data));
+    },
+    onResize: (width, height, pixelWidth, pixelHeight) {
+      FlutterForegroundTask.sendDataToTask('resize_napcat:$width,$height');
     },
   );
 
@@ -74,7 +80,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   void _handleMaibotLine(String line) async {
     napcatController.handleMaibotOutput(line);
     napcatController.handleNapcatOutput(line);
-    final cleanLine = line.replaceAll(_ansiColorRegExp, '');
+    final cleanLine = NapcatLogParser.stripAnsi(line);
     if (cleanLine.contains('访问地址:')) {
       _isLocalhostDetected = true;
       // 仅在非历史回放（实时流数据）时增加进度计数，防止重连重放触发

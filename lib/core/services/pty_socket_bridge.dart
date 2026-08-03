@@ -31,7 +31,10 @@ class PtySocketBridge {
 
   static const int maxBufferLength = 70000;
   static const int maxRestartAttempts = 10;
-
+  bool _disposed = false;
+  Timer? _restartTimer;
+  int _rows = 25;
+  int _columns = 80;
   Pty? _pty;
   ServerSocket? _server;
   final List<Socket> _sockets = [];
@@ -65,10 +68,10 @@ class PtySocketBridge {
 
   /// 启动 PTY（若已运行则忽略）
   void start() {
-    if (_pty != null) return;
+    if (_disposed || _pty != null) return;
     _bufferChunks.clear();
     _bufferLength = 0;
-    _pty = createPTY(rows: 25, columns: 80);
+    _pty = createPTY(rows: _rows, columns: _columns);
     _pty!.output.listen((data) {
       _bufferChunks.add(data);
       _bufferLength += data.length;
@@ -82,11 +85,17 @@ class PtySocketBridge {
       }
     }, onDone: () {
       _pty = null;
-      _schedulePtyRestart();
+      if (!_disposed) _schedulePtyRestart();
     });
     _pty!.writeString(command);
   }
 
+  /// 重置终端大小
+  void resize(int rows, int columns) {
+    _rows = rows;
+    _columns = columns;
+    _pty?.resize(rows, columns);
+  }
   /// 重置重启计数（组件被显式拉起时调用）
   void resetRestartCount() {
     _restartCount = 0;
@@ -112,11 +121,16 @@ class PtySocketBridge {
     Log.i(
         '$name exited, restarting in ${delay}s (Retry $_restartCount/$maxRestartAttempts)',
         'KeepAliveTaskHandler');
-    Future.delayed(Duration(seconds: delay), start);
+    _restartTimer = Timer(Duration(seconds: delay), start);
   }
 
   /// 关闭 PTY 与所有连接
   void dispose() {
+    _disposed = true;
+    _restartTimer?.cancel();
+    for (final s in _sockets) {
+      s.destroy();
+    }
     _sockets.clear();
     _pty?.kill();
     _pty = null;

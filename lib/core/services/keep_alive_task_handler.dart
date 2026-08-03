@@ -70,17 +70,39 @@ class KeepAliveTaskHandler extends TaskHandler {
 
   @override
   void onReceiveData(Object data) {
-    if (data == TaskMessages.startMaibot) {
-      _startMaibotPending = true;
-      _maibotBridge?.resetRestartCount();
-      _maibotBridge?.start();
-    } else if (data == TaskMessages.startNapcat) {
-      _startNapcatPending = true;
-      _napcatBridge?.resetRestartCount();
-      _napcatBridge?.start();
-    } else if (data == TaskMessages.userStop) {
-      _userStopped = true;
-      Log.i('收到用户停止指令，停止自动重建', 'KeepAliveTaskHandler');
+    if (data is String) {
+      if (data == TaskMessages.startMaibot) {
+        _userStopped = false;
+        _startMaibotPending = true;
+        _maibotBridge?.resetRestartCount();
+        _maibotBridge?.start();
+      } else if (data == TaskMessages.startNapcat) {
+        _userStopped = false;
+        _startNapcatPending = true;
+        _napcatBridge?.resetRestartCount();
+        _napcatBridge?.start();
+      } else if (data == TaskMessages.userStop) {
+        _userStopped = true;
+        Log.i('收到用户停止指令，停止自动重建', 'KeepAliveTaskHandler');
+      } else if (data.startsWith('resize_maibot:')) {
+        final parts = data.substring('resize_maibot:'.length).split(',');
+        if (parts.length == 2) {
+          final width = int.tryParse(parts[0]);
+          final height = int.tryParse(parts[1]);
+          if (width != null && height != null) {
+            _maibotBridge?.resize(height, width);
+          }
+        }
+      } else if (data.startsWith('resize_napcat:')) {
+        final parts = data.substring('resize_napcat:'.length).split(',');
+        if (parts.length == 2) {
+          final width = int.tryParse(parts[0]);
+          final height = int.tryParse(parts[1]);
+          if (width != null && height != null) {
+            _napcatBridge?.resize(height, width);
+          }
+        }
+      }
     }
   }
 
@@ -99,6 +121,12 @@ class KeepAliveTaskHandler extends TaskHandler {
     Log.i(
         '前台服务被销毁，isTaskRemoved: $isTaskRemoved, 用户主动划掉: $_userDismissedNotification',
         'KeepAliveTaskHandler');
+
+    // 释放端口并终止 PTY 子进程
+    _maibotBridge?.dispose();
+    _maibotBridge = null;
+    _napcatBridge?.dispose();
+    _napcatBridge = null;
 
     if (!_userDismissedNotification && !_userStopped) {
       Log.w('检测到系统自动清理通知或服务被终止，准备重建...', 'KeepAliveTaskHandler');

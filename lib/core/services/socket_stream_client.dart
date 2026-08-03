@@ -29,6 +29,7 @@ class SocketStreamClient {
   bool _replaying = false;
   bool _disposed = false;
   Timer? _reconnectTimer;
+  StreamSubscription? _subscription;
 
   /// 当前是否处于历史缓冲区回放阶段
   bool get isReplaying => _replaying;
@@ -46,24 +47,25 @@ class SocketStreamClient {
   }
 
   Future<void> _connect() async {
-    if (_disposed) return;
+    if (_disposed || isConnected) return;
     try {
-      _socket = await Socket.connect('127.0.0.1', port);
-      _lineBuffer = '';
-      _replaying = false;
-      _socket!.listen(
-        _onChunk,
-        onDone: _handleDisconnect,
-        onError: (_) => _handleDisconnect(),
-      );
+      _socket = await Socket.connect(InternetAddress.loopbackIPv4, port);
+      if (_disposed) {
+        _socket?.destroy();
+        _socket = null;
+        return;
+      }
+      _subscription = _socket!
+          .cast<List<int>>()
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen(_onStringChunk, onDone: _handleDisconnect, onError: (_) => _handleDisconnect());
     } catch (_) {
-      _scheduleReconnect();
+      _handleDisconnect();
     }
   }
 
-  void _onChunk(List<int> data) {
+  void _onStringChunk(String event) {
     if (_disposed) return;
-    var event = utf8.decode(data, allowMalformed: true);
 
     // [Fix 4.1] 处理历史缓冲区回放标记
     if (event.contains('\x02__HIST_START__\x03')) {
@@ -86,6 +88,9 @@ class SocketStreamClient {
   }
 
   void _handleDisconnect() {
+    _subscription?.cancel();
+    _subscription = null;
+    _socket?.destroy();
     _socket = null;
     _scheduleReconnect();
   }
@@ -100,8 +105,9 @@ class SocketStreamClient {
   void dispose() {
     _disposed = true;
     _reconnectTimer?.cancel();
-    _reconnectTimer = null;
-    _socket?.close();
+    _subscription?.cancel();
+    _subscription = null;
+    _socket?.destroy();
     _socket = null;
   }
 }
