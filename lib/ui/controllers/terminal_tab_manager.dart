@@ -41,6 +41,7 @@ class TerminalTabManager extends GetxController {
 
   // 未注册的挂起系统终端 PTY 列表，防止提前销毁或流中断泄露
   final Set<Pty> _pendingPtys = {};
+
   /// 初始化固定的终端标签页
   void initializeFixedTabs(Terminal maibotTerminal, Terminal napcatTerminal) {
     // 清空现有标签页
@@ -131,7 +132,7 @@ class TerminalTabManager extends GetxController {
           activeTabIndex.value = tabs.length - 1;
 
           Log.i('添加新系统终端标签页: ${newTab.title} (ID: ${newTab.id})',
-               'TerminalTabManager');
+              'TerminalTabManager');
           // 不要 return，继续处理后续输出
         }
 
@@ -147,7 +148,7 @@ class TerminalTabManager extends GetxController {
           'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash" \n';
       newPty.writeString(command);
     } catch (e) {
-      Log.e('添加系统终端标签页失败: $e',  'TerminalTabManager');
+      Log.e('添加系统终端标签页失败: $e', 'TerminalTabManager');
       Get.snackbar('错误', '创建终端失败: $e');
     }
   }
@@ -164,8 +165,7 @@ class TerminalTabManager extends GetxController {
       tabs[index].isActive = true;
       activeTabIndex.value = index;
 
-      Log.i('切换到标签页: ${tabs[index].title} (索引: $index)',
-           'TerminalTabManager');
+      Log.i('切换到标签页: ${tabs[index].title} (索引: $index)', 'TerminalTabManager');
     }
   }
 
@@ -187,7 +187,7 @@ class TerminalTabManager extends GetxController {
       // 关闭PTY
       if (tab.pty != null) {
         tab.pty!.kill();
-        Log.i('关闭终端PTY: ${tab.title}',  'TerminalTabManager');
+        Log.i('关闭终端PTY: ${tab.title}', 'TerminalTabManager');
       }
 
       // 移除标签页
@@ -204,9 +204,9 @@ class TerminalTabManager extends GetxController {
         activeTabIndex.value = activeTabIndex.value - 1;
       }
 
-      Log.i('关闭标签页: ${tab.title}',  'TerminalTabManager');
+      Log.i('关闭标签页: ${tab.title}', 'TerminalTabManager');
     } catch (e) {
-      Log.e('关闭标签页失败: $e',  'TerminalTabManager');
+      Log.e('关闭标签页失败: $e', 'TerminalTabManager');
     }
   }
 
@@ -236,9 +236,9 @@ class TerminalTabManager extends GetxController {
       if (tab.type == TerminalTabType.system && tab.pty != null) {
         try {
           tab.pty!.kill();
-          Log.i('清理终端PTY: ${tab.title}',  'TerminalTabManager');
+          Log.i('清理终端PTY: ${tab.title}', 'TerminalTabManager');
         } catch (e) {
-          Log.e('清理终端PTY失败: $e',  'TerminalTabManager');
+          Log.e('清理终端PTY失败: $e', 'TerminalTabManager');
         }
       }
     }

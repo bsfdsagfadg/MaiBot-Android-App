@@ -20,10 +20,13 @@ typedef String MessageIfAbsent(String messageStr, List<dynamic> args);
 class MessageLookup extends MessageLookupByLibrary {
   String get localeName => 'en';
 
-  static String m0(Object param) => "Copy code-server${param} to data directory";
+  static String m0(Object param) =>
+      "Copy code-server${param} to data directory";
 
-  final Map<String, Function> messages = _notInlinedMessages(_notInlinedMessages);
-  static Map<String, Function> _notInlinedMessages(Object _) => <String, Function>{
+  final Map<String, Function> messages =
+      _notInlinedMessages(_notInlinedMessages);
+  static Map<String, Function> _notInlinedMessages(Object _) =>
+      <String, Function>{
         "copy_code_server": m0,
         "copy_proot_distro": MessageLookupByLibrary.simpleMessage(
           "Copy proot-distro to data directory",

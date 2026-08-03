@@ -136,7 +136,10 @@ class _TerminalTabViewState extends State<TerminalTabView> {
               size: 16,
               color: isActive
                   ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
             ),
             const SizedBox(width: 8),
 
@@ -163,7 +166,10 @@ class _TerminalTabViewState extends State<TerminalTabView> {
                 child: Icon(
                   Icons.close,
                   size: 16,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
                 ),
               ),
             ],

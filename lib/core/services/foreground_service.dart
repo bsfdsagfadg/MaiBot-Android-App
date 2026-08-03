@@ -12,6 +12,7 @@ class ForegroundServiceManager {
   /// KeepAliveTaskHandler 运行在独立 Isolate，无法读取此静态字段，
   /// 其停止意图通过 [TaskMessages.userStop] 控制消息传递。
   static bool _userClickedStopButton = false;
+
   /// 初始化前台服务
   /// Initialize foreground service
   static void init() {

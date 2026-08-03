@@ -16,13 +16,13 @@ import 'ui/controllers/terminal_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // 检查并请求通知权限
   var status = await Permission.notification.status;
   if (status.isDenied || status.isPermanentlyDenied) {
     await Permission.notification.request();
   }
-  
+
   // 隐藏系统 UI
   // Hide system UI
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [
@@ -38,13 +38,13 @@ Future<void> main() async {
   ));
   RuntimeEnvir.initEnvirWithPackageName(Config.packageName);
   await initSettingStore(RuntimeEnvir.configPath);
-  
+
   // 初始化前台服务
   ForegroundServiceManager.init();
-  
+
   // 强制开启前台服务保活
   await ForegroundServiceManager.startService();
-  
+
   runApp(
     Builder(builder: (context) {
       return ViewMetric(
@@ -78,7 +78,8 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
   /// 启动服务状态监听器
   void _startServiceMonitor() {
     // 每10秒检查一次服务状态
-    _serviceMonitorTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+    _serviceMonitorTimer =
+        Timer.periodic(const Duration(seconds: 10), (timer) async {
       final isRunning = await ForegroundServiceManager.isRunningService();
       final userClickedStop = ForegroundServiceManager.userClickedStopButton;
       // 只有在服务未运行且用户没有点击停止按钮的情况下才重启
@@ -105,7 +106,7 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     // 当应用完全退出时，确保清理所有资源
     if (state == AppLifecycleState.detached) {
       Log.i('应用正在退出，清理所有资源...', 'MaiBot');

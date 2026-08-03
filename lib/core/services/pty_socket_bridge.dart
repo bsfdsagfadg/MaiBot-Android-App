@@ -47,7 +47,9 @@ class PtySocketBridge {
         _sockets.add(socket);
         if (_bufferChunks.isNotEmpty) {
           socket.add(utf8.encode('\x02__HIST_START__\x03'));
-          for (var chunk in _bufferChunks) socket.add(chunk);
+          for (var chunk in _bufferChunks) {
+            socket.add(chunk);
+          }
           socket.add(utf8.encode('\x02__HIST_END__\x03'));
         }
         socket.listen(
@@ -92,20 +94,23 @@ class PtySocketBridge {
 
   void _schedulePtyRestart() {
     if (_restartCount >= maxRestartAttempts) {
-      Log.e('$name exited, max retries ($maxRestartAttempts) reached. Stopping restarts.',
+      Log.e(
+          '$name exited, max retries ($maxRestartAttempts) reached. Stopping restarts.',
           'KeepAliveTaskHandler');
       try {
         File('${RuntimeEnvir.tmpPath}/progress_des')
             .writeAsStringSync('组件 $name 连续启动失败，请点按屏幕查看终端日志');
       } catch (e) {
-        Log.e('Failed to write error to progress_des: $e', 'KeepAliveTaskHandler');
+        Log.e('Failed to write error to progress_des: $e',
+            'KeepAliveTaskHandler');
       }
       return;
     }
     int delay = 3 * (1 << _restartCount);
     if (delay > 60) delay = 60;
     _restartCount++;
-    Log.i('$name exited, restarting in ${delay}s (Retry $_restartCount/$maxRestartAttempts)',
+    Log.i(
+        '$name exited, restarting in ${delay}s (Retry $_restartCount/$maxRestartAttempts)',
         'KeepAliveTaskHandler');
     Future.delayed(Duration(seconds: delay), start);
   }

@@ -220,7 +220,8 @@ class HomeController extends GetxController with WidgetsBindingObserver {
 
     // [Fix 4.2 / 5.1] 定时主动探测本地 8001 端口并检查跳转条件，解开多重 AND 条件跳转死锁并兜底日志丢失
     _localhostProbeTimer?.cancel();
-    _localhostProbeTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+    _localhostProbeTimer =
+        Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (webviewController.webviewHasOpen) {
         timer.cancel();
         return;
@@ -228,10 +229,12 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       if (!_isLocalhostDetected) {
         for (final port in Ports.localhostProbePorts) {
           try {
-            final socket = await Socket.connect('127.0.0.1', port, timeout: const Duration(milliseconds: 800));
+            final socket = await Socket.connect('127.0.0.1', port,
+                timeout: const Duration(milliseconds: 800));
             await socket.close();
             _isLocalhostDetected = true;
-            Log.i('主动探测 127.0.0.1:$port 成功，设置 _isLocalhostDetected = true', 'MaiBot');
+            Log.i('主动探测 127.0.0.1:$port 成功，设置 _isLocalhostDetected = true',
+                'MaiBot');
             break;
           } catch (_) {}
         }

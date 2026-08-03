@@ -255,7 +255,8 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         Obx(() {
-          final customWebViews = homeController.webviewController.customWebViews;
+          final customWebViews =
+              homeController.webviewController.customWebViews;
           if (customWebViews.isEmpty) {
             return const Padding(
               padding: EdgeInsets.all(16.0),
@@ -329,7 +330,8 @@ class _SettingsPageState extends State<SettingsPage> {
           title: const Text('NapCat WebUI'),
           subtitle: const Text('显示或隐藏 NapCat 网页控制面板（默认隐藏）'),
           trailing: Switch(
-            value: homeController.napcatController.napCatWebUiEnabled.get() ?? false,
+            value: homeController.napcatController.napCatWebUiEnabled.get() ??
+                false,
             onChanged: (bool value) {
               // 使用新的方法来同步更新响应式变量
               homeController.napcatController.setNapCatWebUiEnabled(value);

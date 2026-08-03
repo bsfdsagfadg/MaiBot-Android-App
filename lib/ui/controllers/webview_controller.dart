@@ -4,7 +4,8 @@ import 'package:settings/settings.dart';
 import '../routes/app_routes.dart';
 
 class WebviewController extends GetxController {
-  final RxList<Map<String, String>> customWebViews = <Map<String, String>>[].obs;
+  final RxList<Map<String, String>> customWebViews =
+      <Map<String, String>>[].obs;
   bool webviewHasOpen = false;
 
   @override
@@ -55,12 +56,12 @@ class WebviewController extends GetxController {
       _saveCustomWebViews();
     }
   }
-  
+
   void navigateToWebview() {
     if (!webviewHasOpen) {
       Future.microtask(() {
         Get.toNamed(AppRoutes.webview);
-        webviewHasOpen = true; 
+        webviewHasOpen = true;
       });
     }
   }

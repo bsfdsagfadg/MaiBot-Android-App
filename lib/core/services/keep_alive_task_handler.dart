@@ -96,7 +96,8 @@ class KeepAliveTaskHandler extends TaskHandler {
 
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTaskRemoved) async {
-    Log.i('前台服务被销毁，isTaskRemoved: $isTaskRemoved, 用户主动划掉: $_userDismissedNotification',
+    Log.i(
+        '前台服务被销毁，isTaskRemoved: $isTaskRemoved, 用户主动划掉: $_userDismissedNotification',
         'KeepAliveTaskHandler');
 
     if (!_userDismissedNotification && !_userStopped) {

@@ -116,9 +116,11 @@ class MaintenanceActions {
       final maiBotDir = Directory(maiBotPath);
       if (await maiBotDir.exists()) {
         try {
-          await Process.run('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
+          await Process.run('${RuntimeEnvir.binPath}/busybox',
+              ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
         } catch (_) {}
-        await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', maiBotPath]);
+        await Process.run(
+            '${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', maiBotPath]);
         Log.i('已删除 MaiBot 目录: $maiBotPath', 'MaiBot');
       }
 
@@ -235,29 +237,23 @@ class MaintenanceActions {
         // 先暂停服务并终止正在后台运行的所有子进程，再删除数据
         await ForegroundServiceManager.stopService();
         try {
-          await Process.run('${RuntimeEnvir.binPath}/busybox', [
-            'killall',
-            '-9',
-            'node',
-            'python',
-            'python3',
-            'bash',
-            'sh'
-          ]);
+          await Process.run('${RuntimeEnvir.binPath}/busybox',
+              ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
         } catch (_) {}
 
         // 定义需要彻底清理的 MaiBot 数据与配置相关路径
         final List<String> pathsToDelete = [
-          '${scripts.ubuntuPath}/root/MaiBot',                                 // 整个 MaiBot 目录（含 data/config/plugins）
-          '${scripts.ubuntuPath}/root/config.toml',                             // 拷贝在根目录的配置模板
-          '${RuntimeEnvir.tmpPath}/.restore_complete',                          // 备份恢复标记
+          '${scripts.ubuntuPath}/root/MaiBot', // 整个 MaiBot 目录（含 data/config/plugins）
+          '${scripts.ubuntuPath}/root/config.toml', // 拷贝在根目录的配置模板
+          '${RuntimeEnvir.tmpPath}/.restore_complete', // 备份恢复标记
         ];
 
         bool deletedAny = false;
         for (final path in pathsToDelete) {
           final entityType = FileSystemEntity.typeSync(path);
           if (entityType != FileSystemEntityType.notFound) {
-            await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', path]);
+            await Process.run(
+                '${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', path]);
             Log.i('已彻底清除路径: $path', 'MaiBot');
             deletedAny = true;
           }
@@ -329,9 +325,11 @@ class MaintenanceActions {
 
         if (await venvDir.exists()) {
           try {
-            await Process.run('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
+            await Process.run('${RuntimeEnvir.binPath}/busybox',
+                ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
           } catch (_) {}
-          await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', venvPath]);
+          await Process.run(
+              '${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', venvPath]);
           Log.i('已删除 Python 虚拟环境: $venvPath', 'MaiBot');
 
           Get.snackbar(

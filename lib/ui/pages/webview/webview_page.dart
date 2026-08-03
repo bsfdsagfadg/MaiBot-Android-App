@@ -25,7 +25,8 @@ class _WebViewPageState extends State<WebViewPage> {
 
   late final WebViewController _maiBotController;
   late final WebViewController _napCatController;
-  final Map<String, WebViewController> _customControllers = {}; // 存储自定义 WebView 控制器，使用 URL 作为 key
+  final Map<String, WebViewController> _customControllers =
+      {}; // 存储自定义 WebView 控制器，使用 URL 作为 key
 
   final HomeController homeController = Get.find<HomeController>();
 
@@ -43,10 +44,14 @@ class _WebViewPageState extends State<WebViewPage> {
     _initNapCatController();
 
     // 监听自定义 WebView 列表变化,清理已删除的控制器
-    _customWebViewsWorker = ever(homeController.webviewController.customWebViews, (List<Map<String, String>> webviews) {
+    _customWebViewsWorker =
+        ever(homeController.webviewController.customWebViews,
+            (List<Map<String, String>> webviews) {
       // 清理不再存在的控制器
       final validUrls = webviews.map((wv) => wv['url'] ?? '').toSet();
-      final controllersToRemove = _customControllers.keys.where((key) => !validUrls.contains(key)).toList();
+      final controllersToRemove = _customControllers.keys
+          .where((key) => !validUrls.contains(key))
+          .toList();
       for (final key in controllersToRemove) {
         _customControllers.remove(key);
       }
@@ -84,11 +89,11 @@ class _WebViewPageState extends State<WebViewPage> {
       final host = uri.host.toLowerCase();
       // 检查是否为本地地址
       return host == 'localhost' ||
-             host == '127.0.0.1' ||
-             host == '0.0.0.0' ||
-             host.startsWith('192.168.') ||
-             host.startsWith('10.') ||
-             (host.startsWith('172.') && _isPrivateIp172(host));
+          host == '127.0.0.1' ||
+          host == '0.0.0.0' ||
+          host.startsWith('192.168.') ||
+          host.startsWith('10.') ||
+          (host.startsWith('172.') && _isPrivateIp172(host));
     } catch (e) {
       debugPrint('Error parsing URL: $e');
       return false;
@@ -145,8 +150,7 @@ class _WebViewPageState extends State<WebViewPage> {
       if (enableDebugging) {
         AndroidWebViewController.enableDebugging(true);
       }
-      final androidController =
-          controller.platform as AndroidWebViewController;
+      final androidController = controller.platform as AndroidWebViewController;
       androidController
         ..setMediaPlaybackRequiresUserGesture(false)
         // 设置混合内容模式以提高兼容性（Android 9+ 需要）
@@ -226,7 +230,8 @@ class _WebViewPageState extends State<WebViewPage> {
       );
 
     // 监听 Token 变化
-    _napCatTokenWorker = ever(homeController.napcatController.napCatWebUiToken, (String token) {
+    _napCatTokenWorker =
+        ever(homeController.napcatController.napCatWebUiToken, (String token) {
       if (token.isNotEmpty) {
         final url = 'http://127.0.0.1:${Ports.napcatWebUi}/webui?token=$token';
         _napCatController.loadRequest(Uri.parse(url));
@@ -235,10 +240,12 @@ class _WebViewPageState extends State<WebViewPage> {
 
     // 初始加载
     if (homeController.napcatController.napCatWebUiToken.isNotEmpty) {
-      final url = 'http://127.0.0.1:${Ports.napcatWebUi}/webui?token=${homeController.napcatController.napCatWebUiToken.value}';
+      final url =
+          'http://127.0.0.1:${Ports.napcatWebUi}/webui?token=${homeController.napcatController.napCatWebUiToken.value}';
       _napCatController.loadRequest(Uri.parse(url));
     } else {
-      _napCatController.loadRequest(Uri.parse('http://127.0.0.1:${Ports.napcatWebUi}/webui'));
+      _napCatController.loadRequest(
+          Uri.parse('http://127.0.0.1:${Ports.napcatWebUi}/webui'));
     }
 
     _configureAndroidPlatform(_napCatController, enableDebugging: true);
@@ -259,7 +266,8 @@ class _WebViewPageState extends State<WebViewPage> {
           onNavigationRequest: (NavigationRequest request) {
             // 仅对配置为本地URL的WebView启用外域拦截
             if (shouldInterceptExternal && !_isLocalUrl(request.url)) {
-              debugPrint('Intercepting external URL from custom WebView: ${request.url}');
+              debugPrint(
+                  'Intercepting external URL from custom WebView: ${request.url}');
               _launchInBrowser(request.url);
               return NavigationDecision.prevent;
             }
@@ -310,21 +318,57 @@ class _WebViewPageState extends State<WebViewPage> {
 
         // 检查是否只接受图片
         final bool isImageOnly = acceptTypes.every((type) =>
-          type.startsWith('image/') ||
-          ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].contains(type.toLowerCase())
-        );
+            type.startsWith('image/') ||
+            [
+              'jpg',
+              'jpeg',
+              'png',
+              'gif',
+              'webp',
+              'bmp',
+              '.jpg',
+              '.jpeg',
+              '.png',
+              '.gif',
+              '.webp',
+              '.bmp'
+            ].contains(type.toLowerCase()));
 
         // 检查是否只接受视频
         final bool isVideoOnly = acceptTypes.every((type) =>
-          type.startsWith('video/') ||
-          ['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', '.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv'].contains(type.toLowerCase())
-        );
+            type.startsWith('video/') ||
+            [
+              'mp4',
+              'avi',
+              'mov',
+              'mkv',
+              'flv',
+              'wmv',
+              '.mp4',
+              '.avi',
+              '.mov',
+              '.mkv',
+              '.flv',
+              '.wmv'
+            ].contains(type.toLowerCase()));
 
         // 检查是否只接受音频
         final bool isAudioOnly = acceptTypes.every((type) =>
-          type.startsWith('audio/') ||
-          ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', '.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'].contains(type.toLowerCase())
-        );
+            type.startsWith('audio/') ||
+            [
+              'mp3',
+              'wav',
+              'ogg',
+              'flac',
+              'm4a',
+              'aac',
+              '.mp3',
+              '.wav',
+              '.ogg',
+              '.flac',
+              '.m4a',
+              '.aac'
+            ].contains(type.toLowerCase()));
 
         if (isImageOnly) {
           pickingType = FileType.image;
@@ -338,8 +382,7 @@ class _WebViewPageState extends State<WebViewPage> {
           for (final type in acceptTypes) {
             if (type.startsWith('.')) {
               extensions.add(type.substring(1));
-            }
-            else if (!type.contains('/')) {
+            } else if (!type.contains('/')) {
               extensions.add(type);
             }
           }
@@ -372,17 +415,15 @@ class _WebViewPageState extends State<WebViewPage> {
 
       // 返回选中的文件路径,转换为 file:// URI 格式
       if (pickedFiles.isNotEmpty) {
-        final List<String> filePaths = pickedFiles
-            .where((file) => file.path != null)
-            .map((file) {
-              final path = file.path!;
-              if (path.startsWith('file://')) {
-                return path;
-              }
-              final normalizedPath = path.replaceAll('\\', '/');
-              return 'file://$normalizedPath';
-            })
-            .toList();
+        final List<String> filePaths =
+            pickedFiles.where((file) => file.path != null).map((file) {
+          final path = file.path!;
+          if (path.startsWith('file://')) {
+            return path;
+          }
+          final normalizedPath = path.replaceAll('\\', '/');
+          return 'file://$normalizedPath';
+        }).toList();
 
         debugPrint('Selected files: $filePaths');
         return filePaths;
@@ -458,7 +499,8 @@ class _WebViewPageState extends State<WebViewPage> {
     }
 
     return Obx(() {
-      final bool napCatEnabled = homeController.napcatController.napCatWebUiEnabledRx.value;
+      final bool napCatEnabled =
+          homeController.napcatController.napCatWebUiEnabledRx.value;
       final customWebViews = homeController.webviewController.customWebViews;
 
       final List<Widget> pages = [
@@ -467,7 +509,9 @@ class _WebViewPageState extends State<WebViewPage> {
           key: const ValueKey('maibot_webview_visibility'),
           visible: _currentIndex == 0,
           maintainState: true,
-          child: WebViewWidget(key: const ValueKey('maibot_webview'), controller: _maiBotController),
+          child: WebViewWidget(
+              key: const ValueKey('maibot_webview'),
+              controller: _maiBotController),
         ),
 
         // 2. NapCat 配置页面（仅在启用时添加）
@@ -476,7 +520,9 @@ class _WebViewPageState extends State<WebViewPage> {
             key: const ValueKey('napcat_webview_visibility'),
             visible: _currentIndex == 1,
             maintainState: true,
-            child: WebViewWidget(key: const ValueKey('napcat_webview'), controller: _napCatController),
+            child: WebViewWidget(
+                key: const ValueKey('napcat_webview'),
+                controller: _napCatController),
           ),
 
         // 3. 自定义 WebView 页面
@@ -500,7 +546,8 @@ class _WebViewPageState extends State<WebViewPage> {
       final int currentNavItemCount = pages.length + 2;
 
       int validCurrentIndex = _currentIndex;
-      if (_previousNavItemCount != 0 && _previousNavItemCount != currentNavItemCount) {
+      if (_previousNavItemCount != 0 &&
+          _previousNavItemCount != currentNavItemCount) {
         validCurrentIndex = settingsIndex;
         _previousNavItemCount = currentNavItemCount;
         WidgetsBinding.instance.addPostFrameCallback((_) {

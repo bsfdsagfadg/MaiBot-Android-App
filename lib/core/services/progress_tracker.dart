@@ -69,9 +69,8 @@ class ProgressTracker {
   Future<void> startWatching() async {
     await progressFile.create(recursive: true);
     await progressFile.writeAsString('0');
-    _progressSubscription = progressFile
-        .watch(events: FileSystemEvent.all)
-        .listen((event) async {
+    _progressSubscription =
+        progressFile.watch(events: FileSystemEvent.all).listen((event) async {
       if (event.type == FileSystemEvent.modify) {
         String content = await progressFile.readAsString();
         Log.e('content -> $content');

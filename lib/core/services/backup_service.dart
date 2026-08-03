@@ -83,15 +83,8 @@ class BackupService {
       Log.i('备份前暂停前台服务，确保数据一致性', 'MaiBot');
       await ForegroundServiceManager.stopService();
       try {
-        await Process.run('${RuntimeEnvir.binPath}/busybox', [
-          'killall',
-          '-9',
-          'node',
-          'python',
-          'python3',
-          'bash',
-          'sh'
-        ]);
+        await Process.run('${RuntimeEnvir.binPath}/busybox',
+            ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
       } catch (_) {}
 
       // 权限获取成功后，如果需要显示加载对话框
