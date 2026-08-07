@@ -89,7 +89,34 @@ class PtySocketBridge {
     });
     _pty!.writeString(command);
   }
+  /// 发送免重启重连提示（不创建新 PTY）
+  void simulateReconnectMessage() {
+    _disposed = false;
+    if (_pty == null) {
+      _bufferChunks.clear();
+      _bufferLength = 0;
 
+      final msg = utf8.encode('\r\n检测到后台进程仍在运行，已自动连接\r\n');
+      _bufferChunks.add(msg);
+      _bufferLength += msg.length;
+
+      for (var s in _sockets) {
+        try {
+          s.add(msg);
+        } catch (_) {}
+      }
+    } else {
+      final msg = utf8.encode('\r\n服务已在运行中\r\n');
+      for (var s in _sockets) {
+        try {
+          s.add(msg);
+        } catch (_) {}
+      }
+    }
+  }
+
+  /// PTY 是否为空，用于健康检查
+  bool get isPtyNull => _pty == null;
   /// 重置终端大小
   void resize(int rows, int columns) {
     _rows = rows;

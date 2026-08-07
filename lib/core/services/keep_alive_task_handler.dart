@@ -57,12 +57,10 @@ class KeepAliveTaskHandler extends TaskHandler {
 
     // 补发 onStart 完成前已到达的启动指令，避免消息被吞导致容器永不启动
     if (_startMaibotPending) {
-      _maibotBridge!.resetRestartCount();
-      _maibotBridge!.start();
+      _checkAndStartBridge(_maibotBridge, Ports.maibotWeb, 'MaiBot');
     }
     if (_startNapcatPending) {
-      _napcatBridge!.resetRestartCount();
-      _napcatBridge!.start();
+      _checkAndStartBridge(_napcatBridge, Ports.napcatWebUi, 'NapCat');
     }
   }
 
@@ -72,16 +70,15 @@ class KeepAliveTaskHandler extends TaskHandler {
       if (data == TaskMessages.startMaibot) {
         _userStopped = false;
         _startMaibotPending = true;
-        _maibotBridge?.resetRestartCount();
-        _maibotBridge?.start();
+        _checkAndStartBridge(_maibotBridge, Ports.maibotWeb, 'MaiBot');
       } else if (data == TaskMessages.startNapcat) {
         _userStopped = false;
         _startNapcatPending = true;
-        _napcatBridge?.resetRestartCount();
-        _napcatBridge?.start();
+        _checkAndStartBridge(_napcatBridge, Ports.napcatWebUi, 'NapCat');
       } else if (data == TaskMessages.userStop) {
         _userStopped = true;
         Log.i('收到用户停止指令，停止自动重建', 'KeepAliveTaskHandler');
+        _killAllOrphans();
       } else if (data.startsWith('resize_maibot:')) {
         final parts = data.substring('resize_maibot:'.length).split(',');
         if (parts.length == 2) {
@@ -104,9 +101,57 @@ class KeepAliveTaskHandler extends TaskHandler {
     }
   }
 
+  Future<void> _checkAndStartBridge(PtySocketBridge? bridge, int checkPort, String name) async {
+    if (bridge == null) return;
+    bool inUse = false;
+    try {
+      final socket = await Socket.connect('127.0.0.1', checkPort, timeout: const Duration(milliseconds: 500));
+      socket.destroy();
+      inUse = true;
+    } catch (_) {}
+
+    if (inUse) {
+      Log.i('$name is already running on port $checkPort, skipping restart to prevent zombie/OOM loop', 'KeepAliveTaskHandler');
+      bridge.simulateReconnectMessage();
+    } else {
+      bridge.resetRestartCount();
+      bridge.start();
+    }
+  }
+
+  Future<void> _killAllOrphans() async {
+    try {
+      await Process.run('${RuntimeEnvir.binPath}/busybox', ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh', 'proot']);
+    } catch (_) {}
+  }
+
 
   @override
-  void onRepeatEvent(DateTime timestamp) {}
+  void onRepeatEvent(DateTime timestamp) {
+    if (_userStopped) return;
+
+    if (_startMaibotPending && _maibotBridge != null && _maibotBridge!.isPtyNull) {
+      _checkHealthAndRestart(_maibotBridge!, Ports.maibotWeb, 'MaiBot');
+    }
+    if (_startNapcatPending && _napcatBridge != null && _napcatBridge!.isPtyNull) {
+      _checkHealthAndRestart(_napcatBridge!, Ports.napcatWebUi, 'NapCat');
+    }
+  }
+
+  Future<void> _checkHealthAndRestart(PtySocketBridge bridge, int checkPort, String name) async {
+    bool inUse = false;
+    try {
+      final socket = await Socket.connect('127.0.0.1', checkPort, timeout: const Duration(milliseconds: 500));
+      socket.destroy();
+      inUse = true;
+    } catch (_) {}
+
+    if (!inUse) {
+      Log.i('$name is no longer running on port $checkPort, triggering auto-restart for orphaned process', 'KeepAliveTaskHandler');
+      bridge.resetRestartCount();
+      bridge.start();
+    }
+  }
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTaskRemoved) async {
     Log.i(
