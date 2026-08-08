@@ -49,11 +49,15 @@ class PtySocketBridge {
       _server!.listen((socket) {
         _sockets.add(socket);
         if (_bufferChunks.isNotEmpty) {
-          socket.add(utf8.encode('\x02__HIST_START__\x03'));
-          for (var chunk in _bufferChunks) {
-            socket.add(chunk);
+          try {
+            socket.add(utf8.encode('\x02__HIST_START__\x03'));
+            for (var chunk in _bufferChunks) {
+              socket.add(chunk);
+            }
+            socket.add(utf8.encode('\x02__HIST_END__\x03'));
+          } catch (_) {
+            _sockets.remove(socket);
           }
-          socket.add(utf8.encode('\x02__HIST_END__\x03'));
         }
         socket.listen(
           (data) => _pty?.write(data),
