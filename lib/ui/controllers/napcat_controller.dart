@@ -141,6 +141,9 @@ class NapcatController extends GetxController {
       return;
     }
 
+    // 清除图片缓存，防止多次生成同名二维码时 UI 显示旧的失效二维码
+    await FileImage(qrcodeFile).evict();
+
     _qrcodeDialog = Dialog(
       backgroundColor: Colors.white,
       child: Padding(
