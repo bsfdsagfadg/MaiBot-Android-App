@@ -92,6 +92,32 @@ class TerminalTabManager extends GetxController {
       _pendingPtys.add(newPty);
       // 标志：是否已经创建了标签页
       var tabCreated = false;
+      final StringBuffer preLoginBuffer = StringBuffer();
+
+      void createTabAndFlush() {
+        if (tabCreated) return;
+        tabCreated = true;
+        _pendingPtys.remove(newPty);
+        
+        final newTab = TerminalTab(
+          id: tabId,
+          title: '终端 $newIndex',
+          type: TerminalTabType.system,
+          terminal: newTerminal,
+          pty: newPty,
+          isActive: false,
+        );
+
+        for (var tab in tabs) {
+          tab.isActive = false;
+        }
+
+        tabs.add(newTab);
+        newTab.isActive = true;
+        activeTabIndex.value = tabs.length - 1;
+
+        Log.i('添加新系统终端标签页: ${newTab.title} (ID: ${newTab.id})', 'TerminalTabManager');
+      }
 
       // 连接终端的 onResize 和 onOutput 事件（需要在监听输出前就连接好）
       newTerminal.onResize = (width, height, pixelWidth, pixelHeight) {
@@ -102,50 +128,37 @@ class TerminalTabManager extends GetxController {
         newPty.writeString(data);
       };
 
+      // 兜底定时器：如果3秒后还没匹配到标识符（例如环境错误或非标准hostname），依然创建标签页展示错误日志
+      Future.delayed(const Duration(seconds: 3), () {
+        if (!tabCreated) {
+          createTabAndFlush();
+          newTerminal.write(preLoginBuffer.toString());
+        }
+      });
+
       // 监听PTY输出，等待登录完成后再创建标签页
       newPty.output
           .cast<List<int>>()
           .transform(const Utf8Decoder(allowMalformed: true))
           .listen((event) {
-        // 检测是否包含 root@localhost 提示符
-        if (!tabCreated && event.contains('root@localhost')) {
-          tabCreated = true;
-          _pendingPtys.remove(newPty);
-          // 创建新标签页
-          final newTab = TerminalTab(
-            id: tabId,
-            title: '终端 $newIndex',
-            type: TerminalTabType.system,
-            terminal: newTerminal,
-            pty: newPty,
-            isActive: false,
-          );
-
-          // 将所有现有标签页设为非激活状态
-          for (var tab in tabs) {
-            tab.isActive = false;
+        if (!tabCreated) {
+          preLoginBuffer.write(event);
+          if (preLoginBuffer.toString().contains('---TERM_READY---')) {
+            createTabAndFlush();
+            // 仅输出标记之后的内容，避免显示前面的 source common.sh 等初始化指令
+            final parts = preLoginBuffer.toString().split('---TERM_READY---');
+            if (parts.length > 1 && parts.last.isNotEmpty) {
+              newTerminal.write(parts.last.replaceFirst(RegExp(r'^\r?\n'), ''));
+            }
           }
-
-          // 添加新标签页并激活
-          tabs.add(newTab);
-          newTab.isActive = true;
-          activeTabIndex.value = tabs.length - 1;
-
-          Log.i('添加新系统终端标签页: ${newTab.title} (ID: ${newTab.id})',
-              'TerminalTabManager');
-          // 不要 return，继续处理后续输出
-        }
-
-        // 标签页创建后，正常输出所有内容
-        if (tabCreated) {
+        } else {
           newTerminal.write(event);
         }
-        // 标签页创建前，不输出任何内容（跳过登录过程的输出）
       });
 
-      // 登录到ubuntu容器
+      // 登录到ubuntu容器，使用明确的回显标记而非依赖不可靠的 root@localhost 提示符
       final command =
-          'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "bash" \n';
+          'source ${RuntimeEnvir.homePath}/common.sh\nlogin_ubuntu "echo ---TERM_READY---; exec bash" \n';
       newPty.writeString(command);
     } catch (e) {
       Log.e('添加系统终端标签页失败: $e', 'TerminalTabManager');
