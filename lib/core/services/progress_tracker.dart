@@ -72,14 +72,16 @@ class ProgressTracker {
     _progressSubscription =
         progressFile.watch(events: FileSystemEvent.all).listen((event) async {
       if (event.type == FileSystemEvent.modify) {
-        String content = await progressFile.readAsString();
-        Log.e('content -> $content');
-        if (content.isEmpty) {
-          return;
+        try {
+          String content = await progressFile.readAsString();
+          if (content.isEmpty) {
+            return;
+          }
+          progress = int.parse(content) / step;
+          onChanged();
+        } catch (e) {
+          Log.e('读取 progress 失败: $e', 'ProgressTracker');
         }
-        progress = int.parse(content) / step;
-        Log.e('progress -> $progress');
-        onChanged();
       }
     });
     await progressDesFile.create(recursive: true);
@@ -88,22 +90,26 @@ class ProgressTracker {
         .watch(events: FileSystemEvent.all)
         .listen((event) async {
       if (event.type == FileSystemEvent.modify) {
-        String content = await progressDesFile.readAsString();
-        if (currentProgress == content) return;
-        currentProgress = content;
-        if (content.contains('Napcat ${S.current.installed}')) {
-          await bump();
-          onNapcatInstalled?.call();
-        }
+        try {
+          String content = await progressDesFile.readAsString();
+          if (currentProgress == content) return;
+          currentProgress = content;
+          if (content.contains('Napcat ${S.current.installed}')) {
+            await bump();
+            onNapcatInstalled?.call();
+          }
 
-        // 当进度到达 "MaiBot Core 配置中" 时，清除终端
-        if (content.trim().contains('MaiBot Core 配置中')) {
-          terminal?.buffer.clear();
-          terminal?.buffer.setCursor(0, 0);
-          Log.i('检测到 MaiBot Core 配置中，清除终端内容', 'MaiBot');
-        }
+          // 当进度到达 "MaiBot Core 配置中" 时，清除终端
+          if (content.trim().contains('MaiBot Core 配置中')) {
+            terminal?.buffer.clear();
+            terminal?.buffer.setCursor(0, 0);
+            Log.i('检测到 MaiBot Core 配置中，清除终端内容', 'MaiBot');
+          }
 
-        onChanged();
+          onChanged();
+        } catch (e) {
+          Log.e('读取 progress_des 失败: $e', 'ProgressTracker');
+        }
       }
     });
 
