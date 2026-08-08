@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_pty/flutter_pty.dart';
 import 'package:get/get.dart';
@@ -20,6 +21,7 @@ class TerminalTab {
   final Terminal terminal;
   final Pty? pty;
   bool isActive;
+  final StreamSubscription? outputSubscription;
 
   TerminalTab({
     required this.id,
@@ -28,6 +30,7 @@ class TerminalTab {
     required this.terminal,
     this.pty,
     this.isActive = false,
+    this.outputSubscription,
   });
 }
 
@@ -94,7 +97,7 @@ class TerminalTabManager extends GetxController {
       var tabCreated = false;
       final StringBuffer preLoginBuffer = StringBuffer();
 
-      void createTabAndFlush() {
+      void createTabAndFlush(StreamSubscription subscription) {
         if (tabCreated) return;
         tabCreated = true;
         _pendingPtys.remove(newPty);
@@ -106,6 +109,7 @@ class TerminalTabManager extends GetxController {
           terminal: newTerminal,
           pty: newPty,
           isActive: false,
+          outputSubscription: subscription,
         );
 
         for (var tab in tabs) {
@@ -128,23 +132,26 @@ class TerminalTabManager extends GetxController {
         newPty.writeString(data);
       };
 
+      // 声明订阅变量以便稍后传入
+      StreamSubscription? subscription;
+
       // 兜底定时器：如果3秒后还没匹配到标识符（例如环境错误或非标准hostname），依然创建标签页展示错误日志
       Future.delayed(const Duration(seconds: 3), () {
-        if (!tabCreated) {
-          createTabAndFlush();
+        if (!tabCreated && subscription != null) {
+          createTabAndFlush(subscription);
           newTerminal.write(preLoginBuffer.toString());
         }
       });
 
       // 监听PTY输出，等待登录完成后再创建标签页
-      newPty.output
+      subscription = newPty.output
           .cast<List<int>>()
           .transform(const Utf8Decoder(allowMalformed: true))
           .listen((event) {
         if (!tabCreated) {
           preLoginBuffer.write(event);
-          if (preLoginBuffer.toString().contains('---TERM_READY---')) {
-            createTabAndFlush();
+          if (preLoginBuffer.toString().contains('---TERM_READY---') && subscription != null) {
+            createTabAndFlush(subscription);
             // 仅输出标记之后的内容，避免显示前面的 source common.sh 等初始化指令
             final parts = preLoginBuffer.toString().split('---TERM_READY---');
             if (parts.length > 1 && parts.last.isNotEmpty) {
@@ -200,6 +207,7 @@ class TerminalTabManager extends GetxController {
       // 关闭PTY
       if (tab.pty != null) {
         tab.pty!.kill();
+        tab.outputSubscription?.cancel();
         Log.i('关闭终端PTY: ${tab.title}', 'TerminalTabManager');
       }
 
@@ -233,8 +241,8 @@ class TerminalTabManager extends GetxController {
 
   @override
   void onClose() {
-    // 清理未注册完成的挂起 PTY，防止僵尸进程泄露
-    for (var pty in _pendingPtys) {
+    // 清理未注册的挂起 PTY
+    for (final pty in _pendingPtys) {
       try {
         pty.kill();
         Log.i('清理未就绪系统终端 PTY', 'TerminalTabManager');
@@ -249,6 +257,7 @@ class TerminalTabManager extends GetxController {
       if (tab.type == TerminalTabType.system && tab.pty != null) {
         try {
           tab.pty!.kill();
+          tab.outputSubscription?.cancel();
           Log.i('清理终端PTY: ${tab.title}', 'TerminalTabManager');
         } catch (e) {
           Log.e('清理终端PTY失败: $e', 'TerminalTabManager');
