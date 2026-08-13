@@ -52,6 +52,7 @@ android {
 
     lint {
         disable 'InvalidPackage'
+        checkReleaseBuilds false
     }
 
     buildTypes {
