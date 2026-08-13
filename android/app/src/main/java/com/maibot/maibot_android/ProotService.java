@@ -48,8 +48,8 @@ public class ProotService extends Service {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("MaiBot 核心守护中")
-                .setContentText("原生进程独立保活中，完美防御系统 OOM 查杀")
+                .setContentTitle("MaiBot 后台服务")
+                .setContentText("容器与服务正在后台运行")
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentIntent(pendingIntent)
                 .build();

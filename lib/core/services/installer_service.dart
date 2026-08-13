@@ -8,15 +8,20 @@ import 'native_extractor.dart';
 import '../config/app_config.dart';
 import '../constants/scripts.dart' as scripts;
 class InstallerService {
-  static Future<bool> runInstallPipeline(Function(String) onProgress) async {
+  static Future<bool> runInstallPipeline({
+    required Function(String) onProgress,
+    Function(String)? onLog,
+  }) async {
     final ubuntuDir = Directory(scripts.ubuntuPath);
     
     // 1. 原生解压 (Native Extraction)
     bool isExtracted = false;
     if (ubuntuDir.existsSync()) {
-      if (ubuntuDir.listSync().isNotEmpty) {
+      final coreFile = File('${scripts.ubuntuPath}/bin/bash');
+      if (coreFile.existsSync()) {
         isExtracted = true;
       } else {
+        // 核心文件不存在，说明解压不完整（如系统自动备份恢复导致残缺），删除重压
         ubuntuDir.deleteSync(recursive: true);
       }
     }
@@ -94,7 +99,7 @@ class InstallerService {
     final maibotDir = Directory('${RuntimeEnvir.homePath}/MaiBot');
     if (!maibotDir.existsSync()) {
       onProgress('正在拉取 MaiBot 核心源码...');
-      final success = await _cloneMaibot();
+      final success = await _cloneMaibot(onLog);
       if (!success) return false;
     }
 
@@ -110,7 +115,7 @@ class InstallerService {
       await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/plugins/*', '${pluginsDir.path}/']);
     } else if (!adapterDir.existsSync()) {
       onProgress('安装默认适配器插件...');
-      await _runInProot('git clone --depth=1 --branch main https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git /root/MaiBot/plugins/MaiBot-Napcat-Adapter');
+      await _runInProot('git clone --depth=1 --branch main https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git /root/MaiBot/plugins/MaiBot-Napcat-Adapter', onLog: onLog);
       final adapterConfig = File('${adapterDir.path}/config.toml');
       if (adapterConfig.existsSync()) adapterConfig.deleteSync();
       
@@ -143,9 +148,9 @@ class InstallerService {
     final venvDir = Directory('${RuntimeEnvir.homePath}/MaiBot/.venv');
     if (!venvDir.existsSync()) {
       onProgress('正在同步 Python 依赖库 (可能需要几分钟)...');
-      final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync');
+      final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync', onLog: onLog);
       if (!success) return false;
-      await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install pip');
+      await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install pip', onLog: onLog);
       if (!success) return false;
     }
     // 6. 安装 NapCat
@@ -153,17 +158,17 @@ class InstallerService {
     final qqBinary = File('${scripts.ubuntuPath}/opt/QQ/qq');
     if (!napcatDir.existsSync() || !qqBinary.existsSync()) {
       onProgress('正在清理依赖并下载 NapCatQQ 组件...');
-      await _runInProot('apt --fix-broken install -y');
+      await _runInProot('apt --fix-broken install -y', onLog: onLog);
       onProgress('正在下载 NapCatQQ 组件...');
       bool downloaded = false;
       for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
         final url = '${mirror}https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh';
-        final res = await _runInProot('curl -sL -o /root/napcat.sh $url');
+        final res = await _runInProot('curl -sL -o /root/napcat.sh $url', onLog: onLog);
         if (res) { downloaded = true; break; }
       }
       if (!downloaded) return false;
       
-      final success = await _runInProot(r"sed -i 's/apt-get install -y \.\/\$QQ_FILE_NAME/apt-get install -y \.\/\$QQ_FILE_NAME || exit 1/g' /root/napcat.sh && bash /root/napcat.sh");
+      final success = await _runInProot(r"sed -i 's/apt-get install -y \.\/\$QQ_FILE_NAME/apt-get install -y \.\/\$QQ_FILE_NAME || exit 1/g' /root/napcat.sh && bash /root/napcat.sh", onLog: onLog);
       if (!success) return false;
     }
 
@@ -248,7 +253,7 @@ class InstallerService {
     return false;
   }
 
-  static Future<bool> _cloneMaibot() async {
+  static Future<bool> _cloneMaibot(Function(String)? onLog) async {
     Setting customGitCloneSetting = 'custom_git_clone_url'.setting;
     String customRepoUrl = customGitCloneSetting.get() ?? '';
 
@@ -268,7 +273,7 @@ class InstallerService {
       final tDir = Directory(tmpDir);
       if (tDir.existsSync()) tDir.deleteSync(recursive: true);
       
-      final success = await _runInProot('git clone --depth=1 --branch main $repo /root/MaiBot_tmp');
+      final success = await _runInProot('git clone --depth=1 --branch main $repo /root/MaiBot_tmp', onLog: onLog);
       if (success) {
         Directory(tmpDir).renameSync('${RuntimeEnvir.homePath}/MaiBot');
         return true;
@@ -277,7 +282,7 @@ class InstallerService {
     return false;
   }
 
-  static Future<bool> _runInProot(String command) async {
+  static Future<bool> _runInProot(String command, {Function(String)? onLog}) async {
     final prootPath = '${RuntimeEnvir.binPath}/proot';
     final args = [
       '-0', '-r', scripts.ubuntuPath,
@@ -289,12 +294,25 @@ class InstallerService {
       'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; $command'
     ];
     
-    final res = await Process.run(prootPath, args, environment: {
-      'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
-      'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
-      'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
-    });
-    
-    return res.exitCode == 0;
+    if (onLog != null) {
+      final process = await Process.start(prootPath, args, environment: {
+        'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
+        'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
+        'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
+      });
+      
+      process.stdout.listen((data) => onLog(String.fromCharCodes(data).replaceAll('\n', '\r\n')));
+      process.stderr.listen((data) => onLog(String.fromCharCodes(data).replaceAll('\n', '\r\n')));
+      
+      final exitCode = await process.exitCode;
+      return exitCode == 0;
+    } else {
+      final res = await Process.run(prootPath, args, environment: {
+        'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
+        'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
+        'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
+      });
+      return res.exitCode == 0;
+    }
   }
 }

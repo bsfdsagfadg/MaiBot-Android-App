@@ -107,11 +107,16 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         '${RuntimeEnvir.homePath}/${Config.ubuntuFileName}');
     
     // 开始 Dart 驱动的安装流
-    final success = await InstallerService.runInstallPipeline((msg) {
-      progressTracker.setProgress(msg);
-      progressTracker.bump();
-      update();
-    });
+    final success = await InstallerService.runInstallPipeline(
+      onProgress: (msg) {
+        progressTracker.setProgress(msg);
+        progressTracker.bump();
+        update();
+      },
+      onLog: (log) {
+        terminal.write(log);
+      },
+    );
 
     if (!success) {
       Log.e('安装流水线执行失败', tag: 'MaiBot');
