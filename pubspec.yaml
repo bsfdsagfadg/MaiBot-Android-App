@@ -21,13 +21,13 @@ dependencies:
   path: ^1.9.1
   webview_flutter: ^4.10.0
   webview_flutter_android: ^4.10.0
-  permission_handler: ^11.3.1
+  permission_handler: ^13.0.0
   http: ^1.2.2
   url_launcher: ^6.3.1
   file_picker: ^12.0.0-beta.5
   flutter_markdown: ^0.7.4+3
-  toml: ^0.15.0
-  archive: ^3.6.1
+  toml: ^0.18.0
+  archive: ^4.0.0
   ffi: ^2.1.2
 
   # get repo
@@ -39,7 +39,6 @@ dependencies:
   shizuku_api: ^1.2.2
 
 dependency_overrides:
-  permission_handler: ^11.3.1
   xterm:
     path: ./packages/xterm.dart
   global_repository:

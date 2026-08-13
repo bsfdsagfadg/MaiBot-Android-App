@@ -21,11 +21,10 @@ dependencies:
   responsive_framework: ^1.0.0
   signale: ^0.0.10
   # 提供路径访问
-  permission_handler: 6.0.0
-  window_manager: ^0.3.0
+  permission_handler: ^13.0.0
+  window_manager: ^0.5.0
   intl: ^0.20.2
-  xterm:
-    git: https://github.com/TerminalStudio/xterm.dart
+  xterm: ^4.0.0
 
   dio: ^5.9.0
   retrofit: ^4.9.1

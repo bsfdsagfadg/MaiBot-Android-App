@@ -73,9 +73,9 @@ class NativeExtractor {
       final linkPath = '$outputPath/${entity.name}';
       final link = Link(linkPath);
       try {
-        link.createSync(entity.nameOfLinkedFile, recursive: true);
+        link.createSync(entity.symbolicLink ?? '', recursive: true);
       } catch (e) {
-        Log.w('软连接创建失败 [$linkPath -> ${entity.nameOfLinkedFile}]: $e', tag: 'NativeExtractor');
+        Log.w('软连接创建失败 [$linkPath -> ${entity.symbolicLink}]: $e', tag: 'NativeExtractor');
       }
     }
     
