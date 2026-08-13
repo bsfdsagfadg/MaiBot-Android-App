@@ -16,7 +16,7 @@ class ForegroundServiceManager {
 
   static Future<void> startService() async {
     _userClickedStopButton = false;
-    Log.i('通过 Native 桥接启动前台服务...', 'ForegroundService');
+    Log.i('[ForegroundService] ${'通过 Native 桥接启动前台服务...'}');
 
     try {
       // 同步配置
@@ -30,20 +30,20 @@ class ForegroundServiceManager {
       });
       _isRunning = true;
     } catch (e) {
-      Log.e('启动 Native Backend 失败: $e', 'ForegroundService');
+      Log.e('[ForegroundService] ${'启动 Native Backend 失败: $e'}');
     }
   }
 
   static Future<void> stopService() async {
     _userClickedStopButton = true;
-    Log.i('用户点击停止按钮，停止原生前台服务', 'ForegroundService');
+    Log.i('[ForegroundService] ${'用户点击停止按钮，停止原生前台服务'}');
     try {
       await _channel.invokeMethod('stop_native_backend', {
         'binPath': RuntimeEnvir.binPath,
       });
       _isRunning = false;
     } catch (e) {
-      Log.e('停止 Native Backend 失败: $e', 'ForegroundService');
+      Log.e('[ForegroundService] ${'停止 Native Backend 失败: $e'}');
     }
   }
 

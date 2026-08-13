@@ -51,7 +51,7 @@ class UpdateChecker {
             break;
           }
         } catch (e) {
-          Log.w('镜像源 $mirror 请求失败: $e', 'MaiBot');
+          Log.w('[MaiBot] ${'镜像源 $mirror 请求失败: $e'}');
           continue;
         }
       }
@@ -88,7 +88,7 @@ class UpdateChecker {
       }
     } catch (e) {
       Get.back(); // 关闭加载提示
-      Log.e('检查更新失败: $e', 'MaiBot');
+      Log.e('[MaiBot] ${'检查更新失败: $e'}');
       Get.snackbar(
         '检查失败',
         '检查更新时发生错误: $e',

@@ -80,14 +80,14 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
 
     // 当应用完全退出时，确保清理所有资源
     if (state == AppLifecycleState.detached) {
-      Log.i('应用正在退出，清理所有资源...', 'MaiBot');
+      Log.i('[MaiBot] ${'应用正在退出，清理所有资源...'}');
       try {
         // 尝试获取并清理 HomeController
         if (Get.isRegistered<HomeController>()) {
           Get.delete<HomeController>(force: true);
         }
       } catch (e) {
-        Log.e('清理资源时出错: $e', 'MaiBot');
+        Log.e('[MaiBot] ${'清理资源时出错: $e'}');
       }
     }
   }

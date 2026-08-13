@@ -29,12 +29,13 @@ class InstallerService {
           extractedDir.renameSync(scripts.ubuntuPath);
         }
       } catch (e) {
-        Log.e('解压过程发生异常: $e', 'InstallerService');
+        Log.e('[InstallerService] ${'解压过程发生异常: $e'}');
         return false;
       }
     }
 
-    // 1.5 备份解析与恢复扫描
+    try {
+      // 1.5 备份解析与恢复扫描
     bool hasBackupData = false;
     bool hasBackupConfig = false;
     bool hasBackupPlugins = false;
@@ -138,7 +139,6 @@ class InstallerService {
       await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install pip');
       if (!success) return false;
     }
-    
     // 6. 安装 NapCat
     final napcatDir = Directory('${RuntimeEnvir.homePath}/napcat');
     final qqBinary = File('${scripts.ubuntuPath}/opt/QQ/qq');
@@ -148,6 +148,7 @@ class InstallerService {
       onProgress('正在下载 NapCatQQ 组件...');
       final success = await _runInProot('curl -o /root/napcat.sh https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh && bash /root/napcat.sh');
       if (!success) return false;
+    }
 
     // 6.5 恢复 NapCat 配置
     final napcatConfigDir = Directory('${napcatDir.path}/config');
@@ -161,13 +162,12 @@ class InstallerService {
     // 7. 清理
     if (restoreTempDir.existsSync()) restoreTempDir.deleteSync(recursive: true);
     restoreMarker.writeAsStringSync('done');
-
-      onProgress('初始化完成！即将启动核心服务...');
-      return true;
-    } catch (e) {
-      Log.e('后续配置执行异常: $e', 'InstallerService');
-      return false;
-    }
+    onProgress('初始化完成！即将启动核心服务...');
+    return true;
+  } catch (e) {
+    Log.e('[InstallerService] ${'后续配置执行异常: $e'}');
+    return false;
+  }
   }
 
   static void _writeNetworkConfigs() {
@@ -188,7 +188,7 @@ class InstallerService {
         'deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ noble-security main restricted universe multiverse\n'
       );
     } catch (e) {
-      Log.e('Failed to write network configs: $e', 'InstallerService');
+      Log.e('[InstallerService] ${'Failed to write network configs: $e'}');
     }
   }
 

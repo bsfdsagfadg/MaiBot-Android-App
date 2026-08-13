@@ -121,7 +121,7 @@ class MaintenanceActions {
         } catch (_) {}
         await Process.run(
             '${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', maiBotPath]);
-        Log.i('已删除 MaiBot 目录: $maiBotPath', 'MaiBot');
+        Log.i('[MaiBot] ${'已删除 MaiBot 目录: $maiBotPath'}');
       }
 
       Get.snackbar(
@@ -136,7 +136,7 @@ class MaintenanceActions {
         exit(0);
       });
     } catch (e) {
-      Log.e('重新安装 MaiBot 失败: $e', 'MaiBot');
+      Log.e('[MaiBot] ${'重新安装 MaiBot 失败: $e'}');
       Get.snackbar(
         '重新安装失败',
         e.toString(),
@@ -178,7 +178,7 @@ class MaintenanceActions {
         final launcherFile = File(launcherPath);
         if (await launcherFile.exists()) {
           await launcherFile.delete();
-          Log.i('已删除 launcher.sh: $launcherPath', 'MaiBot');
+          Log.i('[MaiBot] ${'已删除 launcher.sh: $launcherPath'}');
         }
 
         Get.snackbar(
@@ -193,7 +193,7 @@ class MaintenanceActions {
           exit(0);
         });
       } catch (e) {
-        Log.e('重新安装 NapcatQQ 失败: $e', 'MaiBot');
+        Log.e('[MaiBot] ${'重新安装 NapcatQQ 失败: $e'}');
         Get.snackbar(
           '重新安装失败',
           e.toString(),
@@ -254,7 +254,7 @@ class MaintenanceActions {
           if (entityType != FileSystemEntityType.notFound) {
             await Process.run(
                 '${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', path]);
-            Log.i('已彻底清除路径: $path', 'MaiBot');
+            Log.i('[MaiBot] ${'已彻底清除路径: $path'}');
             deletedAny = true;
           }
         }
@@ -279,7 +279,7 @@ class MaintenanceActions {
           );
         }
       } catch (e) {
-        Log.e('清除 MaiBot 数据失败: $e', 'MaiBot');
+        Log.e('[MaiBot] ${'清除 MaiBot 数据失败: $e'}');
         Get.snackbar(
           '操作失败',
           '清除数据失败: $e',
@@ -330,7 +330,7 @@ class MaintenanceActions {
           } catch (_) {}
           await Process.run(
               '${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', venvPath]);
-          Log.i('已删除 Python 虚拟环境: $venvPath', 'MaiBot');
+          Log.i('[MaiBot] ${'已删除 Python 虚拟环境: $venvPath'}');
 
           Get.snackbar(
             '重置成功',
@@ -351,7 +351,7 @@ class MaintenanceActions {
           );
         }
       } catch (e) {
-        Log.e('删除 Python 虚拟环境失败: $e', 'MaiBot');
+        Log.e('[MaiBot] ${'删除 Python 虚拟环境失败: $e'}');
         Get.snackbar(
           '操作失败',
           '删除虚拟环境失败: $e',

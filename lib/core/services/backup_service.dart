@@ -80,7 +80,7 @@ class BackupService {
       final backupPath = '${backupDir.path}/$backupFileName';
 
       // ---- 暂停容器保证备份一致性：停服终止 PTY，再终止残留容器进程 ----
-      Log.i('备份前暂停前台服务，确保数据一致性', 'MaiBot');
+      Log.i('[MaiBot] ${'备份前暂停前台服务，确保数据一致性'}');
       await ForegroundServiceManager.stopService();
       try {
         await Process.run('${RuntimeEnvir.binPath}/busybox',
@@ -92,7 +92,7 @@ class BackupService {
         final x11Unix = Directory('${RuntimeEnvir.tmpPath}/.X11-unix');
         if (x11Unix.existsSync()) x11Unix.deleteSync(recursive: true);
       } catch (e) {
-        Log.w('清理残留进程与锁文件失败: $e', 'MaiBot');
+        Log.w('[MaiBot] ${'清理残留进程与锁文件失败: $e'}');
       }
 
       // 权限获取成功后，如果需要显示加载对话框
@@ -144,7 +144,7 @@ class BackupService {
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 3),
         );
-        Log.i('备份成功: $backupPath (${fileSizeMB}MB)', 'MaiBot');
+        Log.i('[MaiBot] ${'备份成功: $backupPath (${fileSizeMB}MB)'}');
         return true;
       } else {
         closeDialog();
@@ -156,7 +156,7 @@ class BackupService {
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
-        Log.e('备份失败: ${result.stderr}', 'MaiBot');
+        Log.e('[MaiBot] ${'备份失败: ${result.stderr}'}');
         return false;
       }
     } catch (e) {
@@ -169,7 +169,7 @@ class BackupService {
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-      Log.e('备份异常: $e', 'MaiBot');
+      Log.e('[MaiBot] ${'备份异常: $e'}');
       return false;
     } finally {
       // 兜底：任何遗漏路径都要关闭加载对话框

@@ -1,6 +1,5 @@
 import 'package:global_repository/global_repository.dart';
 import '../config/app_config.dart';
-import '../../generated/l10n.dart';
 
 // ubuntu path (保持原有路径结构，但不再使用 proot-distro)
 // ubuntu path (keep original path structure, but no longer use proot-distro)

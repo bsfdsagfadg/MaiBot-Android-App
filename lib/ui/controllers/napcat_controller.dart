@@ -44,13 +44,13 @@ class NapcatController extends GetxController {
           final token = parsed['access_token']?.toString() ?? '';
           if (token.isNotEmpty) {
             maiBotWebUiToken.value = token;
-            Log.i('成功从 webui.json 读取到 MaiBot Token: $token', 'MaiBot');
+            Log.i('[MaiBot] ${'成功从 webui.json 读取到 MaiBot Token: $token'}');
             return true;
           }
         }
       }
     } catch (e) {
-      Log.e('读取 webui.json 失败: $e', 'MaiBot');
+      Log.e('[MaiBot] ${'读取 webui.json 失败: $e'}');
     }
     return false;
   }
@@ -68,14 +68,14 @@ class NapcatController extends GetxController {
             _isQrcodeShowing.value = false;
             _qrcodeDialog = null;
           }
-          Log.i('检测到 NapCat 自动快速登录成功，准备进入主页面...', 'MaiBot');
+          Log.i('[MaiBot] ${'检测到 NapCat 自动快速登录成功，准备进入主页面...'}');
           break;
 
         case NapcatLogEventType.napcatToken:
           final token = parsed.payload;
           if (token != null) {
             napCatWebUiToken.value = token;
-            Log.i('捕获到 NapCat Token: $token', 'MaiBot');
+            Log.i('[MaiBot] ${'捕获到 NapCat Token: $token'}');
           }
           break;
 
@@ -193,7 +193,7 @@ class NapcatController extends GetxController {
     if (token != null) {
       // 从日志中动态捕获到 Token，直接更新状态，不再从文件重复读取
       maiBotWebUiToken.value = token;
-      Log.i('成功从日志中抓取到 MaiBot Token: $token', 'MaiBot');
+      Log.i('[MaiBot] ${'成功从日志中抓取到 MaiBot Token: $token'}');
     }
   }
 
@@ -262,7 +262,7 @@ class NapcatController extends GetxController {
         );
       }
     } catch (e) {
-      Log.e('检测登录账号失败: $e', 'MaiBot');
+      Log.e('[MaiBot] ${'检测登录账号失败: $e'}');
     }
   }
 }

@@ -114,7 +114,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     });
 
     if (!success) {
-      Log.e('安装流水线执行失败', 'MaiBot');
+      Log.e('[MaiBot] ${'安装流水线执行失败'}');
       return;
     }
 
@@ -158,7 +158,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       onChanged: () => update(),
       // NapCat 安装完成时拉起其 PTY
       onNapcatInstalled: () {
-        Log.i('检测到 Napcat 已安装，准备就绪', 'MaiBot');
+        Log.i('[MaiBot] ${'检测到 Napcat 已安装，准备就绪'}');
       },
     );
     progressTracker.terminal = terminal;
@@ -210,8 +210,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
                 timeout: const Duration(milliseconds: 800));
             await socket.close();
             _isLocalhostDetected = true;
-            Log.i('主动探测 127.0.0.1:$port 成功，设置 _isLocalhostDetected = true',
-                'MaiBot');
+            Log.i('[MaiBot] ${'主动探测 127.0.0.1:$port 成功，设置 _isLocalhostDetected = true'}');
             break;
           } catch (_) {}
         }
@@ -245,7 +244,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       const channel = MethodChannel(Config.methodChannel);
       await channel.invokeMethod('hide_from_recents', {'hide': value});
     } catch (e) {
-      Log.e('设置从最近活动隐藏失败: $e', 'MaiBot');
+      Log.e('[MaiBot] ${'设置从最近活动隐藏失败: $e'}');
     }
   }
 
@@ -257,7 +256,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       maibotClient.dispose();
       napcatClient.dispose();
     } catch (e) {
-      Log.e('清理终端引用时出错: $e', 'MaiBot');
+      Log.e('[MaiBot] ${'清理终端引用时出错: $e'}');
     }
 
     // 移除生命周期观察者
