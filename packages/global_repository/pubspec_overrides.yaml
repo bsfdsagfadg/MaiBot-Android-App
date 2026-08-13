@@ -1,3 +1,0 @@
-dependency_overrides:
-  signale:
-    git: git@github.com:nightmare-space/signale.git

@@ -530,10 +530,7 @@ class _WindowCaptionButtonState extends State<WindowCaptionButton> {
             color: bgColor,
           ),
           child: Center(
-            child: WindowCaptionButtonIcon(
-              name: widget.iconName!,
-              color: iconColor,
-            ),
+            child: SizedBox(),
           ),
         ),
       ),
