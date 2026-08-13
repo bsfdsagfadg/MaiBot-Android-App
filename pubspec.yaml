@@ -33,21 +33,19 @@ dependencies:
   # get repo
   xterm: ^4.0.0
   settings:
-    git: https://github.com/nightmare-space/settings
+    path: ./packages/settings
   global_repository:
-    git: https://github.com/nightmare-space/global_repository
+    path: ./packages/global_repository
   shizuku_api: ^1.2.2
 
 dependency_overrides:
   permission_handler: ^11.3.1
   xterm:
-    git: https://github.com/TerminalStudio/xterm.dart
+    path: ./packages/xterm.dart
   global_repository:
-    git:
-      url: https://github.com/nightmare-space/global_repository
+    path: ./packages/global_repository
   settings:
-    git:
-      url: https://github.com/nightmare-space/settings
+    path: ./packages/settings
 
 dev_dependencies:
   flutter_test:
