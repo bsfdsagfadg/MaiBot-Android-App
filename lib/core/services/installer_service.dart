@@ -12,7 +12,16 @@ class InstallerService {
     final ubuntuDir = Directory(scripts.ubuntuPath);
     
     // 1. 原生解压 (Native Extraction)
-    if (!ubuntuDir.existsSync()) {
+    bool isExtracted = false;
+    if (ubuntuDir.existsSync()) {
+      if (ubuntuDir.listSync().isNotEmpty) {
+        isExtracted = true;
+      } else {
+        ubuntuDir.deleteSync(recursive: true);
+      }
+    }
+    
+    if (!isExtracted) {
       onProgress('正在解压 Ubuntu 根文件系统...');
       try {
         final archivePath = '${RuntimeEnvir.homePath}/${Config.ubuntuFileName}';
@@ -146,7 +155,15 @@ class InstallerService {
       onProgress('正在清理依赖并下载 NapCatQQ 组件...');
       await _runInProot('apt --fix-broken install -y');
       onProgress('正在下载 NapCatQQ 组件...');
-      final success = await _runInProot('curl -o /root/napcat.sh https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh && bash /root/napcat.sh');
+      bool downloaded = false;
+      for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
+        final url = '${mirror}https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh';
+        final res = await _runInProot('curl -sL -o /root/napcat.sh $url');
+        if (res) { downloaded = true; break; }
+      }
+      if (!downloaded) return false;
+      
+      final success = await _runInProot(r"sed -i 's/apt-get install -y \.\/\$QQ_FILE_NAME/apt-get install -y \.\/\$QQ_FILE_NAME || exit 1/g' /root/napcat.sh && bash /root/napcat.sh");
       if (!success) return false;
     }
 

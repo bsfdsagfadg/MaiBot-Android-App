@@ -40,8 +40,6 @@ Future<void> main() async {
   // 初始化前台服务
   ForegroundServiceManager.init();
 
-  // 强制开启前台服务保活
-  await ForegroundServiceManager.startService();
 
   runApp(
     Builder(builder: (context) {
