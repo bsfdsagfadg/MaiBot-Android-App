@@ -47,7 +47,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
         _isBatteryOptimizationIgnored = status.isGranted;
       });
     } catch (e) {
-      Log.e('[MaiBot] ${'检查电池优化豁免状态失败: $e'}');
+      Log.e('检查电池优化豁免状态失败: $e', tag: 'MaiBot');
     }
   }
 
@@ -96,7 +96,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
         });
       }
     } catch (e) {
-      Log.e('[KeepAliveSettingsPage] ${'检查 Shizuku 状态失败: $e'}');
+      Log.e('检查 Shizuku 状态失败: $e', tag: 'KeepAliveSettingsPage');
     }
   }
 
@@ -244,7 +244,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
             duration: const Duration(seconds: 2));
       }
     } catch (e) {
-      Log.e('[MaiBot] ${'请求电池优化豁免失败: $e'}');
+      Log.e('请求电池优化豁免失败: $e', tag: 'MaiBot');
       Get.snackbar('请求失败', '请求电池优化豁免时发生错误: $e',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red,

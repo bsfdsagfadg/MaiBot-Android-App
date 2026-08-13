@@ -141,7 +141,7 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       }
     } catch (e) {
-      Log.e('[MaiBot] ${'打开文件管理器失败: $e'}');
+      Log.e('打开文件管理器失败: $e', tag: 'MaiBot');
       Get.snackbar(
         '打开失败',
         '无法打开文件管理器: $e',

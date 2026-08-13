@@ -110,7 +110,7 @@ Future<void> showQuickLoginDialog() async {
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
-      Log.i('[MaiBot] ${'自动登录QQ号已更新: $newQQ'}');
+      Log.i('自动登录QQ号已更新: $newQQ', tag: 'MaiBot');
     } catch (e) {
       Get.snackbar(
         '保存失败',
@@ -120,7 +120,7 @@ Future<void> showQuickLoginDialog() async {
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
       );
-      Log.e('[MaiBot] ${'保存自动登录QQ号失败: $e'}');
+      Log.e('保存自动登录QQ号失败: $e', tag: 'MaiBot');
     }
   }
 

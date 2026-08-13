@@ -10,7 +10,7 @@ typedef ChmodDart = int Function(Pointer<Utf8> path, int mode);
 
 class NativeExtractor {
   static void extractTarXz(String archivePath, String outputPath) {
-    Log.i('[NativeExtractor] ${'开始原生解压 $archivePath 到 $outputPath'}');
+    Log.i('开始原生解压 $archivePath 到 $outputPath', tag: 'NativeExtractor');
 
     // 1. 读取 XZ 并解码为 Tar 字节 (对于 60MB 文件，会消耗几百MB内存，放在 Isolate 是安全的)
     final bytes = File(archivePath).readAsBytesSync();
@@ -75,10 +75,10 @@ class NativeExtractor {
       try {
         link.createSync(entity.nameOfLinkedFile, recursive: true);
       } catch (e) {
-        Log.w('[NativeExtractor] ${'软连接创建失败 [$linkPath -> ${entity.nameOfLinkedFile}]: $e'}');
+        Log.w('软连接创建失败 [$linkPath -> ${entity.nameOfLinkedFile}]: $e', tag: 'NativeExtractor');
       }
     }
     
-    Log.i('[NativeExtractor] ${'原生解压完成！'}');
+    Log.i('原生解压完成！', tag: 'NativeExtractor');
   }
 }

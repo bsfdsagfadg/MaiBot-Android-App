@@ -29,7 +29,7 @@ class InstallerService {
           extractedDir.renameSync(scripts.ubuntuPath);
         }
       } catch (e) {
-        Log.e('[InstallerService] ${'解压过程发生异常: $e'}');
+        Log.e('解压过程发生异常: $e', tag: 'InstallerService');
         return false;
       }
     }
@@ -165,7 +165,7 @@ class InstallerService {
     onProgress('初始化完成！即将启动核心服务...');
     return true;
   } catch (e) {
-    Log.e('[InstallerService] ${'后续配置执行异常: $e'}');
+    Log.e('后续配置执行异常: $e', tag: 'InstallerService');
     return false;
   }
   }
@@ -188,7 +188,7 @@ class InstallerService {
         'deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ noble-security main restricted universe multiverse\n'
       );
     } catch (e) {
-      Log.e('[InstallerService] ${'Failed to write network configs: $e'}');
+      Log.e('Failed to write network configs: $e', tag: 'InstallerService');
     }
   }
 

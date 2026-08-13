@@ -79,7 +79,7 @@ class TerminalTabManager extends GetxController {
       tabs[index].isActive = true;
       activeTabIndex.value = index;
 
-      Log.i('[TerminalTabManager] ${'切换到标签页: ${tabs[index].title} (索引: $index)'}');
+      Log.i('切换到标签页: ${tabs[index].title} (索引: $index)', tag: 'TerminalTabManager');
     }
   }
 
@@ -114,9 +114,9 @@ class TerminalTabManager extends GetxController {
         activeTabIndex.value = activeTabIndex.value - 1;
       }
 
-      Log.i('[TerminalTabManager] ${'关闭标签页: ${tab.title}'}');
+      Log.i('关闭标签页: ${tab.title}', tag: 'TerminalTabManager');
     } catch (e) {
-      Log.e('[TerminalTabManager] ${'关闭标签页失败: $e'}');
+      Log.e('关闭标签页失败: $e', tag: 'TerminalTabManager');
     }
   }
 
@@ -138,7 +138,7 @@ class TerminalTabManager extends GetxController {
         try {
           tab.outputSubscription?.cancel();
         } catch (e) {
-          Log.e('[TerminalTabManager] ${'清理终端资源失败: $e'}');
+          Log.e('清理终端资源失败: $e', tag: 'TerminalTabManager');
         }
       }
     }

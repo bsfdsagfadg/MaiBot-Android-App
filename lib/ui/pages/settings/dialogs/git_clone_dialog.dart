@@ -60,7 +60,7 @@ Future<void> showCustomGitCloneDialog() async {
 
     try {
       customGitCloneSetting.set(newCommand);
-      Log.i('[MaiBot] ${'已更新自定义 Git Clone 链接: $newCommand'}');
+      Log.i('已更新自定义 Git Clone 链接: $newCommand', tag: 'MaiBot');
 
       Get.snackbar(
         '保存成功',
@@ -77,7 +77,7 @@ Future<void> showCustomGitCloneDialog() async {
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
       );
-      Log.e('[MaiBot] ${'保存自定义 Git Clone 失败: $e'}');
+      Log.e('保存自定义 Git Clone 失败: $e', tag: 'MaiBot');
     }
   }
 

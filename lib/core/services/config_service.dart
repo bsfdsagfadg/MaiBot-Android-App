@@ -30,7 +30,7 @@ class ConfigService {
             port = int.tryParse(wsServers.first['port']?.toString() ?? '') ?? port;
           }
         } catch (e) {
-          Log.w('[ConfigService] ${'Failed to parse onebot11.json, using default token/port'}');
+          Log.w('Failed to parse onebot11.json, using default token/port', tag: 'ConfigService');
         }
       } else {
         // Create onebot11.json if it doesn't exist
@@ -71,7 +71,7 @@ class ConfigService {
           final content = adapterFile.readAsStringSync();
           tomlData = TomlDocument.parse(content).toMap();
         } catch (e) {
-          Log.w('[ConfigService] ${'Failed to parse config.toml, will recreate'}');
+          Log.w('Failed to parse config.toml, will recreate', tag: 'ConfigService');
         }
       }
 
@@ -95,9 +95,9 @@ class ConfigService {
       final newTomlString = TomlDocument.fromMap(tomlData).toString();
       adapterFile.writeAsStringSync(newTomlString);
       
-      Log.i('[ConfigService] ${'Configs synced successfully. Token: $token, Port: $port'}');
+      Log.i('Configs synced successfully. Token: $token, Port: $port', tag: 'ConfigService');
     } catch (e, stackTrace) {
-      Log.e('[ConfigService] ${'Error syncing configs: $e\n$stackTrace'}');
+      Log.e('Error syncing configs: $e\n$stackTrace', tag: 'ConfigService');
     }
   }
 }
