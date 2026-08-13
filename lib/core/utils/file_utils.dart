@@ -1,10 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_pty/flutter_pty.dart';
-import 'package:global_repository/global_repository.dart';
 import 'package:xterm/xterm.dart';
 
 import '../config/app_config.dart';
@@ -18,31 +14,6 @@ Future<String> getLibPath() async {
   return await _channel.invokeMethod('lib_path');
 }
 
-Pty createPTY({
-  String? shell,
-  int rows = 25,
-  int columns = 80,
-}) {
-  Map<String, String> envir = Map.from(Platform.environment);
-  envir['HOME'] = RuntimeEnvir.homePath;
-  // proot environment setup
-  envir['TERMUX_PREFIX'] = RuntimeEnvir.usrPath;
-  envir['TERM'] = 'xterm-256color';
-  envir['PATH'] = RuntimeEnvir.path;
-  // proot deps
-  envir['PROOT_LOADER'] = '${RuntimeEnvir.binPath}/loader';
-  envir['LD_LIBRARY_PATH'] = RuntimeEnvir.binPath;
-  envir['PROOT_TMP_DIR'] = RuntimeEnvir.tmpPath;
-
-  return Pty.start(
-    '${RuntimeEnvir.binPath}/${shell ?? 'bash'}',
-    arguments: [],
-    environment: envir,
-    workingDirectory: RuntimeEnvir.homePath,
-    rows: rows,
-    columns: columns,
-  );
-}
 
 extension TerminalExt on Terminal {
   void writeProgress(String data) {
@@ -50,8 +21,3 @@ extension TerminalExt on Terminal {
   }
 }
 
-extension PTYExt on Pty {
-  void writeString(String data) {
-    write(Uint8List.fromList(utf8.encode(data)));
-  }
-}

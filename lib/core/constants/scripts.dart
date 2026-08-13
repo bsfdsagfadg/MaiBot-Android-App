@@ -137,7 +137,7 @@ install_ubuntu(){
       echo "[restore] 恢复用户数据..."
       mkdir -p "$UBUNTU_PATH/root"
       cp -r "$PERSISTENT_BACKUP/root_backup"/* "$UBUNTU_PATH/root/"
-      rm -rf "$PERSISTENT_BACKUP"
+      [ -n "$HOME_PATH" ] && rm -rf "$PERSISTENT_BACKUP"
     fi
     
     # 在数据恢复后附加环境变量，防止被旧 .bashrc 覆盖
@@ -149,7 +149,13 @@ install_ubuntu(){
 
   fi
   change_ubuntu_source
-  echo 'nameserver 8.8.8.8' > $UBUNTU_PATH/etc/resolv.conf
+  
+  # 强制覆盖 DNS 以对抗安卓内网隔离
+  echo -e 'nameserver 223.5.5.5\nnameserver 114.114.114.114\nnameserver 8.8.8.8\nnameserver 1.1.1.1' > "$UBUNTU_PATH/etc/resolv.conf"
+  
+  # 禁用 APT Http Pipeline 避免在部分国产 ROM 上下载卡死
+  mkdir -p "$UBUNTU_PATH/etc/apt/apt.conf.d"
+  echo 'Acquire::http::Pipeline-Depth "0";' > "$UBUNTU_PATH/etc/apt/apt.conf.d/99custom-network"
 }
 ''';
 

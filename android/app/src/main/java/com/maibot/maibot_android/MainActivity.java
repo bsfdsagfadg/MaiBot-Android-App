@@ -47,7 +47,7 @@ public class MainActivity extends FragmentActivity {
         flutterFragment = (FlutterFragment) fragmentManager.findFragmentByTag(TAG_FLUTTER_FRAGMENT);
         FlutterEngine flutterEngine = FlutterEngineCache.getInstance().get("my_engine_id");
         if (flutterEngine == null) {
-            flutterEngine = new FlutterEngine(this, null, false);
+            flutterEngine = new FlutterEngine(this.getApplicationContext(), null, false);
             flutterEngine.getDartExecutor().executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault());
             GeneratedPluginRegistrant.registerWith(flutterEngine);
             FlutterEngineCache.getInstance().put("my_engine_id", flutterEngine);
@@ -76,6 +76,29 @@ public class MainActivity extends FragmentActivity {
                 } else {
                     result.error("UNSUPPORTED", "API level < 21", null);
                 }
+            } else if ("start_native_backend".equals(call.method)) {
+                String binPath = call.argument("binPath");
+                String homePath = call.argument("homePath");
+                String tmpPath = call.argument("tmpPath");
+                String ubuntuPath = call.argument("ubuntuPath");
+                Intent intent = new Intent(mContext, ProotService.class);
+                intent.putExtra("binPath", binPath);
+                intent.putExtra("homePath", homePath);
+                intent.putExtra("tmpPath", tmpPath);
+                intent.putExtra("ubuntuPath", ubuntuPath);
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    mContext.startForegroundService(intent);
+                } else {
+                    mContext.startService(intent);
+                }
+                result.success(true);
+            } else if ("stop_native_backend".equals(call.method)) {
+                String stopBinPath = call.argument("binPath");
+                Intent intent = new Intent(mContext, ProotService.class);
+                intent.setAction("STOP");
+                intent.putExtra("binPath", stopBinPath);
+                mContext.startService(intent);
+                result.success(true);
             } else {
                 result.notImplemented();
             }

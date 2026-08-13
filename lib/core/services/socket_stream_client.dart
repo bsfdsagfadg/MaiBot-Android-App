@@ -31,6 +31,8 @@ class SocketStreamClient {
   Timer? _reconnectTimer;
   StreamSubscription? _subscription;
 
+  bool _isConnecting = false;
+
   /// 当前是否处于历史缓冲区回放阶段
   bool get isReplaying => _replaying;
 
@@ -47,7 +49,8 @@ class SocketStreamClient {
   }
 
   Future<void> _connect() async {
-    if (_disposed || isConnected) return;
+    if (_disposed || isConnected || _isConnecting) return;
+    _isConnecting = true;
     try {
       _socket = await Socket.connect(InternetAddress.loopbackIPv4, port);
       if (_disposed) {
@@ -61,6 +64,8 @@ class SocketStreamClient {
           .listen(_onStringChunk, onDone: _handleDisconnect, onError: (_) => _handleDisconnect());
     } catch (_) {
       _handleDisconnect();
+    } finally {
+      _isConnecting = false;
     }
   }
 
@@ -88,6 +93,7 @@ class SocketStreamClient {
   }
 
   void _handleDisconnect() {
+    _lineBuffer = '';
     _subscription?.cancel();
     _subscription = null;
     _socket?.destroy();

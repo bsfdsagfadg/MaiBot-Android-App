@@ -7,15 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+
 import 'package:xterm/xterm.dart';
 
 import '../../core/config/app_config.dart';
-import '../../core/constants/scripts.dart';
 import '../../core/services/foreground_service.dart';
+import '../../core/services/installer_service.dart';
 import '../../core/services/progress_tracker.dart';
 import '../../core/services/socket_stream_client.dart';
-import '../../core/utils/version_utils.dart';
 import 'napcat_controller.dart';
 import 'napcat_log_parser.dart';
 import 'terminal_tab_manager.dart';
@@ -38,7 +37,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       maibotClient.socket?.add(utf8.encode(data));
     },
     onResize: (width, height, pixelWidth, pixelHeight) {
-      FlutterForegroundTask.sendDataToTask('resize_maibot:$width,$height');
+      // FlutterForegroundTask.sendDataToTask('resize_maibot:$width,$height');
     },
   );
 
@@ -48,7 +47,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       napcatClient.socket?.add(utf8.encode(data));
     },
     onResize: (width, height, pixelWidth, pixelHeight) {
-      FlutterForegroundTask.sendDataToTask('resize_napcat:$width,$height');
+      // FlutterForegroundTask.sendDataToTask('resize_napcat:$width,$height');
     },
   );
 
@@ -99,66 +98,37 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   // 初始化环境，将动态库中的文件链接到数据目录
   // Init environment and link files from the dynamic library to the data directory
   Future<void> loadMaiBot() async {
-    await progressTracker.startWatching();
-
-    // 创建相关文件夹
+    // 初始化环境
     await Directory(RuntimeEnvir.tmpPath).create(recursive: true);
     await Directory(RuntimeEnvir.homePath).create(recursive: true);
     await Directory(RuntimeEnvir.binPath).create(recursive: true);
 
-
-    progressTracker.setProgress('复制 Ubuntu 系统镜像...');
     await AssetsUtils.copyAssetToPath('assets/${Config.ubuntuFileName}',
         '${RuntimeEnvir.homePath}/${Config.ubuntuFileName}');
-    await AssetsUtils.copyAssetToPath('assets/maibot-startup.sh',
-        '${RuntimeEnvir.homePath}/maibot-startup.sh');
-    await AssetsUtils.copyAssetToPath(
-        'assets/config.toml', '${RuntimeEnvir.homePath}/config.toml');
-    await progressTracker.bump();
+    
+    // 开始 Dart 驱动的安装流
+    final success = await InstallerService.runInstallPipeline((msg) {
+      progressTracker.setProgress(msg);
+      progressTracker.bump();
+      update();
+    });
 
-    // 获取当前应用版本号
-    final appVersion = await getAppVersion();
-
-    // 替换 maibot-startup.sh 中的版本号占位符
-    final startupScriptFile =
-        File('${RuntimeEnvir.homePath}/maibot-startup.sh');
-    if (await startupScriptFile.exists()) {
-      String scriptContent = await startupScriptFile.readAsString();
-      scriptContent = scriptContent.replaceAll('{{VERSION}}', appVersion);
-      await startupScriptFile.writeAsString(scriptContent);
+    if (!success) {
+      Log.e('安装流水线执行失败', 'MaiBot');
+      return;
     }
 
-    // 写入 common.sh 脚本
-    await File('${RuntimeEnvir.homePath}/common.sh')
-        .writeAsString(getCommonScript(appVersion));
+    // 安装成功，启动常驻服务
+    progressTracker.setProgress('开始拉起 MaiBot 原生隔离容器...');
 
-    await progressTracker.bump();
 
     // 触发前台服务拉起容器
-    progressTracker.setProgress('开始拉起 MaiBot 容器...');
-    // 确保前台服务在运行（系统可能已回收服务进程），否则 start_maibot 消息会被丢弃
+    // 启动原生后台守护服务（纯净 Java Backend）
     if (!await ForegroundServiceManager.isRunningService()) {
-      final result = await ForegroundServiceManager.startService();
-      if (result is ServiceRequestFailure) {
-        Log.e('前台服务未运行且启动失败: ${result.error}', 'MaiBot');
-      }
+      await ForegroundServiceManager.startService();
     }
-    FlutterForegroundTask.sendDataToTask(TaskMessages.startMaibot);
 
-    // [Fix] 重构回归修复：start_napcat 控制消息曾失去发送方，导致 NapCat PTY 永不拉起、终端空白。
-    // 已安装（launcher.sh 存在）时直接拉起 NapCat PTY；
-    // 未安装（首次初始化）时由 ProgressTracker 在 "Napcat 已安装" 进度处触发。
-    // 与容器内 install_napcat 的安装判定保持一致：
-    // launcher.sh + QQ 主程序 + napcat 运行目录（package.json）三者齐备才视为已安装
-    final launcherFile = File('$ubuntuPath/root/launcher.sh');
-    final qqBinary = File('$ubuntuPath/opt/QQ/qq');
-    final napcatPackage = File('$ubuntuPath/root/napcat/package.json');
-    if (await launcherFile.exists() &&
-        await qqBinary.exists() &&
-        await napcatPackage.exists()) {
-      Log.i('检测到 NapCat 已安装，直接拉起 NapCat 容器', 'MaiBot');
-      FlutterForegroundTask.sendDataToTask(TaskMessages.startNapcat);
-    }
+    // 前端连接到后端 Socket
     maibotClient.connect();
     napcatClient.connect();
   }
@@ -188,8 +158,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       onChanged: () => update(),
       // NapCat 安装完成时拉起其 PTY
       onNapcatInstalled: () {
-        Log.i('检测到 Napcat 已安装，发送指令启动 NapCat 容器', 'MaiBot');
-        FlutterForegroundTask.sendDataToTask(TaskMessages.startNapcat);
+        Log.i('检测到 Napcat 已安装，准备就绪', 'MaiBot');
       },
     );
     progressTracker.terminal = terminal;

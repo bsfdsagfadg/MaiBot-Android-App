@@ -86,12 +86,6 @@ class _TerminalTabViewState extends State<TerminalTabView> {
             ),
           ),
 
-          // 添加新终端按钮
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => manager.addSystemTerminalTab(),
-            tooltip: '添加新终端',
-          ),
         ],
       ),
     );

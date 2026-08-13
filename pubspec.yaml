@@ -27,19 +27,20 @@ dependencies:
   url_launcher: ^6.3.1
   file_picker: ^12.0.0-beta.5
   flutter_markdown: ^0.7.4+3
+  toml: ^0.15.0
+  archive: ^3.6.1
+  ffi: ^2.1.2
 
   # get repo
   xterm: ^4.0.0
   settings:
     git: https://github.com/nightmare-space/settings
-  flutter_pty: ^0.4.2
   global_repository:
     git: https://github.com/nightmare-space/global_repository
   behavior_api:
     git:
       url: https://github.com/nightmare-space/empty_package
       path: behavior_api
-  flutter_foreground_task: ^9.1.0
   shizuku_api: ^1.2.2
 
 dependency_overrides:
@@ -48,8 +49,6 @@ dependency_overrides:
     git: https://github.com/nightmare-space/signale.git
   xterm:
     git: https://github.com/TerminalStudio/xterm.dart
-  flutter_pty:
-    git: https://github.com/TerminalStudio/flutter_pty
   global_repository:
     git:
       url: https://github.com/nightmare-space/global_repository

@@ -177,10 +177,18 @@ public class UbuntuDocumentsProvider extends DocumentsProvider {
      */
     private File getFileForDocId(String docId) throws FileNotFoundException {
         File target = new File(docId);
+        try {
+            String path = target.getCanonicalPath();
+            String rootPath = getUbuntuRootPath().getCanonicalPath();
+            if (!path.startsWith(rootPath)) {
+                throw new FileNotFoundException("Path traversal denied");
+            }
+        } catch (IOException e) {
+            throw new FileNotFoundException("Invalid path");
+        }
         if (!target.exists()) {
             throw new FileNotFoundException("File not found: " + docId);
         }
-        // 不解析符号链接，直接返回
         return target;
     }
     

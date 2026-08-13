@@ -64,12 +64,15 @@
             android:name="com.maibot.maibot_android.ic_launcher"
             android:resource="@mipmap/ic_launcher" />
         
-        <!-- Flutter Foreground Service -->
-        <service 
-            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+        
+
+        <!-- 纯 Native 后端服务：独立进程，防止 OOM -->
+        <service
+            android:name=".ProotService"
+            android:process=":backend"
             android:foregroundServiceType="dataSync"
             android:exported="false" />
-        
+
         <!-- Ubuntu Documents Provider -->
         <provider
             android:name=".UbuntuDocumentsProvider"

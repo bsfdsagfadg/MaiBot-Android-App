@@ -10,15 +10,6 @@ MAX_NETWORK_RETRY=3
 # 事务完成标记（用于原子性恢复判断）
 RESTORE_MARKER="$TMPDIR/.restore_complete"
 
-# 正常退出清理临时解压目录；失败时写错误描述
-cleanup_on_exit(){
-  RET=$?
-  rm -rf "$TMPDIR/backup_restore"
-  if [ $RET -ne 0 ]; then
-    echo "安装失败，请查看日志" > "$TMPDIR/progress_des"
-  fi
-}
-trap cleanup_on_exit EXIT
 
 # 自定义 Git Clone 命令（为空时使用默认逻辑）
 CUSTOM_GIT_CLONE=""
@@ -32,6 +23,16 @@ if [ ! -d "$TMPDIR" ]; then
   echo "错误：临时目录 $TMPDIR 不存在，请确认挂载已经完成"
   exit 1
 fi
+
+# 正常退出清理临时解压目录；失败时写错误描述
+cleanup_on_exit(){
+  RET=$?
+  rm -rf "$TMPDIR/backup_restore"
+  if [ $RET -ne 0 ]; then
+    echo "安装失败，请查看日志" > "$TMPDIR/progress_des"
+  fi
+}
+trap cleanup_on_exit EXIT
 
 
 progress_echo(){
@@ -60,102 +61,61 @@ install_sudo_curl_git(){
 
 
 }
-
 network_test() {
-    local timeout=5
-    local status=0
-    local found=0
-    target_proxy=""
-    echo "开始网络测试: Github..."
+    # 这个老旧的探测逻辑现在仅作占位符，因为我们改用了更为强大的数组轮询克隆机制
+    return 0
+}
 
-    read_retry
-    local count=$?
-    if [ $count -ge $MAX_NETWORK_RETRY ]; then
-      echo "网络测试已失败 $count 次（上限 $MAX_NETWORK_RETRY），暂停重试。请检查网络后重启应用。" > "$TMPDIR/progress_des"
-      exit 1
-    fi
-
-    proxy_arr=("https://ghfast.top" "https://gh.wuliya.xin" "https://gh-proxy.com" "https://github.moeyy.xyz")
-    check_url="https://raw.githubusercontent.com/NapNeko/NapCatQQ/main/package.json"
-
-    for proxy in "${proxy_arr[@]}"; do
-        echo "测试代理: ${proxy}"
-        status=$(curl -k -L --connect-timeout ${timeout} --max-time $((timeout*2)) -o /dev/null -s -w "%{http_code}" "${proxy}/${check_url}")
-        curl_exit=$?
-        if [ $curl_exit -ne 0 ]; then
-            echo "代理 ${proxy} 测试失败或超时，错误码: $curl_exit"
-            continue
+# 强大的 Github 自动重试与轮询克隆机制
+robust_github_clone() {
+    local repo_url="$1"
+    local dest_dir="$2"
+    local branch="$3"
+    
+    # 尝试的镜像源顺序（直接放 github.com 作为最后保底）
+    local mirrors=("https://ghfast.top/" "https://ghproxy.vip/" "https://gh-proxy.com/" "https://github.moeyy.xyz/" "https://gitproxy.mrhjx.cn/" "")
+    
+    for mirror in "${mirrors[@]}"; do
+        local clone_url="${mirror}${repo_url}"
+        echo "[Git] 尝试克隆分支 $branch: $clone_url"
+        
+        rm -rf "$dest_dir"
+        if git clone --depth=1 --branch "$branch" "$clone_url" "$dest_dir"; then
+            echo "[Git] 克隆成功: $clone_url"
+            return 0
         fi
-        if [ "${status}" = "200" ]; then
-            found=1
-            target_proxy="${proxy}"
-            echo "将使用Github代理: ${proxy}"
-            break
-        fi
+        echo "[Git] 代理 $mirror 克隆失败，切换下一个..."
+        sleep 1
     done
+    
+    echo "[Git] 所有镜像源均克隆失败: $repo_url"
+    return 1
+}
 
-    if [ ${found} -eq 0 ]; then
-        echo "警告: 无法找到可用的Github代理，将尝试直连..."
-        status=$(curl -k --connect-timeout ${timeout} --max-time $((timeout*2)) -o /dev/null -s -w "%{http_code}" "${check_url}")
-        if [ $? -eq 0 ] && [ "${status}" = "200" ]; then
-            echo "直连Github成功，将不使用代理"
-            target_proxy=""
-        else
-            bump_retry
-            echo "警告: 无法连接到Github，请检查网络。（尝试 $((count+1))/$MAX_NETWORK_RETRY）" > "$TMPDIR/progress_des"
-            exit 1
+robust_github_curl() {
+    local output_file="$1"
+    local file_url="$2"
+    
+    local mirrors=("https://ghfast.top/" "https://ghproxy.vip/" "https://gh-proxy.com/" "https://github.moeyy.xyz/" "https://gitproxy.mrhjx.cn/" "")
+    
+    for mirror in "${mirrors[@]}"; do
+        local fetch_url="${mirror}${file_url}"
+        echo "[Curl] 尝试下载: $fetch_url"
+        
+        rm -f "$output_file.tmp"
+        if curl -k -L --connect-timeout 20 -o "$output_file.tmp" "$fetch_url"; then
+            mv "$output_file.tmp" "$output_file"
+            echo "[Curl] 下载成功: $fetch_url"
+            return 0
         fi
-    fi
-    # 成功时重置计数
-    rm -f "$NET_RETRY_FILE"
+        echo "[Curl] 代理 $mirror 下载失败，切换下一个..."
+        sleep 1
+    done
+    
+    echo "[Curl] 所有镜像源均下载失败: $file_url"
+    return 1
 }
 
-# 网络重试计数器
-read_retry(){
-  local c=0
-  if [ -f "$NET_RETRY_FILE" ]; then
-    c=$(cat "$NET_RETRY_FILE" 2>/dev/null | tr -cd '0-9')
-  fi
-  [ -z "$c" ] && c=0
-  return $c
-}
-bump_retry(){
-  local c=0
-  if [ -f "$NET_RETRY_FILE" ]; then
-    c=$(cat "$NET_RETRY_FILE" 2>/dev/null | tr -cd '0-9')
-  fi
-  [ -z "$c" ] && c=0
-  echo $((c+1)) > "$NET_RETRY_FILE"
-}
-
-# 从 onebot11.json 同步 token/port 至 MaiBot 适配器 config.toml
-sync_onebot_to_adapter_config(){
-  local ONEBOT_PATH="$1"
-  local ADAPTER_CFG="$2"
-  if [ -f "$ONEBOT_PATH" ] && [ -f "$ADAPTER_CFG" ]; then
-    local OB_TOKEN=""
-    local OB_PORT=""
-    if command -v python3 >/dev/null 2>&1; then
-      OB_TOKEN=$(python3 -c "import json; d=json.load(open('$ONEBOT_PATH')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('token',''))" 2>/dev/null || true)
-      OB_PORT=$(python3 -c "import json; d=json.load(open('$ONEBOT_PATH')); ws=d.get('network',{}).get('websocketServers',[{}])[0]; print(ws.get('port',8095))" 2>/dev/null || true)
-    fi
-    if [ -z "$OB_TOKEN" ]; then
-      OB_TOKEN=$(grep -o '"token"[[:space:]]*:[[:space:]]*"[^"]*"' "$ONEBOT_PATH" 2>/dev/null | head -n 1 | cut -d'"' -f4 || true)
-    fi
-    if [ -z "$OB_PORT" ]; then
-      OB_PORT=$(grep -o '"port"[[:space:]]*:[[:space:]]*[0-9]*' "$ONEBOT_PATH" 2>/dev/null | head -n 1 | awk -F':' '{print $2}' | tr -d '[:space:]' || true)
-    fi
-    if [ -n "$OB_TOKEN" ]; then
-      local ESCAPED_TOKEN=$(echo "$OB_TOKEN" | sed 's/[&\]/\\&/g')
-      sed -i "s|^token = \".*\"|token = \"$ESCAPED_TOKEN\"|" "$ADAPTER_CFG"
-      echo "✓ 已同步 onebot11.json token 到适配器 config.toml"
-    fi
-    if [ -n "$OB_PORT" ]; then
-      sed -i "s|^port = [0-9]*|port = $OB_PORT|" "$ADAPTER_CFG"
-      echo "✓ 已同步 onebot11.json port ($OB_PORT) 到适配器 config.toml"
-    fi
-  fi
-}
 
 install_uv(){
   INSTALL_DIR="$HOME/.local/bin"
@@ -165,7 +125,7 @@ install_uv(){
     APP_NAME="uv"
     APP_VERSION="0.9.9"
     ARCHIVE_FILE="uv-aarch64-unknown-linux-gnu.tar.gz"
-    DOWNLOAD_URL="${target_proxy:+${target_proxy}/}https://github.com/astral-sh/uv/releases/download/${APP_VERSION}/${ARCHIVE_FILE}"
+    DOWNLOAD_URL="https://github.com/astral-sh/uv/releases/download/${APP_VERSION}/${ARCHIVE_FILE}"
 
     # 检查必要命令
     for cmd in tar mkdir cp chmod mktemp rm curl; do
@@ -185,9 +145,9 @@ install_uv(){
     mkdir -p "$TMP_DIR"
     TMP_ARCHIVE="$TMP_DIR/$ARCHIVE_FILE"
 
-    # 下载并解压（失败直接退出，不使用return）
+    # 下载并解压
     echo "正在下载 $APP_NAME $APP_VERSION..."
-    if ! curl -fL $DOWNLOAD_URL -o $TMP_ARCHIVE; then
+    if ! robust_github_curl "$TMP_ARCHIVE" "$DOWNLOAD_URL"; then
       echo "下载失败"
       rm -rf $TMP_DIR
       exit 1
@@ -242,12 +202,14 @@ install_napcat(){
     cd $HOME
     echo "Napcat $L_NOT_INSTALLED，$L_INSTALLING..."
     network_test
-    curl -o napcat.sh ${target_proxy:+${target_proxy}/}https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh
+    if ! robust_github_curl "napcat.sh" "https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh"; then
+      echo "NapCat 安装脚本下载失败"
+      exit 1
+    fi
     if ! chmod +x napcat.sh; then
       echo "设置 napcat.sh 执行权限失败"
       exit 1
     fi
-
     bash napcat.sh
     # 安装后校验：dpkg 状态必须为 install ok installed（dpkg -l 对 rc/iU 等残留状态同样返回 0），
     # 且安装判定三要素真实在位（QQ deb 下载损坏/apt 安装失败时安装器仍可能自报成功）
@@ -327,7 +289,7 @@ install_maibot(){
 
   rm -rf "$CLONE_TEMP_DIR"
 
-  killall uv 2>/dev/null
+  killall uv 2>/dev/null || true
 
   # [Fix 1.2] 全新安装时清除恢复标记
   if [ ! -d "$INSTALL_DIR" ]; then
@@ -362,7 +324,7 @@ install_maibot(){
 
       # 克隆到临时目录
       echo "正在克隆 MaiBot 仓库，分支: $CLONE_BRANCH..."
-      if ! git clone --depth=1 --branch "$CLONE_BRANCH" ${target_proxy:+${target_proxy}/}https://github.com/Mai-with-u/MaiBot.git "$CLONE_TEMP_DIR"; then
+      if ! robust_github_clone "https://github.com/Mai-with-u/MaiBot.git" "$CLONE_TEMP_DIR" "$CLONE_BRANCH"; then
         echo "克隆 MaiBot 仓库失败"
         rm -rf "$CLONE_TEMP_DIR"  # 清理失败的临时目录
         exit 1
@@ -376,9 +338,7 @@ install_maibot(){
     progress_echo "MaiBot $L_INSTALLED"
   fi
 
-  # --- 插件恢复与默认适配器克隆 ---
-  local ADAPTER_DIR="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter"
-  
+  # --- 插件恢复 ---
   # 避免覆盖用户现有的插件：只有当当前插件目录为空，或仅有官方初始文件时，才执行恢复
   local SHOULD_RESTORE=0
   if [ ! -d "$INSTALL_DIR/plugins" ]; then
@@ -394,29 +354,7 @@ install_maibot(){
     echo "检测到备份的自定义插件，正在从备份中恢复插件..."
     mkdir -p "$INSTALL_DIR/plugins"
     cp -r "$TMPDIR/backup_restore/MaiBot/plugins"/* "$INSTALL_DIR/plugins/"
-    echo "插件恢复完成，跳过安装默认适配器"
-  else
-    # 如果没有备份插件，才进行默认适配器的下载
-    if [ ! -d "$ADAPTER_DIR" ]; then
-      progress_echo "安装默认适配器插件..."
-      mkdir -p "$INSTALL_DIR/plugins"
-      network_test
-      if ! git clone --depth=1 --branch main ${target_proxy:+${target_proxy}/}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git "$ADAPTER_DIR"; then
-        echo "适配器插件克隆失败"
-        exit 1
-      fi
-      # 刚克隆下来删掉默认配置
-      rm -f "$ADAPTER_DIR/config.toml"
-    fi
-    
-    # [Fix] 插件目录存在但适配器配置缺失时，尝试从备份恢复（不覆盖已有配置）
-    if [ "$BACKUP_HAS_MAIBOT_PLUGINS" -eq 1 ] && [ -d "$ADAPTER_DIR" ] && [ ! -f "$ADAPTER_DIR/config.toml" ]; then
-      local BK_ADAPTER_CONFIG="$TMPDIR/backup_restore/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml"
-      if [ -f "$BK_ADAPTER_CONFIG" ]; then
-        echo "检测到适配器配置缺失且备份可用，正在从备份中恢复配置..."
-        cp "$BK_ADAPTER_CONFIG" "$ADAPTER_DIR/config.toml"
-      fi
-    fi
+    echo "插件恢复完成"
   fi
 
   progress_echo "MaiBot 初始化中"
@@ -471,19 +409,20 @@ install_maibot(){
 
   # [Fix 1.2] 标记事务完成（所有恢复操作已完成）
   echo "done" > "$RESTORE_MARKER"
+  # --- 适配器自动下发 ---
+  local ADAPTER_DIR="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter"
+  if [ ! -d "$ADAPTER_DIR" ]; then
+    progress_echo "安装默认适配器插件..."
+    mkdir -p "$INSTALL_DIR/plugins"
+    if ! robust_github_clone "https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git" "$ADAPTER_DIR" "main"; then
+      echo "适配器插件克隆失败"
+      exit 1
+    fi
+    # 刚克隆下来删掉默认配置，等待 Dart 端安全生成
+    rm -f "$ADAPTER_DIR/config.toml"
+  fi
 
   # 启动 MaiBot Core (自动处理配置生成)
-  # 拷贝适配器插件配置（目标不存在时才从预设拷贝，已有配置/备份恢复的不动）
-  local TARGET_CONFIG="$INSTALL_DIR/plugins/MaiBot-Napcat-Adapter/config.toml"
-  if [ -f "/root/config.toml" ] && [ ! -f "$TARGET_CONFIG" ]; then
-      echo "正在拷贝适配器插件配置..."
-      mkdir -p "$(dirname "$TARGET_CONFIG")"
-      cp /root/config.toml "$TARGET_CONFIG"
-  fi
-  
-  # [Fix 1.1] 从 onebot11.json 同步 token/port 覆盖到适配器 config.toml
-  sync_onebot_to_adapter_config "$HOME/napcat/config/onebot11.json" "$TARGET_CONFIG"
-  
   cd "$INSTALL_DIR"
   
   # [Fix 3.3] 动态计算 EULA 和 PRIVACY 的 MD5；文件不存在时自动同意

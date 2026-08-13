@@ -85,7 +85,15 @@ class BackupService {
       try {
         await Process.run('${RuntimeEnvir.binPath}/busybox',
             ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
-      } catch (_) {}
+        
+        // 清理 X11 锁文件，防止下次启动 NapCat 时报 "Display :1 already exists"
+        final x1Lock = File('${RuntimeEnvir.tmpPath}/.X1-lock');
+        if (x1Lock.existsSync()) x1Lock.deleteSync();
+        final x11Unix = Directory('${RuntimeEnvir.tmpPath}/.X11-unix');
+        if (x11Unix.existsSync()) x11Unix.deleteSync(recursive: true);
+      } catch (e) {
+        Log.w('清理残留进程与锁文件失败: $e', 'MaiBot');
+      }
 
       // 权限获取成功后，如果需要显示加载对话框
       if (showLoadingDialog) {
