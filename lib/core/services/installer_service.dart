@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'dart:isolate';
 
 import 'package:global_repository/global_repository.dart';
@@ -168,7 +169,7 @@ class InstallerService {
       }
       if (!downloaded) return false;
       
-      final success = await _runInProot(r"sed -i 's/apt-get install -y \.\/\$QQ_FILE_NAME/apt-get install -y \.\/\$QQ_FILE_NAME || exit 1/g' /root/napcat.sh && bash /root/napcat.sh", onLog: onLog);
+      final success = await _runInProot(r"sed -i 's|apt-get install -y \./\$QQ_FILE_NAME|apt-get install -y ./$QQ_FILE_NAME || exit 1|g' /root/napcat.sh && bash /root/napcat.sh", onLog: onLog);
       if (!success) return false;
     }
 
@@ -301,8 +302,8 @@ class InstallerService {
         'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
       });
       
-      process.stdout.listen((data) => onLog(String.fromCharCodes(data).replaceAll('\n', '\r\n')));
-      process.stderr.listen((data) => onLog(String.fromCharCodes(data).replaceAll('\n', '\r\n')));
+      process.stdout.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+      process.stderr.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
       
       final exitCode = await process.exitCode;
       return exitCode == 0;
