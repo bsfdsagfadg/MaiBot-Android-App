@@ -180,11 +180,11 @@ public class ProotService extends Service {
                                 new Thread(() -> {
                                     try {
                                         OutputStream out = client.getOutputStream();
-                                        out.write("\x02__HIST_START__\x03".getBytes());
+                                        out.write("\u0002__HIST_START__\u0003".getBytes());
                                         synchronized (clients) {
                                             for (byte[] chunk : history) out.write(chunk);
                                         }
-                                        out.write("\x02__HIST_END__\x03".getBytes());
+                                        out.write("\u0002__HIST_END__\u0003".getBytes());
                                         
                                         InputStream in = client.getInputStream();
                                         byte[] inBuffer = new byte[1024];
