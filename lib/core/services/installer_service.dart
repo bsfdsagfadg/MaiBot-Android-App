@@ -48,6 +48,9 @@ class InstallerService {
         if (extractedDir.existsSync()) {
           extractedDir.renameSync(scripts.ubuntuPath);
         }
+
+        onProgress('正在扫描并修复受损的软/硬链接...');
+        await _restoreArchiveLinks(archivePath);
       } catch (e) {
         Log.e('解压过程发生异常: $e', tag: 'InstallerService');
         return false;
@@ -286,6 +289,36 @@ class InstallerService {
       }
     }
     return false;
+  }
+  /// 扫描压缩包中的软硬链接，并在本地强制以软链接形式恢复（解决安卓下解压丢链接的问题）
+  static Future<void> _restoreArchiveLinks(String archivePath) async {
+    try {
+      final res = await Process.run('${RuntimeEnvir.binPath}/busybox', ['tar', '-tvJf', archivePath]);
+      if (res.exitCode == 0 || res.stdout.toString().isNotEmpty) {
+        final lines = res.stdout.toString().split('\n');
+        final regex = RegExp(r'^[lh].*?\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\s+(.*?)\s+->\s+(.*)$');
+        for (final line in lines) {
+          if (line.isEmpty) continue;
+          final match = regex.firstMatch(line);
+          if (match != null) {
+            final rawPath = match.group(1)!;
+            final target = match.group(2)!;
+            
+            if (rawPath.startsWith('${scripts.ubuntuName}/')) {
+              final relativePath = rawPath.substring(scripts.ubuntuName.length + 1);
+              final linkPath = '${scripts.ubuntuPath}/$relativePath';
+              
+              final link = Link(linkPath);
+              if (!link.existsSync() && !File(linkPath).existsSync() && !Directory(linkPath).existsSync()) {
+                try {
+                  link.createSync(target, recursive: true);
+                } catch (_) {}
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   static Future<bool> _runInProot(String command, {Function(String)? onLog}) async {
