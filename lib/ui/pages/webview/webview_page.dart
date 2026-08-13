@@ -6,7 +6,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../controllers/terminal_controller.dart';
+import '../../controllers/home_controller.dart';
 import '../settings/settings_page.dart';
 import '../terminal/terminal_tab_view.dart';
 import '../../navbar/bottom_nav_bar.dart';

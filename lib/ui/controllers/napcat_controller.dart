@@ -191,12 +191,7 @@ class NapcatController extends GetxController {
     // 适配新版日志：🔑 WebUI 登录 Token: ...
     final token = NapcatLogParser.parseMaibotToken(cleanEvent);
     if (token != null) {
-      // 优先从本地 webui.json 读取 Token 凭证
-      if (await _loadMaibotTokenFromFile()) {
-        return;
-      }
-
-      // 若文件不存在（如首次配置流程），则尝试通过日志提取
+      // 从日志中动态捕获到 Token，直接更新状态，不再从文件重复读取
       maiBotWebUiToken.value = token;
       Log.i('成功从日志中抓取到 MaiBot Token: $token', 'MaiBot');
     }

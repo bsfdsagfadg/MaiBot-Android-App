@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../controllers/terminal_controller.dart';
+import '../controllers/home_controller.dart';
 
 class WebViewBottomNavBar extends StatelessWidget {
   final int currentIndex;

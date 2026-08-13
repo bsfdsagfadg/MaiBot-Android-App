@@ -11,7 +11,6 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   # pub repo
-  signale: ^0.0.9
   intl: ^0.20.2
   async: ^2.11.0
   dio: ^5.7.0
@@ -37,16 +36,10 @@ dependencies:
     git: https://github.com/nightmare-space/settings
   global_repository:
     git: https://github.com/nightmare-space/global_repository
-  behavior_api:
-    git:
-      url: https://github.com/nightmare-space/empty_package
-      path: behavior_api
   shizuku_api: ^1.2.2
 
 dependency_overrides:
   permission_handler: ^11.3.1
-  signale:
-    git: https://github.com/nightmare-space/signale.git
   xterm:
     git: https://github.com/TerminalStudio/xterm.dart
   global_repository:
@@ -55,10 +48,6 @@ dependency_overrides:
   settings:
     git:
       url: https://github.com/nightmare-space/settings
-  behavior_api:
-    git:
-      url: https://github.com/nightmare-space/empty_package
-      path: behavior_api
 
 dev_dependencies:
   flutter_test:

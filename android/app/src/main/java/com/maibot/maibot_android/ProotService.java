@@ -74,6 +74,15 @@ public class ProotService extends Service {
             String ubuntuPath = intent.getStringExtra("ubuntuPath");
             
             if (binPath != null && homePath != null) {
+                // 检测是否已经存在存活的容器进程，如果是 DartVM 崩溃后重连，则直接放行，不杀进程
+                if (maibotProcess != null && !maibotProcess.isStopped && 
+                    napcatProcess != null && !napcatProcess.isStopped) {
+                    Log.i(TAG, "Native Backend 依然存活，拦截重复的启动请求，保护底层 PRoot 容器免受重置。");
+                    return START_REDELIVER_INTENT;
+                }
+                
+                Log.i(TAG, "执行容器环境清理与全新启动...");
+                
                 // 清理之前的锁
                 File x1Lock = new File(tmpPath, ".X1-lock");
                 if (x1Lock.exists()) x1Lock.delete();
@@ -87,14 +96,11 @@ public class ProotService extends Service {
                     Log.e(TAG, "killall proot failed", e);
                 }
 
-                if (maibotProcess == null) {
-                    maibotProcess = new ProotProcess("MaiBot", 20001, binPath, homePath, tmpPath, ubuntuPath, "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nexport UV_LINK_MODE=copy\nexport PYTHONUNBUFFERED=1\ncd /root/MaiBot\n/root/.local/bin/uv run bot.py\n");
-                    maibotProcess.start();
-                }
-                if (napcatProcess == null) {
-                    napcatProcess = new ProotProcess("NapCat", 20002, binPath, homePath, tmpPath, ubuntuPath, "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\ncd /root\nbash /root/launcher.sh\n");
-                    napcatProcess.start();
-                }
+                maibotProcess = new ProotProcess("MaiBot", 20001, binPath, homePath, tmpPath, ubuntuPath, "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nexport UV_LINK_MODE=copy\nexport PYTHONUNBUFFERED=1\ncd /root/MaiBot\n/root/.local/bin/uv run bot.py\n");
+                maibotProcess.start();
+                
+                napcatProcess = new ProotProcess("NapCat", 20002, binPath, homePath, tmpPath, ubuntuPath, "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\ncd /root\nbash /root/launcher.sh\n");
+                napcatProcess.start();
             }
         }
         return START_REDELIVER_INTENT;
@@ -147,7 +153,7 @@ public class ProotService extends Service {
         
         private int restartCount = 0;
         private Timer restartTimer;
-        private boolean isStopped = false;
+        boolean isStopped = false;
 
         public ProotProcess(String name, int port, String binPath, String homePath, String tmpPath, String ubuntuPath, String command) {
             this.name = name;
@@ -209,13 +215,29 @@ public class ProotService extends Service {
                 history.clear();
                 historyLength = 0;
                 
-                ProcessBuilder pb = new ProcessBuilder(binPath + "/proot", "-0", "-r", ubuntuPath, "--link2symlink", "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", tmpPath + ":/tmp", "-w", "/root", "/bin/sh");
+                List<String> cmd = new ArrayList<>(java.util.Arrays.asList(binPath + "/proot", "-0", "-r", ubuntuPath, "--link2symlink", "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", tmpPath + ":/tmp", "-w", "/root"));
+                
+                // Fake sysdata bindings to prevent Python/uv crashes on restricted Android /proc
+                String[] fakeProcs = {".loadavg", ".stat", ".uptime", ".version", ".vmstat", ".sysctl_entry_cap_last_cap", ".sysctl_inotify_max_user_watches"};
+                String[] targetProcs = {"/proc/loadavg", "/proc/stat", "/proc/uptime", "/proc/version", "/proc/vmstat", "/proc/sys/kernel/cap_last_cap", "/proc/sys/fs/inotify/max_user_watches"};
+                for (int i = 0; i < fakeProcs.length; i++) {
+                    File fakeFile = new File(ubuntuPath + "/proc/" + fakeProcs[i]);
+                    if (fakeFile.exists()) {
+                        cmd.add("-b");
+                        cmd.add(fakeFile.getAbsolutePath() + ":" + targetProcs[i]);
+                    }
+                }
+                cmd.add("/bin/sh");
+                
+                ProcessBuilder pb = new ProcessBuilder(cmd);
                 pb.environment().put("PATH", binPath + ":/system/bin:/system/xbin");
                 pb.environment().put("HOME", homePath);
                 pb.environment().put("PROOT_TMP_DIR", tmpPath);
                 pb.environment().put("PROOT_LOADER", binPath + "/loader");
                 pb.environment().put("LD_LIBRARY_PATH", binPath);
                 pb.environment().put("TERM", "xterm-256color");
+                pb.environment().put("EULA_AGREE", "agreed");
+                pb.environment().put("PRIVACY_AGREE", "agreed");
                 pb.redirectErrorStream(true);
                 process = pb.start();
 

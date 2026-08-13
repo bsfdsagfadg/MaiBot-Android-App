@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:global_repository/global_repository.dart';
+import 'package:settings/settings.dart';
 
 import 'native_extractor.dart';
 import '../config/app_config.dart';
@@ -33,7 +34,40 @@ class InstallerService {
       }
     }
 
-    try {
+    // 1.5 备份解析与恢复扫描
+    bool hasBackupData = false;
+    bool hasBackupConfig = false;
+    bool hasBackupPlugins = false;
+    bool hasBackupNapcat = false;
+    
+    final backupDir = Directory('/sdcard/Download/MaiBot');
+    final restoreTempDir = Directory('${RuntimeEnvir.tmpPath}/backup_restore');
+    final restoreMarker = File('${RuntimeEnvir.tmpPath}/.restore_complete');
+    
+    if (!restoreMarker.existsSync() && backupDir.existsSync()) {
+      // 获取最新的备份文件
+      final backups = backupDir.listSync().where((e) => e.path.endsWith('.tar.gz')).toList();
+      if (backups.isNotEmpty) {
+        backups.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+        final latestBackup = backups.first;
+        
+        onProgress('检测到历史备份，正在扫描解析...');
+        if (restoreTempDir.existsSync()) restoreTempDir.deleteSync(recursive: true);
+        restoreTempDir.createSync(recursive: true);
+        
+        final res = await Process.run('${RuntimeEnvir.binPath}/busybox', [
+          'tar', '-xzf', latestBackup.path, '-C', restoreTempDir.path
+        ]);
+        
+        if (res.exitCode == 0) {
+          if (Directory('${restoreTempDir.path}/MaiBot/data').existsSync()) hasBackupData = true;
+          if (Directory('${restoreTempDir.path}/MaiBot/config').existsSync()) hasBackupConfig = true;
+          if (Directory('${restoreTempDir.path}/MaiBot/plugins').existsSync()) hasBackupPlugins = true;
+          if (Directory('${restoreTempDir.path}/napcat/config').existsSync()) hasBackupNapcat = true;
+        }
+      }
+    }
+
       // 2. DNS 与 APT 环境注入
       onProgress('配置网络代理与 DNS...');
       _writeNetworkConfigs();
@@ -54,21 +88,79 @@ class InstallerService {
       if (!success) return false;
     }
 
-    // 5. 同步依赖
+    // 4.5 恢复插件与默认适配器克隆
+    final pluginsDir = Directory('${RuntimeEnvir.homePath}/MaiBot/plugins');
+    final adapterDir = Directory('${pluginsDir.path}/MaiBot-Napcat-Adapter');
+    
+    bool shouldRestorePlugins = !pluginsDir.existsSync() || pluginsDir.listSync().where((e) => !e.path.endsWith('__pycache__') && !e.path.endsWith('__init__.py') && !e.path.endsWith('hello_world_plugin')).isEmpty;
+    
+    if (hasBackupPlugins && shouldRestorePlugins) {
+      onProgress('正在从备份中恢复插件...');
+      if (!pluginsDir.existsSync()) pluginsDir.createSync(recursive: true);
+      await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/plugins/*', '${pluginsDir.path}/']);
+    } else if (!adapterDir.existsSync()) {
+      onProgress('安装默认适配器插件...');
+      await _runInProot('git clone --depth=1 --branch main https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git /root/MaiBot/plugins/MaiBot-Napcat-Adapter');
+      final adapterConfig = File('${adapterDir.path}/config.toml');
+      if (adapterConfig.existsSync()) adapterConfig.deleteSync();
+      
+      // 如果有备份，尝试恢复适配器的配置
+      final backupAdapterConfig = File('${restoreTempDir.path}/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml');
+      if (hasBackupPlugins && backupAdapterConfig.existsSync()) {
+        backupAdapterConfig.copySync(adapterConfig.path);
+      }
+    }
+
+    // 4.6 恢复数据与配置
+    final dataDir = Directory('${RuntimeEnvir.homePath}/MaiBot/data');
+    if (!dataDir.existsSync() || dataDir.listSync().isEmpty) {
+      if (hasBackupData) {
+        onProgress('正在从备份中恢复数据...');
+        if (!dataDir.existsSync()) dataDir.createSync(recursive: true);
+        await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/data/*', '${dataDir.path}/']);
+      }
+    }
+
+    final configDir = Directory('${RuntimeEnvir.homePath}/MaiBot/config');
+    if (!configDir.existsSync() || configDir.listSync().isEmpty) {
+      if (hasBackupConfig) {
+        onProgress('正在从备份中恢复核心配置...');
+        if (!configDir.existsSync()) configDir.createSync(recursive: true);
+        await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/config/*', '${configDir.path}/']);
+      }
+    }
+
     final venvDir = Directory('${RuntimeEnvir.homePath}/MaiBot/.venv');
     if (!venvDir.existsSync()) {
       onProgress('正在同步 Python 依赖库 (可能需要几分钟)...');
       final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync');
       if (!success) return false;
+      await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install pip');
+      if (!success) return false;
     }
     
     // 6. 安装 NapCat
     final napcatDir = Directory('${RuntimeEnvir.homePath}/napcat');
-    if (!napcatDir.existsSync()) {
+    final qqBinary = File('${scripts.ubuntuPath}/opt/QQ/qq');
+    if (!napcatDir.existsSync() || !qqBinary.existsSync()) {
+      onProgress('正在清理依赖并下载 NapCatQQ 组件...');
+      await _runInProot('apt --fix-broken install -y');
       onProgress('正在下载 NapCatQQ 组件...');
       final success = await _runInProot('curl -o /root/napcat.sh https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh && bash /root/napcat.sh');
       if (!success) return false;
+
+    // 6.5 恢复 NapCat 配置
+    final napcatConfigDir = Directory('${napcatDir.path}/config');
+    final napcatJson = File('${napcatConfigDir.path}/onebot11.json');
+    if (!napcatJson.existsSync() && hasBackupNapcat) {
+      onProgress('正在从备份中恢复 NapCat 配置...');
+      if (!napcatConfigDir.existsSync()) napcatConfigDir.createSync(recursive: true);
+      await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/napcat/config/*', '${napcatConfigDir.path}/']);
     }
+
+    // 7. 清理
+    if (restoreTempDir.existsSync()) restoreTempDir.deleteSync(recursive: true);
+    restoreMarker.writeAsStringSync('done');
 
       onProgress('初始化完成！即将启动核心服务...');
       return true;
@@ -140,17 +232,21 @@ class InstallerService {
   }
 
   static Future<bool> _cloneMaibot() async {
-    const mirrors = [
-      'https://ghfast.top/',
-      'https://ghproxy.vip/',
-      'https://gh-proxy.com/',
-      ''
-    ];
-    
+    Setting customGitCloneSetting = 'custom_git_clone_url'.setting;
+    String customRepoUrl = customGitCloneSetting.get() ?? '';
+
+    final mirrors = customRepoUrl.isNotEmpty 
+      ? [''] // 如果用户自定义了完整 URL，则不再附加前缀镜像
+      : [
+          'https://ghfast.top/',
+          'https://ghproxy.vip/',
+          'https://gh-proxy.com/',
+          ''
+        ];
     final tmpDir = '${RuntimeEnvir.homePath}/MaiBot_tmp';
     
     for (final mirror in mirrors) {
-      final repo = '${mirror}https://github.com/Mai-with-u/MaiBot.git';
+      final repo = customRepoUrl.isNotEmpty ? customRepoUrl : '${mirror}https://github.com/Mai-with-u/MaiBot.git';
       // Cleanup before try
       final tDir = Directory(tmpDir);
       if (tDir.existsSync()) tDir.deleteSync(recursive: true);

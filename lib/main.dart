@@ -11,7 +11,7 @@ import 'core/config/app_config.dart';
 import 'core/services/env_bootstrapper.dart';
 import 'core/services/foreground_service.dart';
 import 'ui/routes/app_routes.dart';
-import 'ui/controllers/terminal_controller.dart';
+import 'ui/controllers/home_controller.dart';
 
 // Notice: behavior will submit Device
 

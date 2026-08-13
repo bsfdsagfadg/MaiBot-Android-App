@@ -4,7 +4,7 @@ import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:xterm/xterm.dart';
 
-import '../../controllers/terminal_controller.dart';
+import '../../controllers/home_controller.dart';
 import 'terminal_theme.dart';
 
 class TerminalPage extends StatefulWidget {

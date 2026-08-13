@@ -6,7 +6,7 @@ import 'package:global_repository/global_repository.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
-import '../../controllers/terminal_controller.dart';
+import '../../controllers/home_controller.dart';
 import '../../../core/constants/scripts.dart' as scripts;
 import '../../../core/config/app_config.dart';
 import '../../../core/services/backup_service.dart';

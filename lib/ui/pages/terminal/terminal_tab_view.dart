@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:xterm/xterm.dart';
 
-import '../../controllers/terminal_controller.dart';
+import '../../controllers/home_controller.dart';
 import '../../controllers/terminal_tab_manager.dart';
 import 'terminal_theme.dart';
 

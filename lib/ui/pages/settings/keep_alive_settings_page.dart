@@ -7,7 +7,7 @@ import 'package:settings/settings.dart';
 import 'package:shizuku_api/shizuku_api.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../controllers/terminal_controller.dart';
+import '../../controllers/home_controller.dart';
 
 class KeepAliveSettingsPage extends StatefulWidget {
   const KeepAliveSettingsPage({super.key});
