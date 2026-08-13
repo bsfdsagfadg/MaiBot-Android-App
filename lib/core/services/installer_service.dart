@@ -1,11 +1,9 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:isolate';
 
 import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
 
-import 'native_extractor.dart';
 import '../config/app_config.dart';
 import '../constants/scripts.dart' as scripts;
 class InstallerService {
@@ -33,10 +31,17 @@ class InstallerService {
         final archivePath = '${RuntimeEnvir.homePath}/${Config.ubuntuFileName}';
         final targetPath = '${scripts.prootDistroPath}/installed-rootfs';
         
-        // 使用 Dart 在后台 Isolate 进行纯原生解压 (完美处理软链接和 POSIX 权限)
-        await Isolate.run(() {
-          NativeExtractor.extractTarXz(archivePath, targetPath);
-        });
+        Directory(targetPath).createSync(recursive: true);
+        
+        final args = ['tar', '-xJf', archivePath, '-C', targetPath];
+        if (onLog != null) {
+          final process = await Process.start('${RuntimeEnvir.binPath}/busybox', args);
+          process.stdout.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+          process.stderr.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+          await process.exitCode; // 忽略可能存在的 chown 权限警告报错
+        } else {
+          await Process.run('${RuntimeEnvir.binPath}/busybox', args);
+        }
 
         // 移动内容
         final extractedDir = Directory('$targetPath/${scripts.ubuntuName}');
