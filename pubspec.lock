@@ -41,15 +41,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
-  behavior_api:
-    dependency: "direct main"
-    description:
-      path: behavior_api
-      ref: HEAD
-      resolved-ref: d22a5ca9151b016293b41d080f935ae239f34d14
-      url: "https://github.com/nightmare-space/empty_package"
-    source: git
-    version: "1.0.0"
   boolean_selector:
     dependency: transitive
     description:
@@ -681,13 +672,12 @@ packages:
     source: hosted
     version: "1.2.2"
   signale:
-    dependency: "direct main"
+    dependency: transitive
     description:
-      path: "."
-      ref: HEAD
-      resolved-ref: "346dc65012ba6b19f5f4de86598da8a0e45816a8"
-      url: "https://github.com/nightmare-space/signale.git"
-    source: git
+      name: signale
+      sha256: "75b09c5719776ca1dfd10c51e1e3e9d08003a82124bbcc4441df692a30b1d9a1"
+      url: "https://pub.dev"
+    source: hosted
     version: "0.0.12"
   sky_engine:
     dependency: transitive
