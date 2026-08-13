@@ -50,7 +50,7 @@ android {
         }
     }
 
-    lintOptions {
+    lint {
         disable 'InvalidPackage'
     }
 
@@ -61,7 +61,7 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // 禁用对特定原生库的strip操作，避免处理错误
-            packagingOptions {
+            packaging {
                 doNotStrip '**/libsudo.so'
             }
         }
@@ -70,7 +70,7 @@ android {
             minifyEnabled false
             shrinkResources false
             // 禁用对特定原生库的strip操作，避免处理错误
-            packagingOptions {
+            packaging {
                 doNotStrip '**/libsudo.so'
             }
         }
