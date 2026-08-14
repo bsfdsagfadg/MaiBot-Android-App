@@ -191,12 +191,17 @@ class InstallerService {
       bool downloaded = false;
       for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
         final url = '${mirror}https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh';
-        final res = await _runInProot('curl -sL -o /root/napcat.sh $url', onLog: onNapcatLog ?? onLog);
+        final res = await _runInProot('curl -sL -f -o /root/napcat.sh $url', onLog: onNapcatLog ?? onLog);
         if (res) { downloaded = true; break; }
       }
       if (!downloaded) return false;
       
-      final success = await _runInProot(r"sed -i 's|apt-get install -y \./\$QQ_FILE_NAME|apt-get install -y ./$QQ_FILE_NAME || exit 1|g' /root/napcat.sh && bash /root/napcat.sh", onLog: onNapcatLog ?? onLog);
+      final success = await _runInProot(
+        r"sed -i 's|apt-get install.*QQ\.deb.*|& || exit 1|g' /root/napcat.sh "
+        r"&& sed -i 's|curl -k -L -#|curl -k -L -sS|g' /root/napcat.sh "
+        r"&& bash /root/napcat.sh", 
+        onLog: onNapcatLog ?? onLog
+      );
       if (!success) return false;
     }
 
@@ -307,7 +312,7 @@ class InstallerService {
       
       File('${RuntimeEnvir.tmpPath}/uv-aarch64-unknown-linux-gnu/uv').copySync('${localBin.path}/uv');
       File('${RuntimeEnvir.tmpPath}/uv-aarch64-unknown-linux-gnu/uvx').copySync('${localBin.path}/uvx');
-      Process.runSync('chmod', ['+x', '${localBin.path}/uv', '${localBin.path}/uvx']);
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['chmod', '+x', '${localBin.path}/uv', '${localBin.path}/uvx']);
       return true;
     }
     return false;
@@ -329,11 +334,11 @@ class InstallerService {
     
     for (final mirror in mirrors) {
       final repo = customRepoUrl.isNotEmpty ? customRepoUrl : '${mirror}https://github.com/Mai-with-u/MaiBot.git';
-      // Cleanup before try
-      final tDir = Directory(tmpDir);
-      if (tDir.existsSync()) tDir.deleteSync(recursive: true);
+      // Cleanup before try (using busybox to bypass Dart read-only file deletion issues in .git)
+      await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', tmpDir]);
       
-      final success = await _runInProot('git clone --depth=1 --branch main $repo /root/MaiBot_tmp', onLog: onLog);
+      // Use -c gc.auto=0 to prevent git auto maintenance from hanging the proot process after clone
+      final success = await _runInProot('git -c gc.auto=0 clone --depth=1 --branch main $repo /root/MaiBot_tmp', onLog: onLog);
       if (success) {
         Directory(tmpDir).renameSync('${RuntimeEnvir.homePath}/MaiBot');
         return true;
