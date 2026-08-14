@@ -113,7 +113,7 @@ class InstallerService {
       }
     }
 
-    final uvExecutable = File('${RuntimeEnvir.homePath}/.local/bin/uv');
+    final uvExecutable = File('${scripts.ubuntuPath}/root/.local/bin/uv');
     if (!uvExecutable.existsSync()) {
       onProgress('正在下载并安装 Python 依赖管理器 (uv)...');
       final success = await _downloadAndInstallUv(onLog);
@@ -121,7 +121,7 @@ class InstallerService {
     }
 
     // 4. 克隆 MaiBot
-    final maibotDir = Directory('${RuntimeEnvir.homePath}/MaiBot');
+    final maibotDir = Directory('${scripts.ubuntuPath}/root/MaiBot');
     if (!maibotDir.existsSync() || !File('${maibotDir.path}/bot.py').existsSync()) {
       if (maibotDir.existsSync()) {
         await _runInProot('rm -rf /root/MaiBot');
@@ -132,21 +132,21 @@ class InstallerService {
     }
 
     // 4.5 恢复插件与默认适配器克隆
-    final pluginsDir = Directory('${RuntimeEnvir.homePath}/MaiBot/plugins');
+    final pluginsDir = Directory('${scripts.ubuntuPath}/root/MaiBot/plugins');
     final adapterDir = Directory('${pluginsDir.path}/MaiBot-Napcat-Adapter');
     
     if (hasBackupPlugins) {
       onProgress('正在从备份中恢复插件...');
       await _runInProot('rm -rf /root/MaiBot/plugins/*');
       if (!pluginsDir.existsSync()) pluginsDir.createSync(recursive: true);
-      await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/plugins/', '${RuntimeEnvir.homePath}/MaiBot/']);
+      await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/plugins/', '${scripts.ubuntuPath}/root/MaiBot/']);
     }
     
     if (!adapterDir.existsSync()) {
       onProgress('安装默认适配器插件...');
       for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
         final adapterUrl = '${mirror}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git';
-        final res = await _runInProot('git clone --depth=1 --branch main $adapterUrl /root/MaiBot/plugins/MaiBot-Napcat-Adapter', onLog: onLog);
+        final res = await _runInProot('git -c gc.auto=0 clone --depth=1 --branch main $adapterUrl /root/MaiBot/plugins/MaiBot-Napcat-Adapter', onLog: onLog);
         if (res) break;
       }
       final adapterConfig = File('${adapterDir.path}/config.toml');
@@ -159,7 +159,7 @@ class InstallerService {
       }
     }
     // 4.6 恢复数据与配置
-    final dataDir = Directory('${RuntimeEnvir.homePath}/MaiBot/data');
+    final dataDir = Directory('${scripts.ubuntuPath}/root/MaiBot/data');
     if (!dataDir.existsSync() || dataDir.listSync().isEmpty) {
       if (hasBackupData) {
         onProgress('正在从备份中恢复数据...');
@@ -168,7 +168,7 @@ class InstallerService {
       }
     }
 
-    final configDir = Directory('${RuntimeEnvir.homePath}/MaiBot/config');
+    final configDir = Directory('${scripts.ubuntuPath}/root/MaiBot/config');
     if (!configDir.existsSync() || configDir.listSync().isEmpty) {
       if (hasBackupConfig) {
         onProgress('正在从备份中恢复核心配置...');
@@ -177,7 +177,7 @@ class InstallerService {
       }
     }
 
-    final venvDir = Directory('${RuntimeEnvir.homePath}/MaiBot/.venv');
+    final venvDir = Directory('${scripts.ubuntuPath}/root/MaiBot/.venv');
     if (!venvDir.existsSync()) {
       onProgress('正在同步 Python 依赖库 (可能需要几分钟)...');
       final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync', onLog: onLog);
@@ -186,7 +186,7 @@ class InstallerService {
       if (!success) return false;
     }
     // 6. 安装 NapCat
-    final napcatDir = Directory('${RuntimeEnvir.homePath}/napcat');
+    final napcatDir = Directory('${scripts.ubuntuPath}/root/napcat');
     final qqBinary = File('${scripts.ubuntuPath}/opt/QQ/qq');
     if (!napcatDir.existsSync() || !qqBinary.existsSync()) {
       onProgress('正在清理依赖并下载 NapCatQQ 组件...');
@@ -311,7 +311,7 @@ class InstallerService {
     ]);
     
     if (extractRes.exitCode == 0) {
-      final localBin = Directory('${RuntimeEnvir.homePath}/.local/bin');
+      final localBin = Directory('${scripts.ubuntuPath}/root/.local/bin');
       if (!localBin.existsSync()) localBin.createSync(recursive: true);
       
       File('${RuntimeEnvir.tmpPath}/uv-aarch64-unknown-linux-gnu/uv').copySync('${localBin.path}/uv');
@@ -334,7 +334,7 @@ class InstallerService {
           'https://gh-proxy.com/',
           ''
         ];
-    final tmpDir = '${RuntimeEnvir.homePath}/MaiBot_tmp';
+    final tmpDir = '${scripts.ubuntuPath}/root/MaiBot_tmp';
     
     for (final mirror in mirrors) {
       final repo = customRepoUrl.isNotEmpty ? customRepoUrl : '${mirror}https://github.com/Mai-with-u/MaiBot.git';
@@ -344,7 +344,7 @@ class InstallerService {
       // Use -c gc.auto=0 to prevent git auto maintenance from hanging the proot process after clone
       final success = await _runInProot('git -c gc.auto=0 clone --depth=1 --branch main $repo /root/MaiBot_tmp', onLog: onLog);
       if (success) {
-        Directory(tmpDir).renameSync('${RuntimeEnvir.homePath}/MaiBot');
+        Directory(tmpDir).renameSync('${scripts.ubuntuPath}/root/MaiBot');
         return true;
       }
     }
@@ -358,7 +358,6 @@ class InstallerService {
       '--link2symlink',
       '-b', '/dev', '-b', '/proc', '-b', '/sys',
       '-b', '${RuntimeEnvir.tmpPath}:/tmp',
-      '-b', '${RuntimeEnvir.homePath}:/root',
       '-w', '/root',
       '/bin/sh', '-c',
       'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export UV_LINK_MODE=copy; $command'

@@ -215,7 +215,7 @@ public class ProotService extends Service {
                 history.clear();
                 historyLength = 0;
                 
-                List<String> cmd = new ArrayList<>(java.util.Arrays.asList(binPath + "/proot", "-0", "-r", ubuntuPath, "--link2symlink", "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", tmpPath + ":/tmp", "-b", homePath + ":/root", "-w", "/root"));
+                List<String> cmd = new ArrayList<>(java.util.Arrays.asList(binPath + "/proot", "-0", "-r", ubuntuPath, "--link2symlink", "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", tmpPath + ":/tmp", "-w", "/root"));
                 
                 // Fake sysdata bindings to prevent Python/uv crashes on restricted Android /proc
                 String[] fakeProcs = {".loadavg", ".stat", ".uptime", ".version", ".vmstat", ".sysctl_entry_cap_last_cap", ".sysctl_inotify_max_user_watches"};
