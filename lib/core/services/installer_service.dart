@@ -190,12 +190,12 @@ class InstallerService {
     final qqBinary = File('${scripts.ubuntuPath}/opt/QQ/qq');
     if (!napcatDir.existsSync() || !qqBinary.existsSync()) {
       onProgress('正在清理依赖并下载 NapCatQQ 组件...');
-      await _runInProot('echo "[APT] 检查并修复破损的系统包..." && apt-get --fix-broken install -y', onLog: onNapcatLog ?? onLog);
+      await _runInProot('echo "[APT] 检查并修复破损的系统包..." && apt-get --fix-broken install -y', onLog: onLog);
       onProgress('正在下载 NapCatQQ 组件...');
       bool downloaded = false;
       for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
         final url = '${mirror}https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh';
-        final res = await _runInProot('echo "[网络] 尝试获取安装脚本: $url" && curl -sL -f --connect-timeout 10 --max-time 30 -o /root/napcat.sh $url', onLog: onNapcatLog ?? onLog);
+        final res = await _runInProot('echo "[网络] 尝试获取安装脚本: $url" && curl -sL -f --connect-timeout 10 --max-time 30 -o /root/napcat.sh $url', onLog: onLog);
         if (res) { downloaded = true; break; }
       }
       if (!downloaded) return false;
@@ -203,8 +203,9 @@ class InstallerService {
       final success = await _runInProot(
         r"sed -i 's|apt-get install.*QQ\.deb.*|& || exit 1|g' /root/napcat.sh "
         r"&& sed -i 's|curl -k -L -#|curl -k -L |g' /root/napcat.sh "
+        r"&& sed -i 's|curl -k -L |curl -k -L --connect-timeout 10 --max-time 300 |g' /root/napcat.sh "
         r"&& bash /root/napcat.sh", 
-        onLog: onNapcatLog ?? onLog
+        onLog: onLog
       );
       if (!success) return false;
     }
