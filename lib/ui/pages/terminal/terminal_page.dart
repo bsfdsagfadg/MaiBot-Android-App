@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:xterm/xterm.dart';
@@ -17,9 +18,8 @@ class TerminalPage extends StatefulWidget {
 class _TerminalPageState extends State<TerminalPage> {
   HomeController controller = Get.put(HomeController(), permanent: true);
   ManjaroTerminalTheme terminalTheme = ManjaroTerminalTheme();
-
-  // 0: 隐藏, 1: 显示 MaiBot 终端, 2: 显示 NapCat 终端
   int displayMode = 0;
+  DateTime? _lastBackPressTime;
 
   @override
   void initState() {
@@ -33,16 +33,46 @@ class _TerminalPageState extends State<TerminalPage> {
   void dispose() {
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     bool isVisible = displayMode != 0;
-    return Scaffold(
-      backgroundColor: isVisible
-          ? terminalTheme.background
-          : Theme.of(context).colorScheme.surface,
-      body: SafeArea(
-        child: GestureDetector(
+    final theme = Theme.of(context);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (displayMode != 0) {
+          setState(() {
+            displayMode = 0;
+          });
+          return;
+        }
+
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          Get.snackbar(
+            '提示',
+            '再次按返回键退出应用',
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(seconds: 2),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          );
+          return;
+        }
+
+        SystemNavigator.pop();
+      },
+      child: Scaffold(
+        backgroundColor: isVisible
+            ? terminalTheme.background
+            : theme.colorScheme.surface,
+        body: SafeArea(
+          top: true,
+          bottom: true,
+          child: GestureDetector(
           onTap: () {
             setState(() {
               if (displayMode == 0) {
@@ -158,6 +188,7 @@ class _TerminalPageState extends State<TerminalPage> {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),

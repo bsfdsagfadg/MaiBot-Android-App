@@ -20,16 +20,10 @@ import 'ui/controllers/theme_controller.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 隐藏系统 UI
-  // Hide system UI
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [
-    SystemUiOverlay.top,
-    // SystemUiOverlay.bottom,
-  ]);
+  // 启用系统沉浸式全面屏边缘延展 (Edge-to-Edge)
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light, // Android 状态栏图标为白色
-    statusBarBrightness: Brightness.dark, // iOS 状态栏图标为白色
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
   ));

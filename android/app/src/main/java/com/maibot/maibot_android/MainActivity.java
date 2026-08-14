@@ -173,22 +173,11 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     public void onBackPressed() {
-        // 实现双击返回退出到桌面，但不传递给Flutter层
-        if (doubleBackToExitPressedOnce) {
-            // 第二次按返回键，移动到后台（返回桌面）
-            moveTaskToBack(true);
-            return;
+        if (flutterFragment != null) {
+            flutterFragment.onBackPressed();
+        } else {
+            super.onBackPressed();
         }
-
-        // 第一次按返回键，显示提示
-        this.doubleBackToExitPressedOnce = true;
-        Toast.makeText(this, "再按一次返回桌面", Toast.LENGTH_SHORT).show();
-
-        // 2秒后重置标志
-        new Handler().postDelayed(() -> doubleBackToExitPressedOnce = false, DOUBLE_BACK_INTERVAL);
-
-        // 不调用 super.onBackPressed() 和 flutterFragment.onBackPressed()
-        // 确保返回事件不会传递给 Flutter 层
     }
 
     @Override

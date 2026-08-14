@@ -23,6 +23,7 @@ class _WebViewPageState extends State<WebViewPage> {
   int _currentIndex = 0;
   int _previousNavItemCount = 0; // 记录上一次导航栏项目数量
 
+  DateTime? _lastBackPressedTime;
   late final WebViewController _maiBotController;
   late final WebViewController _napCatController;
   final Map<String, WebViewController> _customControllers =
@@ -560,40 +561,80 @@ class _WebViewPageState extends State<WebViewPage> {
           statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
           systemNavigationBarColor: Colors.transparent,
           systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         ),
-        child: Scaffold(
-          backgroundColor: theme.scaffoldBackgroundColor,
-          body: SafeArea(
-            top: true,
-            child: IndexedStack(
-              index: validCurrentIndex,
-              children: [
-                ...pages,
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) return;
 
-                // 4. 终端页面
-                const TerminalTabView(key: ValueKey('terminal_tab_view')),
-
-                // 5. 软件设置页面
-                SettingsPage(
-                  key: const ValueKey('settings_page'),
-                  maiBotController: _maiBotController,
-                  napCatController: _napCatController,
-                  onNavigate: (index) {
-                    setState(() {
-                      _currentIndex = index;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-          bottomNavigationBar: WebViewBottomNavBar(
-            currentIndex: validCurrentIndex,
-            onTap: (index) {
+            // 1. 如果当前不是 MaiBot 主控制台标签页，按返回键优先返回主标签页
+            if (_currentIndex != 0) {
               setState(() {
-                _currentIndex = index;
+                _currentIndex = 0;
               });
-            },
+              return;
+            }
+
+            // 2. 如果 MaiBot WebView 内部有历史页面可回退，则回退上一页
+            if (await _maiBotController.canGoBack()) {
+              await _maiBotController.goBack();
+              return;
+            }
+
+            // 3. 在主页根路径时，双击返回键退出应用或移至后台
+            final now = DateTime.now();
+            if (_lastBackPressedTime == null ||
+                now.difference(_lastBackPressedTime!) > const Duration(seconds: 2)) {
+              _lastBackPressedTime = now;
+              Get.snackbar(
+                '提示',
+                '再次按返回键退出应用',
+                snackPosition: SnackPosition.BOTTOM,
+                duration: const Duration(seconds: 2),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              );
+              return;
+            }
+
+            // 执行安全退出
+            SystemNavigator.pop();
+          },
+          child: Scaffold(
+            backgroundColor: theme.scaffoldBackgroundColor,
+            body: SafeArea(
+              top: true,
+              bottom: false,
+              child: IndexedStack(
+                index: validCurrentIndex,
+                children: [
+                  ...pages,
+
+                  // 4. 终端页面
+                  const TerminalTabView(key: ValueKey('terminal_tab_view')),
+
+                  // 5. 软件设置页面
+                  SettingsPage(
+                    key: const ValueKey('settings_page'),
+                    maiBotController: _maiBotController,
+                    napCatController: _napCatController,
+                    onNavigate: (index) {
+                      setState(() {
+                        _currentIndex = index;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+            bottomNavigationBar: WebViewBottomNavBar(
+              currentIndex: validCurrentIndex,
+              onTap: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            ),
           ),
         ),
       );
