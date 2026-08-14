@@ -195,7 +195,7 @@ class InstallerService {
       bool downloaded = false;
       for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
         final url = '${mirror}https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh';
-        final res = await _runInProot('echo "[网络] 尝试获取安装脚本: $url" && curl -sL -f -o /root/napcat.sh $url', onLog: onNapcatLog ?? onLog);
+        final res = await _runInProot('echo "[网络] 尝试获取安装脚本: $url" && curl -sL -f --connect-timeout 10 --max-time 30 -o /root/napcat.sh $url', onLog: onNapcatLog ?? onLog);
         if (res) { downloaded = true; break; }
       }
       if (!downloaded) return false;
