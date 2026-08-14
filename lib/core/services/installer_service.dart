@@ -33,11 +33,24 @@ class InstallerService {
         
         Directory(targetPath).createSync(recursive: true);
         
-        final args = ['tar', '-xJf', archivePath, '-C', targetPath];
+        final args = ['tar', '-xJvf', archivePath, '-C', targetPath];
         if (onLog != null) {
           final process = await Process.start('${RuntimeEnvir.binPath}/busybox', args);
-          process.stdout.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
-          process.stderr.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+          int extractedFiles = 0;
+          final totalFiles = 12684; // 预估包内文件总数
+          process.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
+            extractedFiles++;
+            if (extractedFiles % 300 == 0 || extractedFiles == totalFiles) {
+              final pct = (extractedFiles / totalFiles * 100).clamp(0, 100).toStringAsFixed(1);
+              onLog('\x1b[32m[解压进度]\x1b[0m $pct% ($extractedFiles/$totalFiles)\r\n');
+            }
+          });
+          process.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
+            // 过滤掉因为非 Root 导致的 chown 报错洪流，防止 UI 线程卡死
+            if (!line.contains('chown') && !line.contains('mknod') && !line.contains('Operation not permitted')) {
+              onLog('\x1b[31m[tar]\x1b[0m $line\r\n');
+            }
+          });
           await process.exitCode; // 忽略可能存在的 chown 权限警告报错
         } else {
           await Process.run('${RuntimeEnvir.binPath}/busybox', args);
