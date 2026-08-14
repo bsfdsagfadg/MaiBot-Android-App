@@ -202,7 +202,7 @@ class InstallerService {
       
       final success = await _runInProot(
         r"sed -i 's|apt-get install.*QQ\.deb.*|& || exit 1|g' /root/napcat.sh "
-        r"&& sed -i 's|curl -k -L -#|curl -k -L -sS|g' /root/napcat.sh "
+        r"&& sed -i 's|curl -k -L -#|curl -k -L |g' /root/napcat.sh "
         r"&& bash /root/napcat.sh", 
         onLog: onNapcatLog ?? onLog
       );
