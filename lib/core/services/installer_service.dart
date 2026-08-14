@@ -10,6 +10,7 @@ class InstallerService {
   static Future<bool> runInstallPipeline({
     required Function(String) onProgress,
     Function(String)? onLog,
+    Function(String)? onNapcatLog,
   }) async {
     final ubuntuDir = Directory(scripts.ubuntuPath);
     
@@ -62,6 +63,15 @@ class InstallerService {
           extractedDir.renameSync(scripts.ubuntuPath);
         }
 
+        // 2. DNS 与 APT 环境注入
+        onProgress('配置网络代理与 DNS...');
+        _writeNetworkConfigs(onLog);
+
+        onProgress('正在安装系统基础依赖...');
+        final aptSuccess = await _runInProot('apt-get update && apt-get install -y sudo wget git curl', onLog: onLog);
+        if (!aptSuccess) return false;
+
+
       } catch (e) {
         Log.e('解压过程发生异常: $e', tag: 'InstallerService');
         return false;
@@ -103,15 +113,6 @@ class InstallerService {
       }
     }
 
-      // 2. DNS 与 APT 环境注入
-      onProgress('配置网络代理与 DNS...');
-      _writeNetworkConfigs(onLog);
-
-      onProgress('正在安装系统基础依赖...');
-      final aptSuccess = await _runInProot('apt-get update && apt-get install -y sudo wget git curl', onLog: onLog);
-      if (!aptSuccess) return false;
-
-    // 3. 安装 UV
     final uvExecutable = File('${RuntimeEnvir.homePath}/.local/bin/uv');
     if (!uvExecutable.existsSync()) {
       onProgress('正在下载并安装 Python 依赖管理器 (uv)...');
@@ -185,17 +186,17 @@ class InstallerService {
     final qqBinary = File('${scripts.ubuntuPath}/opt/QQ/qq');
     if (!napcatDir.existsSync() || !qqBinary.existsSync()) {
       onProgress('正在清理依赖并下载 NapCatQQ 组件...');
-      await _runInProot('apt --fix-broken install -y', onLog: onLog);
+      await _runInProot('apt --fix-broken install -y', onLog: onNapcatLog ?? onLog);
       onProgress('正在下载 NapCatQQ 组件...');
       bool downloaded = false;
       for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
         final url = '${mirror}https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh';
-        final res = await _runInProot('curl -sL -o /root/napcat.sh $url', onLog: onLog);
+        final res = await _runInProot('curl -sL -o /root/napcat.sh $url', onLog: onNapcatLog ?? onLog);
         if (res) { downloaded = true; break; }
       }
       if (!downloaded) return false;
       
-      final success = await _runInProot(r"sed -i 's|apt-get install -y \./\$QQ_FILE_NAME|apt-get install -y ./$QQ_FILE_NAME || exit 1|g' /root/napcat.sh && bash /root/napcat.sh", onLog: onLog);
+      final success = await _runInProot(r"sed -i 's|apt-get install -y \./\$QQ_FILE_NAME|apt-get install -y ./$QQ_FILE_NAME || exit 1|g' /root/napcat.sh && bash /root/napcat.sh", onLog: onNapcatLog ?? onLog);
       if (!success) return false;
     }
 

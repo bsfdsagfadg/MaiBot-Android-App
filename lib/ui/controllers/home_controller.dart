@@ -116,6 +116,9 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       onLog: (log) {
         terminal.write(log);
       },
+      onNapcatLog: (log) {
+        napcatShowTerminal.write(log);
+      },
     );
 
     if (!success) {
