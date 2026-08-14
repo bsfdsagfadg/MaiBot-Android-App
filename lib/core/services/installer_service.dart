@@ -434,12 +434,30 @@ class InstallerService {
       '-b', '${RuntimeEnvir.tmpPath}:/dev/shm',
       '-w', '/root',
       '/bin/sh', '-c',
-      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export DEBIAN_FRONTEND=noninteractive; export GIT_TERMINAL_PROMPT=0; export UV_LINK_MODE=copy; $command'
+      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; '
+      'export TERM=xterm-256color; '
+      'export COLORTERM=truecolor; '
+      'export FORCE_COLOR=1; '
+      'export CLICOLOR_FORCE=1; '
+      'export PYTHONUNBUFFERED=1; '
+      'export LANG=C.UTF-8; '
+      'export LC_ALL=C.UTF-8; '
+      'export DEBIAN_FRONTEND=noninteractive; '
+      'export GIT_TERMINAL_PROMPT=0; '
+      'export UV_LINK_MODE=copy; '
+      '$command'
     ];
     final env = {
       'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
       'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
       'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
+      'TERM': 'xterm-256color',
+      'COLORTERM': 'truecolor',
+      'FORCE_COLOR': '1',
+      'CLICOLOR_FORCE': '1',
+      'PYTHONUNBUFFERED': '1',
+      'LANG': 'C.UTF-8',
+      'LC_ALL': 'C.UTF-8',
     };
     if (onLog != null) {
       final process = await Process.start(prootPath, args, environment: env);

@@ -1,6 +1,65 @@
-import 'dart:ui';
-
+import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart';
+
+/// 根据当前 Material 3 主题动态生成终端色彩配置（支持浅色/深色/AMOLED自适应）
+TerminalTheme getAppTerminalTheme(BuildContext context) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+
+  if (isDark) {
+    return TerminalTheme(
+      cursor: theme.colorScheme.primary,
+      selection: theme.colorScheme.primary.withValues(alpha: 0.35),
+      foreground: const Color(0xFFECEFF4),
+      background: theme.colorScheme.surface,
+      black: const Color(0xFF2E3440),
+      white: const Color(0xFFE5E9F0),
+      red: const Color(0xFFFF6B6B),
+      green: const Color(0xFF51CF66),
+      yellow: const Color(0xFFFCC419),
+      blue: const Color(0xFF339AF0),
+      magenta: const Color(0xFFCC5DE8),
+      cyan: const Color(0xFF22B8CF),
+      brightBlack: const Color(0xFF868E96),
+      brightRed: const Color(0xFFFF8787),
+      brightGreen: const Color(0xFF69DB7C),
+      brightYellow: const Color(0xFFFFD43B),
+      brightBlue: const Color(0xFF4DABF7),
+      brightMagenta: const Color(0xFFDA77F2),
+      brightCyan: const Color(0xFF3BC9DB),
+      brightWhite: const Color(0xFFF8F9FA),
+      searchHitBackground: theme.colorScheme.primary,
+      searchHitBackgroundCurrent: theme.colorScheme.secondary,
+      searchHitForeground: Colors.black,
+    );
+  } else {
+    return TerminalTheme(
+      cursor: theme.colorScheme.primary,
+      selection: theme.colorScheme.primary.withValues(alpha: 0.25),
+      foreground: const Color(0xFF212529),
+      background: theme.colorScheme.surface,
+      black: const Color(0xFF212529),
+      white: const Color(0xFFCED4DA),
+      red: const Color(0xFFE03131),
+      green: const Color(0xFF2F9E44),
+      yellow: const Color(0xFFF08C00),
+      blue: const Color(0xFF1971C2),
+      magenta: const Color(0xFF9C36B5),
+      cyan: const Color(0xFF0C8599),
+      brightBlack: const Color(0xFF495057),
+      brightRed: const Color(0xFFC92A2A),
+      brightGreen: const Color(0xFF2B8A3E),
+      brightYellow: const Color(0xFFD9480F),
+      brightBlue: const Color(0xFF1864AB),
+      brightMagenta: const Color(0xFF862E9C),
+      brightCyan: const Color(0xFF0B7285),
+      brightWhite: const Color(0xFF212529),
+      searchHitBackground: theme.colorScheme.primary,
+      searchHitBackgroundCurrent: theme.colorScheme.secondary,
+      searchHitForeground: Colors.white,
+    );
+  }
+}
 
 class ManjaroTerminalTheme extends TerminalTheme {
   const ManjaroTerminalTheme({

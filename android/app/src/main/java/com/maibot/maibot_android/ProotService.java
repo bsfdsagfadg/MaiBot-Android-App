@@ -99,11 +99,32 @@ public class ProotService extends Service {
                     Log.e(TAG, "killall proot failed", e);
                 }
 
-                String maibotCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nexport UV_LINK_MODE=copy\nexport PYTHONUNBUFFERED=1\ncd /root/MaiBot\nif [ -f EULA.md ]; then export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}'); fi\nif [ -f PRIVACY.md ]; then export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}'); fi\n/root/.local/bin/uv run bot.py\n";
+                String maibotCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" +
+                        "export TERM=xterm-256color\n" +
+                        "export COLORTERM=truecolor\n" +
+                        "export FORCE_COLOR=1\n" +
+                        "export CLICOLOR_FORCE=1\n" +
+                        "export PYTHONUNBUFFERED=1\n" +
+                        "export LANG=C.UTF-8\n" +
+                        "export LC_ALL=C.UTF-8\n" +
+                        "export UV_LINK_MODE=copy\n" +
+                        "cd /root/MaiBot\n" +
+                        "if [ -f EULA.md ]; then export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}'); fi\n" +
+                        "if [ -f PRIVACY.md ]; then export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}'); fi\n" +
+                        "/root/.local/bin/uv run bot.py\n";
                 maibotProcess = new ProotProcess("MaiBot", 20001, binPath, homePath, tmpPath, ubuntuPath, maibotCmd);
                 maibotProcess.start();
                 
-                napcatProcess = new ProotProcess("NapCat", 20002, binPath, homePath, tmpPath, ubuntuPath, "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\ncd /root\nbash /root/launcher.sh\n");
+                String napcatCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" +
+                        "export TERM=xterm-256color\n" +
+                        "export COLORTERM=truecolor\n" +
+                        "export FORCE_COLOR=1\n" +
+                        "export CLICOLOR_FORCE=1\n" +
+                        "export LANG=C.UTF-8\n" +
+                        "export LC_ALL=C.UTF-8\n" +
+                        "cd /root\n" +
+                        "bash /root/launcher.sh\n";
+                napcatProcess = new ProotProcess("NapCat", 20002, binPath, homePath, tmpPath, ubuntuPath, napcatCmd);
                 napcatProcess.start();
             }
         }
@@ -242,6 +263,12 @@ public class ProotService extends Service {
                 pb.environment().put("PROOT_LOADER", binPath + "/loader");
                 pb.environment().put("LD_LIBRARY_PATH", binPath);
                 pb.environment().put("TERM", "xterm-256color");
+                pb.environment().put("COLORTERM", "truecolor");
+                pb.environment().put("FORCE_COLOR", "1");
+                pb.environment().put("CLICOLOR_FORCE", "1");
+                pb.environment().put("PYTHONUNBUFFERED", "1");
+                pb.environment().put("LANG", "C.UTF-8");
+                pb.environment().put("LC_ALL", "C.UTF-8");
                 pb.redirectErrorStream(true);
                 process = pb.start();
 

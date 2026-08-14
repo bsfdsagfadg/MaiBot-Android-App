@@ -55,13 +55,14 @@ class _TerminalTabViewState extends State<TerminalTabView> {
     int activeIndex,
     TerminalTabManager manager,
   ) {
+    final theme = Theme.of(context);
     return Container(
-      height: 46,
+      height: 48,
       decoration: BoxDecoration(
-        color: const Color(0xFF21252B),
+        color: theme.colorScheme.surfaceContainer,
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.1),
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
             width: 1,
           ),
         ),
@@ -87,7 +88,7 @@ class _TerminalTabViewState extends State<TerminalTabView> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.cleaning_services_rounded, size: 18, color: Colors.white70),
+            icon: Icon(Icons.cleaning_services_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
             tooltip: '清屏',
             onPressed: () {
               final activeTab = manager.activeTab;
@@ -109,15 +110,18 @@ class _TerminalTabViewState extends State<TerminalTabView> {
     required VoidCallback onTap,
     VoidCallback? onClose,
   }) {
+    final theme = Theme.of(context);
+    final activeBg = theme.colorScheme.secondaryContainer;
+    final activeFg = theme.colorScheme.onSecondaryContainer;
+    final inactiveFg = theme.colorScheme.onSurfaceVariant;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         margin: const EdgeInsets.only(right: 6),
         decoration: BoxDecoration(
-          color: isActive
-              ? Colors.white.withValues(alpha: 0.15)
-              : Colors.transparent,
+          color: isActive ? activeBg : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -129,9 +133,7 @@ class _TerminalTabViewState extends State<TerminalTabView> {
                   ? Icons.lock_outline_rounded
                   : Icons.terminal_rounded,
               size: 14,
-              color: isActive
-                  ? const Color(0xFF61AFEF)
-                  : Colors.white54,
+              color: isActive ? activeFg : inactiveFg,
             ),
             const SizedBox(width: 6),
 
@@ -142,9 +144,7 @@ class _TerminalTabViewState extends State<TerminalTabView> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                  color: isActive
-                      ? Colors.white
-                      : Colors.white60,
+                  color: isActive ? activeFg : inactiveFg,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -155,10 +155,10 @@ class _TerminalTabViewState extends State<TerminalTabView> {
               const SizedBox(width: 4),
               GestureDetector(
                 onTap: onClose,
-                child: const Icon(
+                child: Icon(
                   Icons.close_rounded,
                   size: 14,
-                  color: Colors.white54,
+                  color: isActive ? activeFg : inactiveFg,
                 ),
               ),
             ],
@@ -173,12 +173,13 @@ class _TerminalTabViewState extends State<TerminalTabView> {
     return ClipRect(
       child: TerminalView(
         tab.terminal,
-        readOnly: tab.type == TerminalTabType.fixed, // 固定终端只读
+        readOnly: false, // 允许终端输入与 CLI 交互
         backgroundOpacity: 1,
-        theme: const ManjaroTerminalTheme(),
+        theme: getAppTerminalTheme(context),
       ),
     );
   }
+
 
   /// 显示关闭确认对话框
   void _showCloseConfirmDialog(int index, TerminalTabManager manager) {
