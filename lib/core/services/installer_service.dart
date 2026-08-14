@@ -190,12 +190,12 @@ class InstallerService {
     final qqBinary = File('${scripts.ubuntuPath}/opt/QQ/qq');
     if (!napcatDir.existsSync() || !qqBinary.existsSync()) {
       onProgress('正在清理依赖并下载 NapCatQQ 组件...');
-      await _runInProot('apt --fix-broken install -y', onLog: onNapcatLog ?? onLog);
+      await _runInProot('echo "[APT] 检查并修复破损的系统包..." && apt-get --fix-broken install -y', onLog: onNapcatLog ?? onLog);
       onProgress('正在下载 NapCatQQ 组件...');
       bool downloaded = false;
       for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
         final url = '${mirror}https://raw.githubusercontent.com/NapNeko/napcat-linux-installer/refs/heads/main/install.sh';
-        final res = await _runInProot('curl -sL -f -o /root/napcat.sh $url', onLog: onNapcatLog ?? onLog);
+        final res = await _runInProot('echo "[网络] 尝试获取安装脚本: $url" && curl -sL -f -o /root/napcat.sh $url', onLog: onNapcatLog ?? onLog);
         if (res) { downloaded = true; break; }
       }
       if (!downloaded) return false;
