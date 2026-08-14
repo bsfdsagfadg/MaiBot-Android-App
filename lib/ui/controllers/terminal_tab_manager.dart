@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:xterm/xterm.dart';
 
+import '../../../core/constants/scripts.dart' as scripts;
 
 /// 终端标签页类型
 enum TerminalTabType {
-  fixed, // 固定的MaiBot终端（只读、颜色过滤、不可关闭）
-  system, // 系统终端（可交互、可关闭）
+  fixed, // 固定的MaiBot/NapCat终端（只读）
+  system, // 自定义交互终端（可写、可交互、可关闭）
 }
 
 /// 终端标签页数据模型
@@ -18,6 +21,7 @@ class TerminalTab {
   final Terminal terminal;
   bool isActive;
   final StreamSubscription? outputSubscription;
+  final Process? process;
 
   TerminalTab({
     required this.id,
@@ -26,6 +30,7 @@ class TerminalTab {
     required this.terminal,
     this.isActive = false,
     this.outputSubscription,
+    this.process,
   });
 }
 
@@ -98,25 +103,90 @@ class TerminalTabManager extends GetxController {
     }
 
     try {
-      // 如果有其他需要清理的资源，在这里处理
       tab.outputSubscription?.cancel();
-      // 移除标签页
+      tab.process?.kill(ProcessSignal.sigkill);
       tabs.removeAt(index);
 
-      // 如果关闭的是当前激活的标签页，切换到前一个标签页
       if (index == activeTabIndex.value) {
         final newIndex = (index > 0) ? index - 1 : 0;
         if (tabs.isNotEmpty) {
           switchToTab(newIndex);
         }
       } else if (index < activeTabIndex.value) {
-        // 如果关闭的标签页在当前激活标签页之前，需要更新索引
         activeTabIndex.value = activeTabIndex.value - 1;
       }
 
       Log.i('关闭标签页: ${tab.title}', tag: 'TerminalTabManager');
     } catch (e) {
       Log.e('关闭标签页失败: $e', tag: 'TerminalTabManager');
+    }
+  }
+
+  /// 创建新的系统交互终端
+  Future<void> createNewSystemTab() async {
+    final newId = 'system_${DateTime.now().millisecondsSinceEpoch}';
+    final newTitle = '终端 ${tabs.length + 1}';
+    final newTerminal = Terminal(maxLines: 5000);
+
+    final prootPath = '${RuntimeEnvir.binPath}/proot';
+    final args = [
+      '-0', '-r', scripts.ubuntuPath,
+      '--link2symlink',
+      '-b', '/dev', '-b', '/proc', '-b', '/sys',
+      '-b', '${RuntimeEnvir.tmpPath}:/tmp',
+      '-b', '${RuntimeEnvir.tmpPath}:/dev/shm',
+      '-w', '/root',
+      '/bin/bash', '-l'
+    ];
+    final env = {
+      'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
+      'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
+      'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
+      'TERM': 'xterm-256color',
+      'COLORTERM': 'truecolor',
+      'FORCE_COLOR': '1',
+      'CLICOLOR_FORCE': '1',
+      'LANG': 'C.UTF-8',
+      'LC_ALL': 'C.UTF-8',
+    };
+
+    try {
+      final process = await Process.start(prootPath, args, environment: env);
+
+      newTerminal.onOutput = (data) {
+        process.stdin.add(utf8.encode(data));
+      };
+
+      final sub = process.stdout
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen((data) {
+        newTerminal.write(data.replaceAllMapped(RegExp(r'(?<!\r)\n'), (m) => '\r\n'));
+      });
+      process.stderr
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen((data) {
+        newTerminal.write(data.replaceAllMapped(RegExp(r'(?<!\r)\n'), (m) => '\r\n'));
+      });
+
+      process.exitCode.then((_) {
+        // 自动提示
+      });
+
+      final newTab = TerminalTab(
+        id: newId,
+        title: newTitle,
+        type: TerminalTabType.system,
+        terminal: newTerminal,
+        isActive: false,
+        outputSubscription: sub,
+        process: process,
+      );
+
+      tabs.add(newTab);
+      switchToTab(tabs.length - 1);
+    } catch (e) {
+      Log.e('创建系统终端失败: $e', tag: 'TerminalTabManager');
+      Get.snackbar('创建失败', '无法拉起交互终端: $e', snackPosition: SnackPosition.BOTTOM);
     }
   }
 
@@ -132,17 +202,17 @@ class TerminalTabManager extends GetxController {
   void onClose() {
     // 清理资源
 
-    // 关闭所有系统终端的PTY
+    // 关闭所有系统终端的进程与订阅
     for (var tab in tabs) {
       if (tab.type == TerminalTabType.system) {
         try {
           tab.outputSubscription?.cancel();
+          tab.process?.kill(ProcessSignal.sigkill);
         } catch (e) {
           Log.e('清理终端资源失败: $e', tag: 'TerminalTabManager');
         }
       }
     }
-    tabs.clear();
     super.onClose();
   }
 }

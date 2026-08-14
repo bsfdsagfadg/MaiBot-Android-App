@@ -1,12 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:xterm/xterm.dart';
 
+import '../../../core/utils/file_utils.dart';
 import '../../controllers/home_controller.dart';
 import '../../controllers/terminal_tab_manager.dart';
 import 'terminal_theme.dart';
-
-/// 终端标签页视图
 class TerminalTabView extends StatefulWidget {
   const TerminalTabView({super.key});
 
@@ -88,6 +89,74 @@ class _TerminalTabViewState extends State<TerminalTabView> {
             ),
           ),
           IconButton(
+            icon: Icon(Icons.add_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
+            tooltip: '新建终端',
+            onPressed: () => manager.createNewSystemTab(),
+          ),
+          IconButton(
+            icon: Icon(Icons.copy_all_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
+            tooltip: '复制终端内容',
+            onPressed: () async {
+              final activeTab = manager.activeTab;
+              if (activeTab != null) {
+                final text = _getTerminalText(activeTab.terminal);
+                if (text.isNotEmpty) {
+                  await Clipboard.setData(ClipboardData(text: text));
+                  Get.snackbar(
+                    '已复制',
+                    '${activeTab.title} 终端内容已复制到剪贴板',
+                    snackPosition: SnackPosition.BOTTOM,
+                    duration: const Duration(seconds: 2),
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  );
+                } else {
+                  Get.snackbar(
+                    '提示',
+                    '当前终端无内容',
+                    snackPosition: SnackPosition.BOTTOM,
+                    duration: const Duration(seconds: 2),
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  );
+                }
+              }
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.save_alt_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
+            tooltip: '保存日志文件',
+            onPressed: () async {
+              final activeTab = manager.activeTab;
+              if (activeTab != null) {
+                final text = _getTerminalText(activeTab.terminal);
+                try {
+                  final dir = getMaiBotBackupDirectory();
+                  final now = DateTime.now();
+                  final timestamp =
+                      '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+                  final logFile = File('${dir.path}/terminal_${activeTab.id}_$timestamp.log');
+                  await logFile.writeAsString(text);
+                  Get.snackbar(
+                    '保存成功',
+                    '日志已导出至: ${logFile.path}',
+                    snackPosition: SnackPosition.BOTTOM,
+                    duration: const Duration(seconds: 3),
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  );
+                } catch (e) {
+                  Get.snackbar(
+                    '保存失败',
+                    '写入日志文件异常: $e',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                    duration: const Duration(seconds: 3),
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  );
+                }
+              }
+            },
+          ),
+          IconButton(
             icon: Icon(Icons.cleaning_services_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
             tooltip: '清屏',
             onPressed: () {
@@ -101,6 +170,18 @@ class _TerminalTabViewState extends State<TerminalTabView> {
         ],
       ),
     );
+  }
+
+  String _getTerminalText(Terminal terminal) {
+    final buffer = terminal.buffer;
+    final lines = <String>[];
+    for (int i = 0; i < buffer.lines.length; i++) {
+      lines.add(buffer.lines[i].toString().trimRight());
+    }
+    while (lines.isNotEmpty && lines.last.isEmpty) {
+      lines.removeLast();
+    }
+    return lines.join('\n');
   }
 
   /// 构建单个标签页项
@@ -173,7 +254,7 @@ class _TerminalTabViewState extends State<TerminalTabView> {
     return ClipRect(
       child: TerminalView(
         tab.terminal,
-        readOnly: false, // 允许终端输入与 CLI 交互
+        readOnly: tab.type == TerminalTabType.fixed, // 默认与固定终端只读，仅新建终端可写交互
         backgroundOpacity: 1,
         theme: getAppTerminalTheme(context),
       ),
