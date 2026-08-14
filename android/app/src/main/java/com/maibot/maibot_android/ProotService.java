@@ -215,7 +215,7 @@ public class ProotService extends Service {
                 history.clear();
                 historyLength = 0;
                 
-                List<String> cmd = new ArrayList<>(java.util.Arrays.asList(binPath + "/proot", "-0", "-r", ubuntuPath, "--link2symlink", "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", tmpPath + ":/tmp", "-w", "/root"));
+                List<String> cmd = new ArrayList<>(java.util.Arrays.asList(binPath + "/proot", "-0", "-r", ubuntuPath, "--link2symlink", "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", tmpPath + ":/tmp", "-b", homePath + ":/root", "-w", "/root"));
                 
                 // Fake sysdata bindings to prevent Python/uv crashes on restricted Android /proc
                 String[] fakeProcs = {".loadavg", ".stat", ".uptime", ".version", ".vmstat", ".sysctl_entry_cap_last_cap", ".sysctl_inotify_max_user_watches"};
@@ -231,7 +231,7 @@ public class ProotService extends Service {
                 
                 ProcessBuilder pb = new ProcessBuilder(cmd);
                 pb.environment().put("PATH", binPath + ":/system/bin:/system/xbin");
-                pb.environment().put("HOME", homePath);
+                pb.environment().put("HOME", "/root");
                 pb.environment().put("PROOT_TMP_DIR", tmpPath);
                 pb.environment().put("PROOT_LOADER", binPath + "/loader");
                 pb.environment().put("LD_LIBRARY_PATH", binPath);

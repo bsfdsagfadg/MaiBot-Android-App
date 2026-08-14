@@ -39,14 +39,14 @@ class InstallerService {
           final process = await Process.start('${RuntimeEnvir.binPath}/busybox', args);
           int extractedFiles = 0;
           final totalFiles = 12684; // 预估包内文件总数
-          process.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
+          process.stdout.transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter()).listen((line) {
             extractedFiles++;
             if (extractedFiles % 300 == 0 || extractedFiles == totalFiles) {
               final pct = (extractedFiles / totalFiles * 100).clamp(0, 100).toStringAsFixed(1);
               onLog('\x1b[32m[解压进度]\x1b[0m $pct% ($extractedFiles/$totalFiles)\r\n');
             }
           });
-          process.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
+          process.stderr.transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter()).listen((line) {
             // 过滤掉因为非 Root 导致的 chown 报错洪流，防止 UI 线程卡死
             if (!line.contains('chown') && !line.contains('mknod') && !line.contains('Operation not permitted')) {
               onLog('\x1b[31m[tar]\x1b[0m $line\r\n');
@@ -280,8 +280,8 @@ class InstallerService {
       
       if (onLog != null) {
         final process = await Process.start('${RuntimeEnvir.binPath}/busybox', ['wget', '-O', tmpArchive, target]);
-        process.stdout.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
-        process.stderr.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+        process.stdout.transform(const Utf8Decoder(allowMalformed: true)).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+        process.stderr.transform(const Utf8Decoder(allowMalformed: true)).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
         final exitCode = await process.exitCode;
         if (exitCode == 0) {
           downloaded = true;
@@ -354,11 +354,11 @@ class InstallerService {
       '--link2symlink',
       '-b', '/dev', '-b', '/proc', '-b', '/sys',
       '-b', '${RuntimeEnvir.tmpPath}:/tmp',
+      '-b', '${RuntimeEnvir.homePath}:/root',
       '-w', '/root',
       '/bin/sh', '-c',
       'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; $command'
     ];
-    
     if (onLog != null) {
       final process = await Process.start(prootPath, args, environment: {
         'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
@@ -366,8 +366,8 @@ class InstallerService {
         'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
       });
       
-      process.stdout.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
-      process.stderr.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+      process.stdout.transform(const Utf8Decoder(allowMalformed: true)).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+      process.stderr.transform(const Utf8Decoder(allowMalformed: true)).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
       
       final exitCode = await process.exitCode;
       return exitCode == 0;
