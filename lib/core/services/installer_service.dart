@@ -144,7 +144,11 @@ class InstallerService {
     
     if (!adapterDir.existsSync()) {
       onProgress('安装默认适配器插件...');
-      await _runInProot('git clone --depth=1 --branch main https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git /root/MaiBot/plugins/MaiBot-Napcat-Adapter', onLog: onLog);
+      for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
+        final adapterUrl = '${mirror}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git';
+        final res = await _runInProot('git clone --depth=1 --branch main $adapterUrl /root/MaiBot/plugins/MaiBot-Napcat-Adapter', onLog: onLog);
+        if (res) break;
+      }
       final adapterConfig = File('${adapterDir.path}/config.toml');
       if (adapterConfig.existsSync()) adapterConfig.deleteSync();
       
@@ -357,7 +361,7 @@ class InstallerService {
       '-b', '${RuntimeEnvir.homePath}:/root',
       '-w', '/root',
       '/bin/sh', '-c',
-      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; $command'
+      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export UV_LINK_MODE=copy; $command'
     ];
     if (onLog != null) {
       final process = await Process.start(prootPath, args, environment: {
