@@ -16,18 +16,21 @@ class InstallerService {
     final ubuntuDir = Directory(scripts.ubuntuPath);
     
     // 1. 原生解压 (Native Extraction)
+    final rootfsMarker = File('${scripts.ubuntuPath}/.rootfs_ready');
     bool isExtracted = false;
-    if (ubuntuDir.existsSync()) {
+    if (ubuntuDir.existsSync() && rootfsMarker.existsSync()) {
       final coreFile = File('${scripts.ubuntuPath}/bin/bash');
       if (coreFile.existsSync()) {
         isExtracted = true;
-      } else {
-        // 核心文件不存在，说明解压不完整（如系统自动备份恢复导致残缺），删除重压
-        ubuntuDir.deleteSync(recursive: true);
       }
     }
     
     if (!isExtracted) {
+      if (ubuntuDir.existsSync()) {
+        try {
+          ubuntuDir.deleteSync(recursive: true);
+        } catch (_) {}
+      }
       onProgress('正在解压 Ubuntu 根文件系统...');
       try {
         final archivePath = '${RuntimeEnvir.homePath}/${Config.ubuntuFileName}';
@@ -48,12 +51,11 @@ class InstallerService {
             }
           });
           process.stderr.transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter()).listen((line) {
-            // 过滤掉因为非 Root 导致的 chown 报错洪流，防止 UI 线程卡死
             if (!line.contains('chown') && !line.contains('mknod') && !line.contains('Operation not permitted')) {
               onLog('\x1b[31m[tar]\x1b[0m $line\r\n');
             }
           });
-          await process.exitCode; // 忽略可能存在的 chown 权限警告报错
+          await process.exitCode;
         } else {
           await Process.run('${RuntimeEnvir.binPath}/busybox', args);
         }
@@ -64,21 +66,24 @@ class InstallerService {
           extractedDir.renameSync(scripts.ubuntuPath);
         }
 
-        // 2. DNS 与 APT 环境注入
-        onProgress('配置网络代理与 DNS...');
+        // 标记 Rootfs 解压完成
+        rootfsMarker.writeAsStringSync('ready');
+
+        // 2. DNS 与系统环境注入
+        onProgress('配置网络代理与系统参数...');
         _writeNetworkConfigs(onLog);
-
-        onProgress('正在安装系统基础依赖...');
-        final aptSuccess = await _runInProot('apt-get update && apt-get install -y sudo wget git curl', onLog: onLog);
-        if (!aptSuccess) return false;
-
-
       } catch (e) {
         Log.e('解压过程发生异常: $e', tag: 'InstallerService');
         return false;
       }
     }
 
+    // 2. 独立自愈校验系统依赖（git, curl, wget, sudo 等）
+    final depSuccess = await _ensureSystemDependencies(onProgress, onLog);
+    if (!depSuccess) {
+      Log.e('系统基础依赖修复/安装失败', tag: 'InstallerService');
+      return false;
+    }
     try {
       // 1.5 备份解析与恢复扫描
     bool hasBackupData = false;
@@ -114,8 +119,10 @@ class InstallerService {
       }
     }
 
+    // 3. 校验并安装 uv
     final uvExecutable = File('${scripts.ubuntuPath}/root/.local/bin/uv');
-    if (!uvExecutable.existsSync()) {
+    final uvxExecutable = File('${scripts.ubuntuPath}/root/.local/bin/uvx');
+    if (!uvExecutable.existsSync() || uvExecutable.lengthSync() < 10000 || !uvxExecutable.existsSync()) {
       onProgress('正在下载并安装 Python 依赖管理器 (uv)...');
       final success = await _downloadAndInstallUv(onLog);
       if (!success) return false;
@@ -123,7 +130,9 @@ class InstallerService {
 
     // 4. 克隆 MaiBot
     final maibotDir = Directory('${scripts.ubuntuPath}/root/MaiBot');
-    if (!maibotDir.existsSync() || !File('${maibotDir.path}/bot.py').existsSync()) {
+    final botPy = File('${maibotDir.path}/bot.py');
+    final pyproject = File('${maibotDir.path}/pyproject.toml');
+    if (!maibotDir.existsSync() || !botPy.existsSync() || !pyproject.existsSync()) {
       if (maibotDir.existsSync()) {
         await _runInProot('rm -rf /root/MaiBot');
       }
@@ -135,6 +144,8 @@ class InstallerService {
     // 4.5 恢复插件与默认适配器克隆
     final pluginsDir = Directory('${scripts.ubuntuPath}/root/MaiBot/plugins');
     final adapterDir = Directory('${pluginsDir.path}/MaiBot-Napcat-Adapter');
+    final adapterMain = File('${adapterDir.path}/adapter.py');
+    final adapterInit = File('${adapterDir.path}/__init__.py');
     
     if (hasBackupPlugins) {
       onProgress('正在从备份中恢复插件...');
@@ -143,7 +154,10 @@ class InstallerService {
       await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/plugins/', '${scripts.ubuntuPath}/root/MaiBot/']);
     }
     
-    if (!adapterDir.existsSync()) {
+    if (!adapterDir.existsSync() || (!adapterMain.existsSync() && !adapterInit.existsSync())) {
+      if (adapterDir.existsSync()) {
+        await _runInProot('rm -rf /root/MaiBot/plugins/MaiBot-Napcat-Adapter');
+      }
       onProgress('安装默认适配器插件...');
       for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
         final adapterUrl = '${mirror}https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git';
@@ -177,21 +191,31 @@ class InstallerService {
         await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/config/*', '${configDir.path}/']);
       }
     }
-
+    // 5. 同步 Python 依赖库
     final venvDir = Directory('${scripts.ubuntuPath}/root/MaiBot/.venv');
-    if (!venvDir.existsSync()) {
+    final venvMarker = File('${venvDir.path}/.venv_sync_done');
+    final pythonBin = File('${venvDir.path}/bin/python');
+    if (!venvDir.existsSync() || !venvMarker.existsSync() || !pythonBin.existsSync()) {
+      if (venvDir.existsSync() && !venvMarker.existsSync()) {
+        // 说明上次依赖安装到一半被中断，清理未完成的残破虚拟环境以防幽灵缺失
+        await _runInProot('rm -rf /root/MaiBot/.venv');
+      }
       onProgress('正在同步 Python 依赖库 (可能需要几分钟)...');
       final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync', onLog: onLog);
       if (!success) return false;
       await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install pip', onLog: onLog);
       if (!success) return false;
+      venvMarker.writeAsStringSync('ready');
     }
+
     // 6. 安装 NapCat
     final napcatDir = Directory('${scripts.ubuntuPath}/root/napcat');
     final qqBinary = File('${scripts.ubuntuPath}/opt/QQ/qq');
-    if (!napcatDir.existsSync() || !qqBinary.existsSync()) {
+    final launcherSh = File('${scripts.ubuntuPath}/root/launcher.sh');
+    final napcatEntry = File('${napcatDir.path}/napcat.mjs');
+    if (!napcatDir.existsSync() || !qqBinary.existsSync() || !launcherSh.existsSync() || !napcatEntry.existsSync()) {
       onProgress('正在清理依赖并下载 NapCatQQ 组件...');
-      await _runInProot('echo "[APT] 检查并修复破损的系统包..." && apt-get --fix-broken install -y', onLog: onLog);
+      await _runInProot('echo "[APT] 检查并修复破损的系统包..." && dpkg --configure -a || true && apt-get --fix-broken install -y', onLog: onLog);
       onProgress('正在下载 NapCatQQ 组件...');
       bool downloaded = false;
       for (final mirror in ['https://ghfast.top/', 'https://gh-proxy.com/', 'https://mirror.ghproxy.com/', '']) {
@@ -255,17 +279,64 @@ class InstallerService {
       final vmstat = File('${procDir.path}/.vmstat');
       if (!vmstat.existsSync()) vmstat.writeAsStringSync('nr_free_pages 100000\n');
 
-      onLog?.call('\x1b[32m[APT]\x1b[0m 正在配置 Tsinghua 镜像源...\r\n');
-      
-      final sourcesList = File('${scripts.ubuntuPath}/etc/apt/sources.list');
-      sourcesList.writeAsStringSync(
-        'deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ noble main restricted universe multiverse\n'
-        'deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ noble-updates main restricted universe multiverse\n'
-        'deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ noble-security main restricted universe multiverse\n'
-      );
+      _writeSourcesList('http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/', onLog);
     } catch (e) {
       Log.e('Failed to write network configs: $e', tag: 'InstallerService');
     }
+  }
+
+  static void _writeSourcesList(String mirrorUrl, Function(String)? onLog) {
+    try {
+      onLog?.call('\x1b[32m[APT]\x1b[0m 配置镜像源 -> $mirrorUrl\r\n');
+      final sourcesList = File('${scripts.ubuntuPath}/etc/apt/sources.list');
+      sourcesList.writeAsStringSync(
+        'deb $mirrorUrl noble main restricted universe multiverse\n'
+        'deb $mirrorUrl noble-updates main restricted universe multiverse\n'
+        'deb $mirrorUrl noble-security main restricted universe multiverse\n'
+      );
+    } catch (e) {
+      Log.e('Failed to write sources.list: $e', tag: 'InstallerService');
+    }
+  }
+
+  /// 检查系统核心依赖，缺失时自动多镜像源尝试自愈修复
+  static Future<bool> _ensureSystemDependencies(Function(String) onProgress, Function(String)? onLog) async {
+    final gitBinary = File('${scripts.ubuntuPath}/usr/bin/git');
+    final curlBinary = File('${scripts.ubuntuPath}/usr/bin/curl');
+    final wgetBinary = File('${scripts.ubuntuPath}/usr/bin/wget');
+    final sudoBinary = File('${scripts.ubuntuPath}/usr/bin/sudo');
+
+    // 核心依赖全部完好，直接跳过（零耗时，秒级通过）
+    if (gitBinary.existsSync() && curlBinary.existsSync() && wgetBinary.existsSync() && sudoBinary.existsSync()) {
+      return true;
+    }
+
+    onProgress('正在检查并安装系统运行依赖 (git/curl/wget)...');
+    _writeNetworkConfigs(onLog);
+
+    const aptMirrors = [
+      'http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/',
+      'http://mirrors.ustc.edu.cn/ubuntu-ports/',
+      'http://mirrors.aliyun.com/ubuntu-ports/',
+      'http://ports.ubuntu.com/ubuntu-ports/',
+    ];
+
+    for (final mirror in aptMirrors) {
+      _writeSourcesList(mirror, onLog);
+      
+      // 包含自动解 dpkg 锁、修复破损包与非交互式安装
+      final repairCmd = 
+          'dpkg --configure -a || true; '
+          'apt-get --fix-broken install -y || true; '
+          'apt-get update && apt-get install -y --no-install-recommends sudo wget git curl ca-certificates';
+      
+      final success = await _runInProot(repairCmd, onLog: onLog, timeout: const Duration(minutes: 5));
+      if (success && gitBinary.existsSync() && curlBinary.existsSync()) {
+        return true;
+      }
+    }
+
+    return gitBinary.existsSync();
   }
 
   static Future<bool> _downloadAndInstallUv(Function(String)? onLog) async {

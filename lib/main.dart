@@ -12,6 +12,7 @@ import 'core/services/env_bootstrapper.dart';
 import 'core/services/foreground_service.dart';
 import 'ui/routes/app_routes.dart';
 import 'ui/controllers/home_controller.dart';
+import 'ui/controllers/theme_controller.dart';
 
 // Notice: behavior will submit Device
 
@@ -93,23 +94,24 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: 'MaiBot Android',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.primaries[3],
-      ),
-      // locale: const Locale('zh', 'CN'),
-      // locale: const Locale('en'),
-      localizationsDelegates: const [
-        S.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: S.delegate.supportedLocales,
-      // 使用路由管理
-      initialRoute: AppRoutes.terminal,
-      getPages: AppRoutes.routes,
-    );
+    final ThemeController themeController = Get.put(ThemeController(), permanent: true);
+
+    return Obx(() {
+      return GetMaterialApp(
+        title: 'MaiBot Android',
+        theme: themeController.getLightTheme(),
+        darkTheme: themeController.getDarkTheme(),
+        themeMode: themeController.currentThemeMode.value,
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        initialRoute: AppRoutes.terminal,
+        getPages: AppRoutes.routes,
+      );
+    });
   }
 }

@@ -18,6 +18,7 @@ import 'dialogs/git_clone_dialog.dart';
 import 'keep_alive_settings_page.dart';
 import 'maintenance_actions.dart';
 
+import '../../controllers/theme_controller.dart';
 class SettingsPage extends StatefulWidget {
   final WebViewController maiBotController;
   final WebViewController napCatController;
@@ -157,9 +158,10 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
+    final ThemeController themeController = Get.find<ThemeController>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FA),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
@@ -172,6 +174,9 @@ class _SettingsPageState extends State<SettingsPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                _buildSectionHeader('界面与主题', Icons.palette_rounded),
+                _buildThemeCard(themeController),
+                const SizedBox(height: 16),
                 _buildSectionHeader('常用操作', Icons.tune_rounded),
                 _buildCard([
                   _buildSettingTile(
@@ -576,17 +581,22 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildCard(List<Widget> children, {Color? backgroundColor, Color? borderColor}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardBg = backgroundColor ?? (isDark ? const Color(0xFF1E2228) : Colors.white);
+    final borderCol = borderColor ?? (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05));
+
     return Container(
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: borderColor ?? Colors.black.withValues(alpha: 0.05),
+          color: borderCol,
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -597,6 +607,160 @@ class _SettingsPageState extends State<SettingsPage> {
         children: children,
       ),
     );
+  }
+
+  Widget _buildThemeCard(ThemeController controller) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return _buildCard([
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.color_lens_rounded, color: theme.colorScheme.primary, size: 22),
+                ),
+                const SizedBox(width: 14),
+                const Text(
+                  '主题色调',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                ),
+                const Spacer(),
+                Obx(() => Text(
+                      controller.currentSeedName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: controller.currentSeedColor,
+                      ),
+                    )),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // 色彩选择器横向列表
+            SizedBox(
+              height: 48,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: ThemeController.presetColors.length,
+                itemBuilder: (context, index) {
+                  final item = ThemeController.presetColors[index];
+                  return Obx(() {
+                    final isSelected = controller.selectedColorIndex.value == index;
+                    return GestureDetector(
+                      onTap: () => controller.setColorIndex(index),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: item.color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? Colors.white : Colors.transparent,
+                            width: 2.5,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: item.color.withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                  )
+                                ]
+                              : null,
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
+                            : null,
+                      ),
+                    );
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      const Divider(height: 1, indent: 56),
+      // 主题模式选择
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.brightness_medium_rounded, color: Colors.amber, size: 22),
+            ),
+            const SizedBox(width: 14),
+            const Text(
+              '显示模式',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+            const Spacer(),
+            Obx(() {
+              final mode = controller.currentThemeMode.value;
+              return SegmentedButton<ThemeMode>(
+                showSelectedIcon: false,
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                segments: const [
+                  ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.auto_mode_rounded, size: 16), label: Text('自动', style: TextStyle(fontSize: 12))),
+                  ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded, size: 16), label: Text('浅色', style: TextStyle(fontSize: 12))),
+                  ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_rounded, size: 16), label: Text('深色', style: TextStyle(fontSize: 12))),
+                ],
+                selected: {mode},
+                onSelectionChanged: (Set<ThemeMode> newSelection) {
+                  controller.setThemeMode(newSelection.first);
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+      Obx(() {
+        final mode = controller.currentThemeMode.value;
+        final isSystemDark = mode == ThemeMode.system && isDark;
+        if (mode == ThemeMode.dark || isSystemDark) {
+          return Column(
+            children: [
+              const Divider(height: 1, indent: 56),
+              SwitchListTile(
+                secondary: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blueGrey.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.contrast_rounded, color: Colors.blueGrey, size: 22),
+                ),
+                title: const Text('AMOLED 纯黑暗色', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                subtitle: const Text('纯黑底色背景，降低 OLED 屏幕功耗', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                value: controller.isAmoledDark.value,
+                activeThumbColor: theme.colorScheme.primary,
+                onChanged: (bool value) => controller.setAmoledDark(value),
+              ),
+            ],
+          );
+        }
+        return const SizedBox.shrink();
+      }),
+    ]);
   }
 
   Widget _buildSettingTile({
