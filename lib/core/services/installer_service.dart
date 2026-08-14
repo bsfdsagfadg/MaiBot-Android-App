@@ -123,7 +123,10 @@ class InstallerService {
 
     // 4. 克隆 MaiBot
     final maibotDir = Directory('${RuntimeEnvir.homePath}/MaiBot');
-    if (!maibotDir.existsSync()) {
+    if (!maibotDir.existsSync() || !File('${maibotDir.path}/bot.py').existsSync()) {
+      if (maibotDir.existsSync()) {
+        await _runInProot('rm -rf /root/MaiBot');
+      }
       onProgress('正在拉取 MaiBot 核心源码...');
       final success = await _cloneMaibot(onLog);
       if (!success) return false;
@@ -133,13 +136,14 @@ class InstallerService {
     final pluginsDir = Directory('${RuntimeEnvir.homePath}/MaiBot/plugins');
     final adapterDir = Directory('${pluginsDir.path}/MaiBot-Napcat-Adapter');
     
-    bool shouldRestorePlugins = !pluginsDir.existsSync() || pluginsDir.listSync().where((e) => !e.path.endsWith('__pycache__') && !e.path.endsWith('__init__.py') && !e.path.endsWith('hello_world_plugin')).isEmpty;
-    
-    if (hasBackupPlugins && shouldRestorePlugins) {
+    if (hasBackupPlugins) {
       onProgress('正在从备份中恢复插件...');
+      await _runInProot('rm -rf /root/MaiBot/plugins/*');
       if (!pluginsDir.existsSync()) pluginsDir.createSync(recursive: true);
-      await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/plugins/*', '${pluginsDir.path}/']);
-    } else if (!adapterDir.existsSync()) {
+      await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/plugins/', '${RuntimeEnvir.homePath}/MaiBot/']);
+    }
+    
+    if (!adapterDir.existsSync()) {
       onProgress('安装默认适配器插件...');
       await _runInProot('git clone --depth=1 --branch main https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git /root/MaiBot/plugins/MaiBot-Napcat-Adapter', onLog: onLog);
       final adapterConfig = File('${adapterDir.path}/config.toml');
@@ -151,7 +155,6 @@ class InstallerService {
         backupAdapterConfig.copySync(adapterConfig.path);
       }
     }
-
     // 4.6 恢复数据与配置
     final dataDir = Directory('${RuntimeEnvir.homePath}/MaiBot/data');
     if (!dataDir.existsSync() || dataDir.listSync().isEmpty) {
