@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
@@ -96,22 +97,28 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final ThemeController themeController = Get.put(ThemeController(), permanent: true);
 
-    return Obx(() {
-      return GetMaterialApp(
-        title: 'MaiBot Android',
-        theme: themeController.getLightTheme(),
-        darkTheme: themeController.getDarkTheme(),
-        themeMode: themeController.currentThemeMode.value,
-        localizationsDelegates: const [
-          S.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: S.delegate.supportedLocales,
-        initialRoute: AppRoutes.terminal,
-        getPages: AppRoutes.routes,
-      );
-    });
+    return DynamicColorBuilder(
+      builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
+        themeController.updateSystemDynamicSchemes(lightDynamic, darkDynamic);
+
+        return Obx(() {
+          return GetMaterialApp(
+            title: 'MaiBot Android',
+            theme: themeController.getLightTheme(dynamicLightScheme: lightDynamic),
+            darkTheme: themeController.getDarkTheme(dynamicDarkScheme: darkDynamic),
+            themeMode: themeController.currentThemeMode.value,
+            localizationsDelegates: const [
+              S.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: S.delegate.supportedLocales,
+            initialRoute: AppRoutes.terminal,
+            getPages: AppRoutes.routes,
+          );
+        });
+      },
+    );
   }
 }

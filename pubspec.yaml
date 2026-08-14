@@ -37,6 +37,7 @@ dependencies:
   global_repository:
     path: ./packages/global_repository
   shizuku_api: ^1.2.2
+  dynamic_color: ^1.9.0
 
 dependency_overrides:
   xterm:

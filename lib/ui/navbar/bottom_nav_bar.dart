@@ -26,65 +26,44 @@ class WebViewBottomNavBar extends StatelessWidget {
       final customWebViews = homeController.webviewController.customWebViews;
 
       // 动态构建导航栏项目
-      final List<BottomNavigationBarItem> navItems = [
-        const BottomNavigationBarItem(
+      final List<NavigationDestination> destinations = [
+        const NavigationDestination(
           icon: Icon(Icons.smart_toy_outlined),
-          activeIcon: Icon(Icons.smart_toy_rounded),
+          selectedIcon: Icon(Icons.smart_toy_rounded),
           label: 'MaiBot',
         ),
         if (napCatEnabled)
-          const BottomNavigationBarItem(
+          const NavigationDestination(
             icon: Icon(Icons.pets_outlined),
-            activeIcon: Icon(Icons.pets_rounded),
+            selectedIcon: Icon(Icons.pets_rounded),
             label: 'NapCat',
           ),
         // 添加自定义 WebView 项
-        ...customWebViews.map((webview) => BottomNavigationBarItem(
+        ...customWebViews.map((webview) => NavigationDestination(
               icon: const Icon(Icons.language_outlined),
-              activeIcon: const Icon(Icons.language_rounded),
+              selectedIcon: const Icon(Icons.language_rounded),
               label: webview['title'] ?? 'WebUI',
             )),
-        const BottomNavigationBarItem(
+        const NavigationDestination(
           icon: Icon(Icons.terminal_outlined),
-          activeIcon: Icon(Icons.terminal_rounded),
+          selectedIcon: Icon(Icons.terminal_rounded),
           label: '终端',
         ),
-        const BottomNavigationBarItem(
+        const NavigationDestination(
           icon: Icon(Icons.settings_outlined),
-          activeIcon: Icon(Icons.settings_rounded),
+          selectedIcon: Icon(Icons.settings_rounded),
           label: '设置',
         ),
       ];
 
-      final theme = Theme.of(context);
-      final primaryColor = theme.colorScheme.primary;
+      final int selectedIndex = currentIndex >= destinations.length
+          ? destinations.length - 1
+          : currentIndex;
 
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            top: BorderSide(
-              color: Colors.black.withValues(alpha: 0.06),
-              width: 1,
-            ),
-          ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: currentIndex >= navItems.length
-              ? navItems.length - 1
-              : currentIndex,
-          onTap: onTap,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          elevation: 0,
-          selectedItemColor: primaryColor,
-          unselectedItemColor: Colors.black45,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
-          items: navItems,
-        ),
+      return NavigationBar(
+        selectedIndex: selectedIndex,
+        onDestinationSelected: onTap,
+        destinations: destinations,
       );
     });
   }

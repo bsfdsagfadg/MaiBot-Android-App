@@ -560,18 +560,24 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildSectionHeader(String title, IconData icon, {bool isDanger = false}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final color = isDanger
+        ? (isDark ? const Color(0xFFFF8A80) : Colors.red.shade700)
+        : theme.colorScheme.onSurfaceVariant;
+
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: isDanger ? Colors.red.shade700 : Colors.black54),
+          Icon(icon, size: 18, color: color),
           const SizedBox(width: 6),
           Text(
             title,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: isDanger ? Colors.red.shade700 : Colors.black54,
+              color: color,
               letterSpacing: 0.2,
             ),
           ),
@@ -583,25 +589,18 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildCard(List<Widget> children, {Color? backgroundColor, Color? borderColor}) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final cardBg = backgroundColor ?? (isDark ? const Color(0xFF1E2228) : Colors.white);
-    final borderCol = borderColor ?? (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05));
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cardBg,
+    return Card(
+      elevation: 0,
+      color: backgroundColor ?? (isDark ? theme.colorScheme.surfaceContainerLow : theme.colorScheme.surfaceContainerLow),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: borderCol,
+        side: BorderSide(
+          color: borderColor ?? theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.3 : 0.4),
           width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: children,
@@ -656,6 +655,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   final item = ThemeController.presetColors[index];
                   return Obx(() {
                     final isSelected = controller.selectedColorIndex.value == index;
+                    final displayColor = item.isDynamic
+                        ? (controller.isDynamicSelected ? theme.colorScheme.primary : const Color(0xFF6750A4))
+                        : item.color!;
+
                     return GestureDetector(
                       onTap: () => controller.setColorIndex(index),
                       child: Container(
@@ -663,25 +666,31 @@ class _SettingsPageState extends State<SettingsPage> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: item.color,
+                          color: displayColor,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: isSelected ? Colors.white : Colors.transparent,
+                            color: isSelected ? theme.colorScheme.onSurface : Colors.transparent,
                             width: 2.5,
                           ),
                           boxShadow: isSelected
                               ? [
                                   BoxShadow(
-                                    color: item.color.withValues(alpha: 0.5),
+                                    color: displayColor.withValues(alpha: 0.45),
                                     blurRadius: 8,
                                     spreadRadius: 1,
                                   )
                                 ]
                               : null,
                         ),
-                        child: isSelected
-                            ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
-                            : null,
+                        child: item.isDynamic
+                            ? Icon(
+                                isSelected ? Icons.check_rounded : Icons.auto_awesome_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              )
+                            : (isSelected
+                                ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
+                                : null),
                       ),
                     );
                   });
