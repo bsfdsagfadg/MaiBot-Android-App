@@ -53,12 +53,22 @@ void showAddWebViewDialog(WebviewController controller) {
               );
               return;
             }
-
             // 如果URL不包含协议前缀,自动添加 http://127.0.0.1:
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
               url = 'http://127.0.0.1:$url';
             }
 
+            final parsedUri = Uri.tryParse(url);
+            if (parsedUri == null || (parsedUri.scheme != 'http' && parsedUri.scheme != 'https')) {
+              Get.snackbar(
+                'URL 格式无效',
+                '请输入有效的 http 或 https 地址',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+              );
+              return;
+            }
             controller.addCustomWebView(title, url);
             Get.back();
 
@@ -133,12 +143,22 @@ void showEditWebViewDialog(
               );
               return;
             }
-
             // 如果URL不包含协议前缀,自动添加 http://127.0.0.1:
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
               url = 'http://127.0.0.1:$url';
             }
 
+            final parsedUri = Uri.tryParse(url);
+            if (parsedUri == null || (parsedUri.scheme != 'http' && parsedUri.scheme != 'https')) {
+              Get.snackbar(
+                'URL 格式无效',
+                '请输入有效的 http 或 https 地址',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+              );
+              return;
+            }
             controller.updateCustomWebView(index, title, url);
             Get.back();
 

@@ -6,6 +6,7 @@ import 'package:global_repository/global_repository.dart';
 
 import '../constants/scripts.dart' as scripts;
 import 'foreground_service.dart';
+import '../utils/file_utils.dart';
 
 /// 备份服务：将 MaiBot 数据打包到手机下载目录
 class BackupService {
@@ -66,7 +67,7 @@ class BackupService {
       }
 
       // 备份文件路径（保存到下载文件夹）
-      final backupDir = Directory('/storage/emulated/0/Download/MaiBot');
+      final backupDir = getMaiBotBackupDirectory();
       if (!await backupDir.exists()) {
         await backupDir.create(recursive: true);
       }

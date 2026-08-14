@@ -53,8 +53,11 @@ public class ProotService extends Service {
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentIntent(pendingIntent)
                 .build();
-        startForeground(1002, notification);
-
+        try {
+            startForeground(1002, notification);
+        } catch (Exception e) {
+            Log.e(TAG, "startForeground error", e);
+        }
         if (intent != null) {
             String action = intent.getAction();
             if ("STOP".equals(action)) {
@@ -170,7 +173,9 @@ public class ProotService extends Service {
             if (isStopped) return;
             try {
                 if (serverSocket == null) {
-                    serverSocket = new ServerSocket(port);
+                    serverSocket = new ServerSocket();
+                    serverSocket.setReuseAddress(true);
+                    serverSocket.bind(new java.net.InetSocketAddress("127.0.0.1", port));
                     new Thread(() -> {
                         while (!isStopped) {
                             try {
@@ -252,22 +257,28 @@ public class ProotService extends Service {
                         while ((read = stdout.read(buffer)) != -1) {
                             byte[] chunk = new byte[read];
                             System.arraycopy(buffer, 0, chunk, 0, read);
+                            List<Socket> currentClients;
                             synchronized (clients) {
                                 history.add(chunk);
                                 historyLength += read;
                                 while (historyLength > MAX_HISTORY && history.size() > 1) {
                                     historyLength -= history.removeFirst().length;
                                 }
-                                List<Socket> deadClients = new ArrayList<>();
-                                for (Socket client : clients) {
-                                    try {
-                                        client.getOutputStream().write(chunk);
-                                    } catch (IOException e) {
-                                        try { client.close(); } catch (IOException ex) {}
-                                        deadClients.add(client);
-                                    }
+                                currentClients = new ArrayList<>(clients);
+                            }
+                            List<Socket> deadClients = new ArrayList<>();
+                            for (Socket client : currentClients) {
+                                try {
+                                    client.getOutputStream().write(chunk);
+                                } catch (IOException e) {
+                                    try { client.close(); } catch (IOException ex) {}
+                                    deadClients.add(client);
                                 }
-                                clients.removeAll(deadClients);
+                            }
+                            if (!deadClients.isEmpty()) {
+                                synchronized (clients) {
+                                    clients.removeAll(deadClients);
+                                }
                             }
                         }
                     } catch (IOException e) {

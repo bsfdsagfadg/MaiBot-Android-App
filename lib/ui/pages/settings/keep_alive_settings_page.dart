@@ -43,9 +43,11 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     if (!Platform.isAndroid) return;
     try {
       final status = await Permission.ignoreBatteryOptimizations.status;
-      setState(() {
-        _isBatteryOptimizationIgnored = status.isGranted;
-      });
+      if (mounted) {
+        setState(() {
+          _isBatteryOptimizationIgnored = status.isGranted;
+        });
+      }
     } catch (e) {
       Log.e('检查电池优化豁免状态失败: $e', tag: 'MaiBot');
     }
@@ -57,18 +59,22 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     try {
       final isBinderRunning = await _shizukuApi.pingBinder() ?? false;
       if (!isBinderRunning) {
-        setState(() {
-          _shizukuAvailable = false;
-          _shizukuPermissionGranted = false;
-        });
+        if (mounted) {
+          setState(() {
+            _shizukuAvailable = false;
+            _shizukuPermissionGranted = false;
+          });
+        }
         return;
       }
 
       final hasPermission = await _shizukuApi.checkPermission() ?? false;
-      setState(() {
-        _shizukuAvailable = isBinderRunning;
-        _shizukuPermissionGranted = hasPermission;
-      });
+      if (mounted) {
+        setState(() {
+          _shizukuAvailable = isBinderRunning;
+          _shizukuPermissionGranted = hasPermission;
+        });
+      }
 
       if (hasPermission) {
         // 1. 查询 Doze 白名单
@@ -89,11 +95,13 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
         final isPhantomIncreased = phantomOut != null &&
             phantomOut.contains('max_phantom_processes=64');
 
-        setState(() {
-          _shizukuDozeWhitelist = isDozeWhitelisted;
-          _shizukuRunAnyInBackground = isRunAnyAllowed;
-          _shizukuPhantomProcessLimit = isPhantomIncreased;
-        });
+        if (mounted) {
+          setState(() {
+            _shizukuDozeWhitelist = isDozeWhitelisted;
+            _shizukuRunAnyInBackground = isRunAnyAllowed;
+            _shizukuPhantomProcessLimit = isPhantomIncreased;
+          });
+        }
       }
     } catch (e) {
       Log.e('检查 Shizuku 状态失败: $e', tag: 'KeepAliveSettingsPage');

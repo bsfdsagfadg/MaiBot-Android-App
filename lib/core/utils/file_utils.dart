@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
@@ -12,6 +13,29 @@ MethodChannel _channel = const MethodChannel(Config.methodChannel);
 /// Gets the path of the Apk So library
 Future<String> getLibPath() async {
   return await _channel.invokeMethod('lib_path');
+}
+
+/// 获取 MaiBot 备份与数据持久化下载目录，按优先级自适应探测不同 Android 分身/主系统路径
+Directory getMaiBotBackupDirectory() {
+  const candidates = [
+    '/storage/emulated/0/Download/MaiBot',
+    '/sdcard/Download/MaiBot',
+    '/storage/self/primary/Download/MaiBot',
+  ];
+  for (final path in candidates) {
+    final dir = Directory(path);
+    if (dir.existsSync()) {
+      return dir;
+    }
+  }
+  // 默认选用首选路径
+  final primary = Directory(candidates.first);
+  try {
+    if (!primary.existsSync()) {
+      primary.createSync(recursive: true);
+    }
+  } catch (_) {}
+  return primary;
 }
 
 

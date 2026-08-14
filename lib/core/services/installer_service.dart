@@ -6,6 +6,7 @@ import 'package:settings/settings.dart';
 
 import '../config/app_config.dart';
 import '../constants/scripts.dart' as scripts;
+import '../utils/file_utils.dart';
 class InstallerService {
   static Future<bool> runInstallPipeline({
     required Function(String) onProgress,
@@ -85,7 +86,7 @@ class InstallerService {
     bool hasBackupPlugins = false;
     bool hasBackupNapcat = false;
     
-    final backupDir = Directory('/sdcard/Download/MaiBot');
+    final backupDir = getMaiBotBackupDirectory();
     final restoreTempDir = Directory('${RuntimeEnvir.tmpPath}/backup_restore');
     final restoreMarker = File('${RuntimeEnvir.tmpPath}/.restore_complete');
     
@@ -352,7 +353,7 @@ class InstallerService {
     return false;
   }
 
-  static Future<bool> _runInProot(String command, {Function(String)? onLog}) async {
+  static Future<bool> _runInProot(String command, {Function(String)? onLog, Duration timeout = const Duration(minutes: 10)}) async {
     final prootPath = '${RuntimeEnvir.binPath}/proot';
     final args = [
       '-0', '-r', scripts.ubuntuPath,
@@ -362,27 +363,44 @@ class InstallerService {
       '-b', '${RuntimeEnvir.tmpPath}:/dev/shm',
       '-w', '/root',
       '/bin/sh', '-c',
-      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export UV_LINK_MODE=copy; $command'
+      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export DEBIAN_FRONTEND=noninteractive; export GIT_TERMINAL_PROMPT=0; export UV_LINK_MODE=copy; $command'
     ];
+    final env = {
+      'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
+      'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
+      'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
+    };
     if (onLog != null) {
-      final process = await Process.start(prootPath, args, environment: {
-        'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
-        'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
-        'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
-      });
+      final process = await Process.start(prootPath, args, environment: env);
       
-      process.stdout.transform(const Utf8Decoder(allowMalformed: true)).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
-      process.stderr.transform(const Utf8Decoder(allowMalformed: true)).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+      process.stdout.transform(const Utf8Decoder(allowMalformed: true)).listen(
+        (data) => onLog(data.replaceAll('\n', '\r\n')),
+        onError: (_) {},
+      );
+      process.stderr.transform(const Utf8Decoder(allowMalformed: true)).listen(
+        (data) => onLog(data.replaceAll('\n', '\r\n')),
+        onError: (_) {},
+      );
       
-      final exitCode = await process.exitCode;
-      return exitCode == 0;
+      try {
+        final exitCode = await process.exitCode.timeout(timeout, onTimeout: () {
+          process.kill(ProcessSignal.sigkill);
+          return -1;
+        });
+        return exitCode == 0;
+      } catch (e) {
+        process.kill(ProcessSignal.sigkill);
+        return false;
+      }
     } else {
-      final res = await Process.run(prootPath, args, environment: {
-        'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
-        'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
-        'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
-      });
-      return res.exitCode == 0;
+      try {
+        final res = await Process.run(prootPath, args, environment: env).timeout(timeout, onTimeout: () {
+          return ProcessResult(-1, -1, '', 'Timed out');
+        });
+        return res.exitCode == 0;
+      } catch (e) {
+        return false;
+      }
     }
   }
 }
