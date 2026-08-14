@@ -63,7 +63,7 @@ class InstallerService {
         }
 
         onProgress('正在扫描并修复受损的软/硬链接...');
-        await _restoreArchiveLinks(archivePath);
+        await _restoreArchiveLinks(archivePath, onLog);
       } catch (e) {
         Log.e('解压过程发生异常: $e', tag: 'InstallerService');
         return false;
@@ -107,13 +107,17 @@ class InstallerService {
 
       // 2. DNS 与 APT 环境注入
       onProgress('配置网络代理与 DNS...');
-      _writeNetworkConfigs();
+      _writeNetworkConfigs(onLog);
+
+      onProgress('正在安装系统基础依赖...');
+      final aptSuccess = await _runInProot('apt-get update && apt-get install -y sudo wget git curl', onLog: onLog);
+      if (!aptSuccess) return false;
 
     // 3. 安装 UV
     final uvExecutable = File('${RuntimeEnvir.homePath}/.local/bin/uv');
     if (!uvExecutable.existsSync()) {
       onProgress('正在下载并安装 Python 依赖管理器 (uv)...');
-      final success = await _downloadAndInstallUv();
+      final success = await _downloadAndInstallUv(onLog);
       if (!success) return false;
     }
 
@@ -214,8 +218,9 @@ class InstallerService {
   }
   }
 
-  static void _writeNetworkConfigs() {
+  static void _writeNetworkConfigs(Function(String)? onLog) {
     try {
+      onLog?.call('\x1b[32m[DNS]\x1b[0m 正在写入 resolv.conf...\r\n');
       final resolvConf = File('${scripts.ubuntuPath}/etc/resolv.conf');
       resolvConf.writeAsStringSync('nameserver 223.5.5.5\nnameserver 114.114.114.114\nnameserver 8.8.8.8\n');
 
@@ -224,6 +229,20 @@ class InstallerService {
       
       final networkConf = File('${aptConfDir.path}/99custom-network');
       networkConf.writeAsStringSync('Acquire::http::Pipeline-Depth "0";\nAcquire::Retries "3";\n');
+      
+      onLog?.call('\x1b[32m[Sysdata]\x1b[0m 正在配置伪装系统信息...\r\n');
+      final procDir = Directory('${scripts.ubuntuPath}/proc');
+      if (!procDir.existsSync()) procDir.createSync(recursive: true);
+      final loadavg = File('${procDir.path}/.loadavg');
+      if (!loadavg.existsSync()) loadavg.writeAsStringSync('0.12 0.07 0.02 2/165 765\n');
+      final stat = File('${procDir.path}/.stat');
+      if (!stat.existsSync()) stat.writeAsStringSync('cpu  1957 0 2877 93280 262 342 254 87 0 0\n');
+      final uptime = File('${procDir.path}/.uptime');
+      if (!uptime.existsSync()) uptime.writeAsStringSync('12345.67 890.12\n');
+      final vmstat = File('${procDir.path}/.vmstat');
+      if (!vmstat.existsSync()) vmstat.writeAsStringSync('nr_free_pages 100000\n');
+
+      onLog?.call('\x1b[32m[APT]\x1b[0m 正在配置 Tsinghua 镜像源...\r\n');
       
       final sourcesList = File('${scripts.ubuntuPath}/etc/apt/sources.list');
       sourcesList.writeAsStringSync(
@@ -236,7 +255,7 @@ class InstallerService {
     }
   }
 
-  static Future<bool> _downloadAndInstallUv() async {
+  static Future<bool> _downloadAndInstallUv(Function(String)? onLog) async {
     const mirrors = [
       'https://ghfast.top/',
       'https://gh-proxy.com/',
@@ -250,15 +269,32 @@ class InstallerService {
     bool downloaded = false;
     for (final mirror in mirrors) {
       final target = '$mirror$releaseUrl';
-      final res = await Process.run('${RuntimeEnvir.binPath}/busybox', ['wget', '-O', tmpArchive, target]);
-      if (res.exitCode == 0) {
-        downloaded = true;
-        break;
+      onLog?.call('\x1b[32m[UV]\x1b[0m 尝试从 $mirror 下载...\r\n');
+      
+      if (onLog != null) {
+        final process = await Process.start('${RuntimeEnvir.binPath}/busybox', ['wget', '-O', tmpArchive, target]);
+        process.stdout.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+        process.stderr.transform(utf8.decoder).listen((data) => onLog(data.replaceAll('\n', '\r\n')));
+        final exitCode = await process.exitCode;
+        if (exitCode == 0) {
+          downloaded = true;
+          break;
+        }
+      } else {
+        final res = await Process.run('${RuntimeEnvir.binPath}/busybox', ['wget', '-O', tmpArchive, target]);
+        if (res.exitCode == 0) {
+          downloaded = true;
+          break;
+        }
       }
     }
     
-    if (!downloaded) return false;
+    if (!downloaded) {
+      onLog?.call('\x1b[31m[UV]\x1b[0m 所有镜像源下载均失败！\r\n');
+      return false;
+    }
     
+    onLog?.call('\x1b[32m[UV]\x1b[0m 下载完成，正在解压...\r\n');
     final extractRes = await Process.run('${RuntimeEnvir.binPath}/busybox', [
       'tar', '-xzf', tmpArchive, '-C', RuntimeEnvir.tmpPath
     ]);
@@ -304,10 +340,12 @@ class InstallerService {
     return false;
   }
   /// 扫描压缩包中的软硬链接，并在本地强制以软链接形式恢复（解决安卓下解压丢链接的问题）
-  static Future<void> _restoreArchiveLinks(String archivePath) async {
+  static Future<void> _restoreArchiveLinks(String archivePath, Function(String)? onLog) async {
     try {
+      onLog?.call('\x1b[32m[Links]\x1b[0m 正在扫描并恢复丢失的软硬链接...\r\n');
       final res = await Process.run('${RuntimeEnvir.binPath}/busybox', ['tar', '-tvJf', archivePath]);
       if (res.exitCode == 0 || res.stdout.toString().isNotEmpty) {
+        int restored = 0;
         final lines = res.stdout.toString().split('\n');
         final regex = RegExp(r'^[lh].*?\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\s+(.*?)\s+->\s+(.*)$');
         for (final line in lines) {
@@ -325,11 +363,13 @@ class InstallerService {
               if (!link.existsSync() && !File(linkPath).existsSync() && !Directory(linkPath).existsSync()) {
                 try {
                   link.createSync(target, recursive: true);
+                  restored++;
                 } catch (_) {}
               }
             }
           }
         }
+        onLog?.call('\x1b[32m[Links]\x1b[0m 扫描完毕，成功恢复 $restored 个链接！\r\n');
       }
     } catch (_) {}
   }

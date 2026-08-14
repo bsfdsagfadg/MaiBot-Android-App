@@ -11,6 +11,7 @@ class EnvBootstrapper {
   /// 初始化环境，将动态库中的文件链接到数据目录
   /// Init environment and link files from the dynamic library to the data directory
   static Future<void> initEnvir() async {
+    await Directory(RuntimeEnvir.binPath).create(recursive: true);
     List<String> androidFiles = [
       'libbash.so',
       'libbusybox.so',
