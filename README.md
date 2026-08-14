@@ -16,71 +16,29 @@
 
 ---
 
-# 🤖 MaiBot手机端：让每一个普通人都能轻松领养自己的“赛博网友”
+# 📱 MaiBot 手机端：一键在 Android 设备部署 MaiBot 机器人
 
-你是否想过，用一部闲置的安卓手机，就能让自己的 QQ 号变成一个活跃在群聊中、拥有自己性格的“生命体”？
+**MaiBot-Android-App** 是专为 Android 设备优化的 MaiBot 运行环境集成包。
 
-**MaiBot-Android-App** 正是为此而生。
+通过将 Linux 容器环境（PRoot）、Python 运行环境与 NapCatQQ 协议适配器整体封装为手机应用，无需电脑或手动配置 Termux / Docker，即可在 Android 手机上本地部署并运行 MaiBot。
 
-它不是一个普通的 AI 聊天界面，也不是一个冰冷的工具箱。  
-它的核心功能非常明确：
-
-> 🔹 **把你自己的 QQ 号，变成一个可以自动与人互动、拥有情绪、会学习黑话的赛博网友“麦麦”。**
-
-你可以用它：
-- 让你和你的朋友们，都可以在 QQ 上和麦麦进行贴近人类习惯的日常闲聊
-- 加入 QQ 群，与广大群友们一起互动，体验麦麦独立的情绪系统和表情包互动能力
-- 接入你喜欢的大语言模型（如 GPT、Claude、DeepSeek 等），让麦麦拥有强大的思考能力
-
-最关键的是：**这一切，不需要电脑、不需要配置 ZeroTermux 或 Docker、不需要懂命令行。**
-
-只需要一部安卓手机，安装 App，等待应用启动完成，扫码登录 QQ，填入大模型密钥，就能让麦麦在你的手机里“活”起来。
+主要功能：
+- **本地一键运行**：自动解压并配置 Ubuntu 容器与 Python 依赖环境，一键启动服务。
+- **图形化控制面板**：内嵌 WebView 控制台，直接在手机端完成模型配置与参数调整。
+- **消息协议集成**：内置 NapCatQQ 适配器，支持扫码登录与 OneBot v11 协议通信。
+- **后台常驻运行**：配合 Android 前台服务、电池优化白名单及唤醒锁，保障后台稳定运行。
 
 ---
 
-<p align="center">当然，这个软件是 【开源】 且 【免费】 的 ！！！</p>
+## 🌐 什么是 MaiBot？
+
+MaiBot 是一个基于大语言模型的开源对话机器人项目，支持拟人化回复、自然语言交互规划与上下文学习。
+
+- 💬 **拟人化交互**：采用自然语言风格构建提示词，支持贴近日常交流的拟人回复。
+- ⚙️ **多模型接入**：支持主流 LLM API 接口（如 OpenAI、Claude、DeepSeek 及各类兼容接口）。
+- 🧩 **插件扩展**：支持安装适配器与功能插件以扩展机器人的交互能力。
 
 ---
-
-## 🎯 为什么要做这个 App？它的最大优势是什么？
-
-MaiBot（麦麦）的原始设计理念是创造一个“最像而不是好”的赛博生命。但原始的 MaiBot 部署通常需要通过服务器环境或复杂的终端操作——这对绝大多数零技术背景的用户来说太难了。
-
-因此，我们基于 AstrBot 安卓端框架开发了 **MaiBot-Android-App**，它的最大优势是：
-
-> ✅ **将复杂的容器环境与麦麦后端，封装成一个手机 App，让电子小白也能轻松使用。**
-
-它解决了：
-- ❌ 难以跟着文档一步一步配置复杂的运行环境
-- ❌ 不知道什么是“命令行”、“Docker”或“终端”
-- ❌ 没有电脑或无法长期开机
-- ✅ 但希望用闲置手机一键养一只“麦麦”
-
-我们把复杂的依赖打包进 App，通过手机一键启动，极大降低了麦麦的使用门槛。
-
----
-
-## 🌐 什么是 MaiBot (麦麦)？
-
-<img src="https://raw.githubusercontent.com/MaiM-with-u/MaiBot/main/depends-data/maimai-v2.png" align="right" width="30%" alt="MaiBot Character" style="margin-left: 20px; margin-bottom: 20px;">
-
-在深入安卓 App 之前，先让我们了解它背后的核心灵魂：**[MaiBot](https://github.com/MaiM-with-u/MaiBot)**。
-
-**🍔 MaiCore 是一个基于大语言模型的可交互智能体**
-
-MaiBot 不仅仅是一个机器人，她致力于成为一个活跃在 QQ 群聊中的“生命体”。她不追求完美，但追求真实。
-
-- 💭 **拟人构建**：使用自然语言风格构建 Prompt，回复贴近人类习惯。
-- 🎭 **行为规划**：懂得在合适的时间说话，使用合适的动作。
-- 🧠 **表达学习**：模仿群友的说话风格，学习黑话，不断进化。
-- 💝 **情感表达**：拥有独立的情绪系统和表情包互动能力。
-
-> 📌 **千石可乐说**：  
-> “如果人类真的需要一个 AI 来陪伴自己，并不是所有人都需要一个完美的，能解决所有问题的 'helpful assistant'，而是一个会犯错的，拥有自己感知和想法的 '生命形式'。”
-
----
-
-<br clear="both">
 
 ## ✅ 安卓 App 能做什么？不能做什么？
 
@@ -139,13 +97,13 @@ MaiBot 不仅仅是一个机器人，她致力于成为一个活跃在 QQ 群聊
 
 ---
 
-## 📌 总结：这款 App 到底解决了什么问题？
+## 📌 特性对比
 
-| 问题维度 | 传统部署方式 (ZeroTermux/Docker) | MaiBot-Android-App 解决方案 |
-|--------|----------------------|---------------------------|
-| **部署环境** | 需要服务器或复杂的本地终端配置 | **普通手机** 一键安装即可运行 |
-| **配置复杂度** | 需熟悉命令行、依赖安装 | 图形化界面自动配置容器与网络 |
-| **使用场景** | 适合极客、开发者 | 面向所有想养一只“麦麦”的**普通用户** |
+| 维度 | 传统命令行 / Docker 部署 | MaiBot-Android-App 方案 |
+|---|---|---|
+| **部署方式** | 需 Linux 服务器或手动配置 Termux | Android 应用一键安装初始化 |
+| **环境配置** | 手动安装 Python、apt 依赖与适配器 | 全自动配置容器、DNS 与 Python 虚拟环境 |
+| **使用门槛** | 需要基础命令行与 Linux 运维经验 | 手机图形化界面操作与管理 |
 
 ---
 
@@ -153,10 +111,10 @@ MaiBot 不仅仅是一个机器人，她致力于成为一个活跃在 QQ 群聊
 
 本项目站在巨人的肩膀上，没有以下优秀的开源项目，就没有本 App 的诞生：
 
-- [**zz6zz666/AstrBot-Android-App**](https://github.com/zz6zz666/AstrBot-Android-App)：**本项目的直接基础与灵感来源**。感谢原作者提供的出色安卓容器架构和一键部署思路。
-- [**Mai-with-u/MaiBot**](https://github.com/MaiM-with-u/MaiBot)：麦麦的灵魂核心，感谢千石可乐及贡献者团队创造了这个有趣的生命体。
-- [**Code LFA**](https://github.com/nightmare-space/code_lfa)：提供安卓端 Ubuntu 容器底层环境。
-- [**NapCatQQ**](https://napneko.github.io/guide/napcat)：高效稳定的现代 QQ 协议适配器。
+- [**zz6zz666/AstrBot-Android-App**](https://github.com/zz6zz666/AstrBot-Android-App)：本项目的架构基础与参考来源。
+- [**Mai-with-u/MaiBot**](https://github.com/MaiM-with-u/MaiBot)：MaiBot 开源项目。
+- [**Code LFA**](https://github.com/nightmare-space/code_lfa)：提供 Android 端 Ubuntu 容器底层环境。
+- [**NapCatQQ**](https://napneko.github.io/guide/napcat)：QQ 协议适配器。
 
 ---
 
@@ -171,7 +129,5 @@ MaiBot 不仅仅是一个机器人，她致力于成为一个活跃在 QQ 群聊
 
 ## 💬 反馈交流
 
-- 如果你在使用手机端部署时遇到问题，欢迎提交 Issues。
-- ⚠️ 注意：如果是关于麦麦**聊天逻辑、人设、报错**等核心功能问题，请勿在此提问，建议前往麦麦官方社区查阅文档。
-
-> Code is open, but the soul is yours.
+- 如果你在使用本安卓端应用时遇到部署或闪退问题，欢迎提交 Issues。
+- 如需了解 MaiBot 核心功能、提示词配置与模型设置，请参考 MaiBot 官方文档。

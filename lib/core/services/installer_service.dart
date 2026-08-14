@@ -127,7 +127,7 @@ class InstallerService {
       if (maibotDir.existsSync()) {
         await _runInProot('rm -rf /root/MaiBot');
       }
-      onProgress('正在拉取 MaiBot 核心源码...');
+      onProgress('正在获取 MaiBot 源码...');
       final success = await _cloneMaibot(onLog);
       if (!success) return false;
     }
@@ -172,7 +172,7 @@ class InstallerService {
     final configDir = Directory('${scripts.ubuntuPath}/root/MaiBot/config');
     if (!configDir.existsSync() || configDir.listSync().isEmpty) {
       if (hasBackupConfig) {
-        onProgress('正在从备份中恢复核心配置...');
+        onProgress('正在从备份中恢复应用配置...');
         if (!configDir.existsSync()) configDir.createSync(recursive: true);
         await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/config/*', '${configDir.path}/']);
       }
@@ -223,7 +223,7 @@ class InstallerService {
     // 7. 清理
     if (restoreTempDir.existsSync()) restoreTempDir.deleteSync(recursive: true);
     restoreMarker.writeAsStringSync('done');
-    onProgress('初始化完成！即将启动核心服务...');
+    onProgress('初始化完成，正在启动后台服务...');
     return true;
   } catch (e) {
     Log.e('后续配置执行异常: $e', tag: 'InstallerService');

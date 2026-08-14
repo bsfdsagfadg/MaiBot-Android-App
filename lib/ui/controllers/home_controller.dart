@@ -127,11 +127,9 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     }
 
     // 安装成功，启动常驻服务
-    progressTracker.setProgress('开始拉起 MaiBot 原生隔离容器...');
+    progressTracker.setProgress('正在启动后台运行环境...');
 
-
-    // 触发前台服务拉起容器
-    // 启动原生后台守护服务（纯净 Java Backend）
+    // 启动原生后台守护服务
     if (!await ForegroundServiceManager.isRunningService()) {
       await ForegroundServiceManager.startService();
     }

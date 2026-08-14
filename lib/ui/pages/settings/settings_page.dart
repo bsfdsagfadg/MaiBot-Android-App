@@ -155,362 +155,622 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        const Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text(
-            '设置',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.info_outline),
-          title: const Text('软件版本'),
-          subtitle: Text(
-            _appVersion.isEmpty ? '加载中...' : '$_appVersion（点击检查更新）',
-          ),
-          onTap: () => _updateChecker.checkForUpdates(),
-        ),
-        ListTile(
-          leading: const Icon(Icons.home),
-          title: const Text('回到 MaiBot 主页'),
-          subtitle: const Text('重置并刷新 MaiBot 页面'),
-          onTap: () {
-            // 重置 MaiBot WebView URL 并刷新
-            widget.maiBotController.loadRequest(
-              Uri.parse('http://127.0.0.1:${Ports.maibotWeb}'),
-            );
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
 
-            // 跳转到 MaiBot 标签页（索引 0）
-            widget.onNavigate(0);
-
-            Get.snackbar(
-              '已跳转',
-              'MaiBot 页面已重置并刷新',
-              snackPosition: SnackPosition.BOTTOM,
-              duration: const Duration(seconds: 2),
-            );
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.restart_alt),
-          title: const Text('更新或重装 MaiBot'),
-          subtitle: const Text('清除 MaiBot 组件并重新安装最新版本'),
-          onTap: MaintenanceActions.reinstallMaiBot,
-        ),
-        ListTile(
-          leading: const Icon(Icons.refresh),
-          title: const Text('更新或重装 NapcatQQ'),
-          subtitle: const Text('清除 NapcatQQ 组件并重新安装最新版本'),
-          onTap: MaintenanceActions.reinstallNapcat,
-        ),
-        ListTile(
-          leading: const Icon(Icons.backup),
-          title: const Text('备份 MaiBot 数据'),
-          subtitle: const Text('备份 MaiBot 配置和数据到手机存储'),
-          onTap: () async {
-            await BackupService.performBackup(showLoadingDialog: true);
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.delete),
-          title: const Text('清除 MaiBot 数据'),
-          subtitle: const Text('彻底清除 MaiBot 所有数据和本地配置，\n重启时自动从备份恢复或全新干净初始化'),
-          onTap: MaintenanceActions.clearMaiBotData,
-        ),
-        ListTile(
-          leading: const Icon(Icons.refresh),
-          title: const Text('重置 Python 环境'),
-          subtitle: const Text('删除虚拟环境并重启应用，启动时将自动重建'),
-          onTap: MaintenanceActions.resetPythonEnv,
-        ),
-        ListTile(
-          leading: const Icon(Icons.login),
-          title: const Text('快速登录 QQ'),
-          subtitle: const Text('配置自动登录的QQ账号'),
-          onTap: () => showQuickLoginDialog(),
-        ),
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Row(
-            children: [
-              const Text(
-                '自定义 WebView',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
-                onPressed: () =>
-                    showAddWebViewDialog(homeController.webviewController),
-                tooltip: '添加自定义 WebView',
-              ),
-            ],
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FA),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+              child: _buildHeaderCard(primaryColor),
+            ),
           ),
-        ),
-        Obx(() {
-          final customWebViews =
-              homeController.webviewController.customWebViews;
-          if (customWebViews.isEmpty) {
-            return const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Center(
-                child: Text(
-                  '访问插件的 WebUI 面板\n点击右上角"+"添加',
-                  style: TextStyle(color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-          return Column(
-            children: List.generate(customWebViews.length, (index) {
-              final webview = customWebViews[index];
-              return ListTile(
-                leading: const Icon(Icons.language),
-                title: Text(webview['title'] ?? 'WebUI'),
-                subtitle: Text(webview['url'] ?? ''),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
-                      onPressed: () => showEditWebViewDialog(
-                          homeController.webviewController, index, webview),
-                      tooltip: '编辑',
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _buildSectionHeader('常用操作', Icons.tune_rounded),
+                _buildCard([
+                  _buildSettingTile(
+                    icon: Icons.home_rounded,
+                    iconColor: Colors.blue,
+                    title: '回到 MaiBot 主页',
+                    subtitle: '重置并刷新 MaiBot 页面',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: () {
+                      widget.maiBotController.loadRequest(
+                        Uri.parse('http://127.0.0.1:${Ports.maibotWeb}'),
+                      );
+                      widget.onNavigate(0);
+                      Get.snackbar(
+                        '已跳转',
+                        'MaiBot 页面已重置并刷新',
+                        snackPosition: SnackPosition.BOTTOM,
+                        duration: const Duration(seconds: 2),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.account_circle_rounded,
+                    iconColor: Colors.indigo,
+                    title: '快速登录 QQ',
+                    subtitle: '配置自动免扫码登录的 QQ 账号',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: () => showQuickLoginDialog(),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.folder_open_rounded,
+                    iconColor: Colors.amber.shade800,
+                    title: '查看数据目录与文件',
+                    subtitle: '通过系统文件管理或 MT 管理器浏览 Ubuntu 环境目录',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: () => _openFileManager(),
+                  ),
+                ]),
+                const SizedBox(height: 16),
+                _buildSectionHeader('控制面板与令牌', Icons.dashboard_rounded),
+                _buildCard([
+                  Obx(() {
+                    final enabled = homeController.napcatController.napCatWebUiEnabledRx.value;
+                    return SwitchListTile(
+                      secondary: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.web_rounded, color: Colors.teal, size: 22),
+                      ),
+                      title: const Text('NapCat 控制面板', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                      subtitle: Text(
+                        enabled ? '已开启：可在底部导航栏访问 NapCat 控制台' : '已关闭：底部导航栏不显示 NapCat 面板',
+                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                      value: enabled,
+                      activeThumbColor: primaryColor,
+                      onChanged: (bool value) {
+                        homeController.napcatController.setNapCatWebUiEnabled(value);
+                        Get.snackbar(
+                          value ? 'WebUI 已启用' : 'WebUI 已禁用',
+                          value ? 'NapCat 标签页已显示，可直接访问控制面板' : 'NapCat 标签页已隐藏',
+                          snackPosition: SnackPosition.BOTTOM,
+                          duration: const Duration(seconds: 2),
+                        );
+                      },
+                    );
+                  }),
+                  const Divider(height: 1, indent: 56),
+                  Obx(() {
+                    final token = homeController.napcatController.maiBotWebUiToken.value;
+                    return _buildTokenTile(
+                      icon: Icons.key_rounded,
+                      iconColor: Colors.purple,
+                      title: 'MaiBot 登录 Token',
+                      token: token,
+                    );
+                  }),
+                  const Divider(height: 1, indent: 56),
+                  Obx(() {
+                    final token = homeController.napcatController.napCatWebUiToken.value;
+                    return _buildTokenTile(
+                      icon: Icons.vpn_key_rounded,
+                      iconColor: Colors.deepPurple,
+                      title: 'NapCat 登录 Token',
+                      token: token,
+                    );
+                  }),
+                  const Divider(height: 1, indent: 56),
+                  _buildCustomWebViewsSection(),
+                ]),
+                const SizedBox(height: 16),
+                _buildSectionHeader('系统与网络', Icons.settings_suggest_rounded),
+                _buildCard([
+                  _buildSettingTile(
+                    icon: Icons.battery_charging_full_rounded,
+                    iconColor: Colors.green,
+                    title: '后台保活设置',
+                    subtitle: '电池优化、WLAN 保持连接及后台运行配置',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: () {
+                      Get.to(() => const KeepAliveSettingsPage());
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.code_rounded,
+                    iconColor: Colors.cyan.shade700,
+                    title: '自定义 Git Clone 链接',
+                    subtitle: '配置自定义或 Fork 的 MaiBot 仓库地址',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: () => showCustomGitCloneDialog(),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.cleaning_services_rounded,
+                    iconColor: Colors.orange,
+                    title: '清空 WebView 缓存',
+                    subtitle: '清理内置网页与控制台的临时缓存',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: () async {
+                      try {
+                        await widget.maiBotController.clearCache();
+                        await widget.napCatController.clearCache();
+                        if (context.mounted) {
+                          Get.snackbar(
+                            '成功',
+                            'WebView 缓存已清理',
+                            snackPosition: SnackPosition.BOTTOM,
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          Get.snackbar(
+                            '清理失败',
+                            e.toString(),
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white,
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ]),
+                const SizedBox(height: 16),
+                _buildSectionHeader('维护与环境重置', Icons.build_circle_rounded, isDanger: true),
+                _buildCard([
+                  _buildSettingTile(
+                    icon: Icons.backup_rounded,
+                    iconColor: Colors.blue.shade700,
+                    title: '备份 MaiBot 数据',
+                    subtitle: '打包本地配置、插件及数据至手机下载目录',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: () async {
+                      await BackupService.performBackup(showLoadingDialog: true);
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.restart_alt_rounded,
+                    iconColor: Colors.orange.shade800,
+                    title: '重置 Python 环境',
+                    subtitle: '删除虚拟环境并在启动时重新构建依赖',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: MaintenanceActions.resetPythonEnv,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.refresh_rounded,
+                    iconColor: Colors.deepOrange,
+                    title: '重新安装 NapCat 组件',
+                    subtitle: '清除 NapCat 文件并触发重新安装',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: MaintenanceActions.reinstallNapcat,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.system_update_alt_rounded,
+                    iconColor: Colors.deepOrange.shade700,
+                    title: '重新安装 MaiBot',
+                    subtitle: '重新拉取并安装 MaiBot 代码',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: MaintenanceActions.reinstallMaiBot,
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.delete_forever_rounded,
+                    iconColor: Colors.red,
+                    title: '清除 MaiBot 数据',
+                    subtitle: '清除本地数据与配置，恢复初始状态',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: MaintenanceActions.clearMaiBotData,
+                  ),
+                ], backgroundColor: Colors.red.withValues(alpha: 0.02), borderColor: Colors.red.withValues(alpha: 0.15)),
+                const SizedBox(height: 16),
+                _buildSectionHeader('关于与支持', Icons.info_outline_rounded),
+                _buildCard([
+                  _buildSettingTile(
+                    icon: Icons.verified_rounded,
+                    iconColor: primaryColor,
+                    title: '软件版本',
+                    subtitle: _appVersion.isEmpty ? '加载中...' : 'v$_appVersion（点击检查更新）',
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('检查更新', style: TextStyle(fontSize: 12, color: primaryColor, fontWeight: FontWeight.bold)),
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete,
-                        size: 20,
-                        color: Colors.red,
+                    onTap: () => _updateChecker.checkForUpdates(),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.privacy_tip_rounded,
+                    iconColor: Colors.blueGrey,
+                    title: '隐私政策',
+                    subtitle: '查看应用隐私保护与开源协议条款',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: () async {
+                      try {
+                        final privacyContent =
+                            await rootBundle.loadString('assets/privacy_policy.md');
+                        if (context.mounted) {
+                          Get.dialog(
+                            Dialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Row(
+                                      children: [
+                                        const Text(
+                                          '隐私政策',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        IconButton(
+                                          icon: const Icon(Icons.close),
+                                          onPressed: () => Get.back(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Divider(height: 1),
+                                  Flexible(
+                                    child: SingleChildScrollView(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: MarkdownBody(
+                                        data: privacyContent,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          Get.snackbar('加载失败', '无法加载隐私政策: $e', snackPosition: SnackPosition.BOTTOM);
+                        }
+                      }
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.power_settings_new_rounded,
+                    iconColor: Colors.redAccent,
+                    title: '退出应用',
+                    subtitle: '完全终止前台守护服务与容器进程',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: MaintenanceActions.exitApp,
+                  ),
+                ]),
+                const SizedBox(height: 36),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderCard(Color primaryColor) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [primaryColor, primaryColor.withValues(alpha: 0.82)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'MaiBot Android',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
                       ),
-                      onPressed: () => showConfirmDeleteWebView(
-                        homeController.webviewController,
-                        index,
-                        webview['title'] ?? 'WebUI',
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _appVersion.isEmpty ? '加载中...' : '版本: v$_appVersion',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13,
                       ),
-                      tooltip: '删除',
                     ),
                   ],
                 ),
-              );
-            }),
-          );
-        }),
-        const Divider(),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Text(
-            '高级设置',
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF69F0AE),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      '服务运行中',
+                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, {bool isDanger = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: isDanger ? Colors.red.shade700 : Colors.black54),
+          const SizedBox(width: 6),
+          Text(
+            title,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              color: isDanger ? Colors.red.shade700 : Colors.black54,
+              letterSpacing: 0.2,
             ),
           ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.security),
-          title: const Text('后台保活设置'),
-          subtitle: const Text('电池优化、前台服务以及后台锁提示'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Get.to(() => const KeepAliveSettingsPage());
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.web),
-          title: const Text('NapCat WebUI'),
-          subtitle: const Text('显示或隐藏 NapCat 网页控制面板（默认隐藏）'),
-          trailing: Switch(
-            value: homeController.napcatController.napCatWebUiEnabled.get() ??
-                false,
-            onChanged: (bool value) {
-              // 使用新的方法来同步更新响应式变量
-              homeController.napcatController.setNapCatWebUiEnabled(value);
+        ],
+      ),
+    );
+  }
 
+  Widget _buildCard(List<Widget> children, {Color? backgroundColor, Color? borderColor}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor ?? Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: borderColor ?? Colors.black.withValues(alpha: 0.05),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildSettingTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: iconColor, size: 22),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(fontSize: 12, color: Colors.black54),
+      ),
+      trailing: trailing,
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildTokenTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String token,
+  }) {
+    final bool hasToken = token.isNotEmpty;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: iconColor, size: 22),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+      ),
+      subtitle: Text(
+        hasToken ? (token.length > 20 ? '${token.substring(0, 16)}••••' : token) : '暂未捕获到 Token',
+        style: TextStyle(
+          fontSize: 12,
+          color: hasToken ? Colors.black87 : Colors.black38,
+          fontFamily: hasToken ? 'monospace' : null,
+        ),
+      ),
+      trailing: hasToken
+          ? OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.copy_rounded, size: 14),
+              label: const Text('复制', style: TextStyle(fontSize: 12)),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: token));
+                Get.snackbar(
+                  '已复制',
+                  '$title 已复制到剪贴板',
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 2),
+                );
+              },
+            )
+          : null,
+      onTap: hasToken
+          ? () async {
+              await Clipboard.setData(ClipboardData(text: token));
               Get.snackbar(
-                value ? 'WebUI 已启用' : 'WebUI 已禁用',
-                value ? 'NapCat 标签页已显示，可以立即访问控制面板' : 'NapCat 标签页已隐藏',
+                '已复制',
+                '$title 已复制到剪贴板',
                 snackPosition: SnackPosition.BOTTOM,
                 duration: const Duration(seconds: 2),
               );
-            },
-          ),
-        ),
-        Obx(() {
-          final token = homeController.napcatController.napCatWebUiToken.value;
-          return ListTile(
-            leading: const Icon(Icons.vpn_key),
-            title: const Text('NapCat 登录 token'),
-            subtitle: Text(token.isEmpty ? '暂未获取到token' : token),
-            onTap: token.isEmpty
-                ? null
-                : () async {
-                    await Clipboard.setData(ClipboardData(text: token));
-                    Get.snackbar(
-                      '已复制',
-                      'NapCat Token 已复制到剪贴板',
-                      snackPosition: SnackPosition.BOTTOM,
-                      duration: const Duration(seconds: 2),
-                    );
-                  },
-          );
-        }),
-        Obx(() {
-          final token = homeController.napcatController.maiBotWebUiToken.value;
-          return ListTile(
-            leading: const Icon(Icons.key),
-            title: const Text('MaiBot 登录 token'),
-            subtitle: Text(token.isEmpty ? '暂未获取到token' : token),
-            onTap: token.isEmpty
-                ? null
-                : () async {
-                    await Clipboard.setData(ClipboardData(text: token));
-                    Get.snackbar(
-                      '已复制',
-                      'MaiBot Token 已复制到剪贴板',
-                      snackPosition: SnackPosition.BOTTOM,
-                      duration: const Duration(seconds: 2),
-                    );
-                  },
-          );
-        }),
-        ListTile(
-          leading: const Icon(Icons.code),
-          title: const Text('自定义 Git Clone 命令'),
-          subtitle: const Text('自定义 MaiBot 的获取方式'),
-          onTap: () => showCustomGitCloneDialog(),
-        ),
-        ListTile(
-          leading: const Icon(Icons.folder),
-          title: const Text('文件系统'),
-          subtitle: const Text(
-            '内置 Ubuntu 文件系统已挂载至 \'文件\'\n可添加至 MT 文件管理器侧栏以快捷访问',
-          ),
-          onTap: () => _openFileManager(),
-        ),
-        ListTile(
-          leading: const Icon(Icons.delete_outline),
-          title: const Text('清空 WebView 缓存'),
-          subtitle: const Text('清理所有 WebView 缓存'),
-          onTap: () async {
-            try {
-              await widget.maiBotController.clearCache();
-              await widget.napCatController.clearCache();
-              if (context.mounted) {
-                Get.snackbar(
-                  '成功',
-                  'WebView 缓存已清理',
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-              }
-            } catch (e) {
-              if (context.mounted) {
-                Get.snackbar(
-                  '清理失败',
-                  e.toString(),
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-              }
             }
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.privacy_tip_outlined),
-          title: const Text('隐私政策'),
-          subtitle: const Text('查看应用隐私政策'),
-          onTap: () async {
-            try {
-              final privacyContent =
-                  await rootBundle.loadString('assets/privacy_policy.md');
-              if (context.mounted) {
-                Get.dialog(
-                  Dialog(
-                    child: Column(
+          : null,
+    );
+  }
+
+  Widget _buildCustomWebViewsSection() {
+    return Obx(() {
+      final customWebViews = homeController.webviewController.customWebViews;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.language_rounded, color: Colors.blue, size: 22),
+                ),
+                const SizedBox(width: 14),
+                const Text(
+                  '自定义 WebView 面板',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                ),
+                const Spacer(),
+                FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('添加', style: TextStyle(fontSize: 12)),
+                  onPressed: () => showAddWebViewDialog(homeController.webviewController),
+                ),
+              ],
+            ),
+          ),
+          if (customWebViews.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 16),
+              child: Text(
+                '可添加外部插件的 Web 控制面板并显示在底部导航栏',
+                style: TextStyle(color: Colors.black38, fontSize: 12),
+              ),
+            )
+          else
+            ...List.generate(customWebViews.length, (index) {
+              final webview = customWebViews[index];
+              return Column(
+                children: [
+                  const Divider(height: 1, indent: 56),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    title: Text(webview['title'] ?? 'WebUI', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    subtitle: Text(webview['url'] ?? '', style: const TextStyle(fontSize: 12, color: Colors.black45)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Row(
-                            children: [
-                              const Text(
-                                '隐私政策',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                icon: const Icon(Icons.close),
-                                onPressed: () => Get.back(),
-                              ),
-                            ],
-                          ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_rounded, size: 18, color: Colors.black54),
+                          onPressed: () => showEditWebViewDialog(homeController.webviewController, index, webview),
+                          tooltip: '编辑',
                         ),
-                        const Divider(height: 1),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(16.0),
-                            child: MarkdownBody(
-                              data: privacyContent,
-                              styleSheet: MarkdownStyleSheet(
-                                h1: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                h2: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                h3: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                p: const TextStyle(fontSize: 14),
-                                listBullet: const TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                          onPressed: () => showConfirmDeleteWebView(homeController.webviewController, index, webview['title'] ?? 'WebUI'),
+                          tooltip: '删除',
                         ),
                       ],
                     ),
                   ),
-                );
-              }
-            } catch (e) {
-              if (context.mounted) {
-                Get.snackbar(
-                  '加载失败',
-                  '无法加载隐私政策: $e',
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-              }
-            }
-          },
-        ),
-        const Divider(),
-        ListTile(
-          leading: const Icon(Icons.exit_to_app, color: Colors.red),
-          title: const Text(
-            '退出应用',
-            style: TextStyle(color: Colors.red),
-          ),
-          subtitle: const Text('退出 MaiBot 应用'),
-          onTap: MaintenanceActions.exitApp,
-        ),
-      ],
-    );
+                ],
+              );
+            }),
+        ],
+      );
+    });
   }
 }

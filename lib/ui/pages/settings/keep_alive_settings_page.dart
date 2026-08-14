@@ -263,133 +263,258 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF6F8FA),
       appBar: AppBar(
-        title: const Text('后台保活设置', style: TextStyle(fontSize: 18)),
+        title: const Text('后台保活设置', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        centerTitle: true,
+        scrolledUnderElevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Get.back(),
+        ),
       ),
       body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              '为了让 MaiBot 在后台稳定运行，建议开启以下权限和设置。\n\n💡 防杀终极指南：\n请在系统多任务（最近任务）界面为 MaiBot 加上小锁。只要保留在后台不手贱划掉清理，配合下方的电池优化等设置，MaiBot 就能稳定长久地陪伴你！',
-              style: TextStyle(color: Colors.grey, fontSize: 14),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Colors.blue, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '为确保后台常驻运行不中断，建议完成下方系统权限设置，并在多任务界面为 MaiBot 加锁。',
+                    style: TextStyle(color: Colors.blue.shade900, fontSize: 13, height: 1.4),
+                  ),
+                ),
+              ],
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.battery_saver),
-            title: const Text('电池优化豁免'),
-            subtitle: Text(_isBatteryOptimizationIgnored ? '已授权' : '未授权（点击授权）'),
-            trailing: _isBatteryOptimizationIgnored
-                ? const Icon(Icons.check_circle, color: Colors.green)
-                : const Icon(Icons.warning, color: Colors.orange),
-            onTap: _requestBatteryOptimization,
-          ),
-          ListTile(
-            leading: const Icon(Icons.wifi_lock),
-            title: const Text('保持 Wi-Fi 唤醒 (WLAN 锁)'),
-            subtitle: const Text('息屏时防止 Wi-Fi 休眠，避免断网导致的掉线（重启应用后生效）'),
-            trailing: Switch(
+          const SizedBox(height: 16),
+          _buildSectionTitle('基础保活选项', Icons.battery_charging_full_rounded),
+          _buildCard([
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.battery_saver_rounded, color: Colors.green, size: 22),
+              ),
+              title: const Text('电池优化豁免', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              subtitle: Text(
+                _isBatteryOptimizationIgnored ? '已获得豁免权限，允许后台运行' : '未授权：系统可能在息屏时休眠进程',
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              trailing: _isBatteryOptimizationIgnored
+                  ? const Icon(Icons.check_circle_rounded, color: Colors.green, size: 22)
+                  : FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: _requestBatteryOptimization,
+                      child: const Text('授权', style: TextStyle(fontSize: 12)),
+                    ),
+              onTap: _requestBatteryOptimization,
+            ),
+            const Divider(height: 1, indent: 56),
+            SwitchListTile(
+              secondary: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.wifi_lock_rounded, color: Colors.indigo, size: 22),
+              ),
+              title: const Text('保持 Wi-Fi 连接 (WLAN 锁)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              subtitle: const Text('息屏时避免系统 Wi-Fi 进入休眠，保障网络连接稳定', style: TextStyle(fontSize: 12, color: Colors.black54)),
               value: _enableWifiLock.get() ?? true,
+              activeThumbColor: primaryColor,
               onChanged: (bool value) {
                 _enableWifiLock.set(value);
-                setState(() {});
+                if (mounted) setState(() {});
               },
             ),
-          ),
-          const Divider(),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text(
-              'Shizuku 保活扩展',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
+          ]),
+          const SizedBox(height: 16),
+          _buildSectionTitle('Shizuku 进阶配置', Icons.extension_rounded),
+          _buildCard([
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.link_rounded, color: Colors.purple, size: 22),
+              ),
+              title: const Text('Shizuku 运行状态', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              subtitle: Text(
+                !_shizukuAvailable
+                    ? '未运行：请先启动 Shizuku 应用'
+                    : (_shizukuPermissionGranted ? '已连接并获得授权' : '已检测到服务，点击请求授权'),
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              trailing: Icon(
+                !_shizukuAvailable
+                    ? Icons.cancel_rounded
+                    : (_shizukuPermissionGranted ? Icons.check_circle_rounded : Icons.info_rounded),
+                color: !_shizukuAvailable
+                    ? Colors.grey
+                    : (_shizukuPermissionGranted ? Colors.green : Colors.orange),
+                size: 22,
+              ),
+              onTap: () async {
+                await _ensureShizukuPermission();
+                await _checkShizukuStatus();
+              },
+            ),
+            const Divider(height: 1, indent: 56),
+            SwitchListTile(
+              secondary: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.flash_on_rounded, color: Colors.teal, size: 22),
+              ),
+              title: const Text('写入系统 Doze 白名单', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              subtitle: const Text('通过 Shell 命令直接将应用注册至系统低电耗白名单', style: TextStyle(fontSize: 12, color: Colors.black54)),
+              value: _shizukuDozeWhitelist,
+              activeThumbColor: primaryColor,
+              onChanged: (bool value) => _toggleDozeWhitelist(value),
+            ),
+            const Divider(height: 1, indent: 56),
+            SwitchListTile(
+              secondary: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.deepOrange.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.tune_rounded, color: Colors.deepOrange, size: 22),
+              ),
+              title: const Text('无限制后台运行 (AppOps)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              subtitle: const Text('开启 RUN_ANY_IN_BACKGROUND 权限，允许应用在后台持续运行', style: TextStyle(fontSize: 12, color: Colors.black54)),
+              value: _shizukuRunAnyInBackground,
+              activeThumbColor: primaryColor,
+              onChanged: (bool value) => _toggleRunAnyInBackground(value),
+            ),
+            const Divider(height: 1, indent: 56),
+            SwitchListTile(
+              secondary: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.memory_rounded, color: Colors.blueGrey, size: 22),
+              ),
+              title: const Text('提高幻影进程限制 (Android 12+)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              subtitle: const Text('将系统幻影进程上限提升至 64，避免 Linux 容器子进程被系统清理', style: TextStyle(fontSize: 12, color: Colors.black54)),
+              value: _shizukuPhantomProcessLimit,
+              activeThumbColor: primaryColor,
+              onChanged: (bool value) => _togglePhantomProcess(value),
+            ),
+          ]),
+          const SizedBox(height: 16),
+          _buildSectionTitle('任务管理与隐身', Icons.task_alt_rounded),
+          _buildCard([
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade700.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.lock_outline_rounded, color: Colors.amber.shade800, size: 22),
+              ),
+              title: const Text('多任务锁定建议', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              subtitle: const Text(
+                '在系统的最近任务列表中长按或下拉 MaiBot 卡片添加锁定图标，防止一键清理任务时被关闭。',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
               ),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.extension),
-            title: const Text('Shizuku 授权状态'),
-            subtitle: Text(
-              !_shizukuAvailable
-                  ? '服务未运行，请先启动 Shizuku 应用程序'
-                  : (_shizukuPermissionGranted ? '已成功授权并连接' : '已检测到服务，点击请求授权'),
-            ),
-            trailing: Icon(
-              !_shizukuAvailable
-                  ? Icons.error_outline
-                  : (_shizukuPermissionGranted
-                      ? Icons.check_circle_outline
-                      : Icons.help_outline),
-              color: !_shizukuAvailable
-                  ? Colors.red
-                  : (_shizukuPermissionGranted ? Colors.green : Colors.orange),
-            ),
-            onTap: () async {
-              await _ensureShizukuPermission();
-              await _checkShizukuStatus();
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.battery_charging_full),
-            title: const Text('强制 Doze 电池优化白名单'),
-            subtitle: const Text('通过 Shell 将本应用加入 Doze 白名单，保证息屏连接不中断'),
-            trailing: Switch(
-              value: _shizukuDozeWhitelist,
-              onChanged: (bool value) {
-                _toggleDozeWhitelist(value);
-              },
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.settings_suggest),
-            title: const Text('无限制后台运行'),
-            subtitle: const Text('突破 Android AppOps 后台广播与进程限制，始终允许在后台运行'),
-            trailing: Switch(
-              value: _shizukuRunAnyInBackground,
-              onChanged: (bool value) {
-                _toggleRunAnyInBackground(value);
-              },
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.memory),
-            title: const Text('提高幻影进程限制'),
-            subtitle: const Text('将最大幻影进程数限制提高至64，避免因进程过多导致子进程被意外杀掉'),
-            trailing: Switch(
-              value: _shizukuPhantomProcessLimit,
-              onChanged: (bool value) {
-                _togglePhantomProcess(value);
-              },
-            ),
-          ),
-          const Divider(),
-          const ListTile(
-            leading: Icon(Icons.lock_outline),
-            title: Text('添加后台锁提示'),
-            subtitle: Text(
-                '请在系统的多任务（最近任务）界面，下拉或长按 MaiBot 卡片，为其添加后台锁定状态（通常显示为小锁图标）。这能有效防止系统自动清理应用。'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.visibility_off),
-            title: const Text('从最近活动中隐藏自身'),
-            subtitle: const Text(
-                '开启后应用将不会出现在最近任务列表中。\n⚠️ 警告：这会导致系统在内存紧张时大概率清理掉本应用，引起运行不稳定，请谨慎开启！'),
-            trailing: Switch(
+            const Divider(height: 1, indent: 56),
+            SwitchListTile(
+              secondary: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.visibility_off_rounded, color: Colors.red, size: 22),
+              ),
+              title: const Text('从最近任务列表中隐藏', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              subtitle: const Text('隐藏后应用不在多任务列表显示。在系统内存紧张时可能降低保活优先级。', style: TextStyle(fontSize: 12, color: Colors.black54)),
               value: Get.find<HomeController>().hideFromRecents.get() ?? false,
+              activeThumbColor: primaryColor,
               onChanged: (bool value) {
                 Get.find<HomeController>().setHideFromRecents(value);
-                setState(() {});
+                if (mounted) setState(() {});
               },
             ),
+          ]),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.black54),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
       ),
     );
   }

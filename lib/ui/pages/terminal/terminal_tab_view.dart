@@ -56,12 +56,12 @@ class _TerminalTabViewState extends State<TerminalTabView> {
     TerminalTabManager manager,
   ) {
     return Container(
-      height: 48,
+      height: 46,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: const Color(0xFF21252B),
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
+            color: Colors.white.withValues(alpha: 0.1),
             width: 1,
           ),
         ),
@@ -72,6 +72,7 @@ class _TerminalTabViewState extends State<TerminalTabView> {
           Expanded(
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               itemCount: tabs.length,
               itemBuilder: (context, index) {
                 return _buildTabItem(
@@ -85,7 +86,17 @@ class _TerminalTabViewState extends State<TerminalTabView> {
               },
             ),
           ),
-
+          IconButton(
+            icon: const Icon(Icons.cleaning_services_rounded, size: 18, color: Colors.white70),
+            tooltip: '清屏',
+            onPressed: () {
+              final activeTab = manager.activeTab;
+              if (activeTab != null) {
+                activeTab.terminal.buffer.clear();
+                activeTab.terminal.buffer.setCursor(0, 0);
+              }
+            },
+          ),
         ],
       ),
     );
@@ -101,23 +112,13 @@ class _TerminalTabViewState extends State<TerminalTabView> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        constraints: const BoxConstraints(
-          minWidth: 120,
-          maxWidth: 200,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        margin: const EdgeInsets.only(right: 6),
         decoration: BoxDecoration(
           color: isActive
-              ? Theme.of(context).colorScheme.primaryContainer
+              ? Colors.white.withValues(alpha: 0.15)
               : Colors.transparent,
-          border: Border(
-            bottom: BorderSide(
-              color: isActive
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.transparent,
-              width: 2,
-            ),
-          ),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -125,28 +126,25 @@ class _TerminalTabViewState extends State<TerminalTabView> {
             // 标签页图标
             Icon(
               tab.type == TerminalTabType.fixed
-                  ? Icons.lock_outline
-                  : Icons.terminal,
-              size: 16,
+                  ? Icons.lock_outline_rounded
+                  : Icons.terminal_rounded,
+              size: 14,
               color: isActive
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.6),
+                  ? const Color(0xFF61AFEF)
+                  : Colors.white54,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
 
             // 标签页标题
             Flexible(
               child: Text(
                 tab.title,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                   color: isActive
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.onSurface,
+                      ? Colors.white
+                      : Colors.white60,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -157,13 +155,10 @@ class _TerminalTabViewState extends State<TerminalTabView> {
               const SizedBox(width: 4),
               GestureDetector(
                 onTap: onClose,
-                child: Icon(
-                  Icons.close,
-                  size: 16,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.6),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 14,
+                  color: Colors.white54,
                 ),
               ),
             ],

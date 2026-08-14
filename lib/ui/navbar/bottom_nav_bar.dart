@@ -28,39 +28,63 @@ class WebViewBottomNavBar extends StatelessWidget {
       // 动态构建导航栏项目
       final List<BottomNavigationBarItem> navItems = [
         const BottomNavigationBarItem(
-          icon: Icon(Icons.smart_toy),
+          icon: Icon(Icons.smart_toy_outlined),
+          activeIcon: Icon(Icons.smart_toy_rounded),
           label: 'MaiBot',
         ),
         if (napCatEnabled)
           const BottomNavigationBarItem(
-            icon: Icon(Icons.pets),
+            icon: Icon(Icons.pets_outlined),
+            activeIcon: Icon(Icons.pets_rounded),
             label: 'NapCat',
           ),
-        // 添加自定义 WebView 项（地球图标）
+        // 添加自定义 WebView 项
         ...customWebViews.map((webview) => BottomNavigationBarItem(
-              icon: const Icon(Icons.language),
+              icon: const Icon(Icons.language_outlined),
+              activeIcon: const Icon(Icons.language_rounded),
               label: webview['title'] ?? 'WebUI',
             )),
         const BottomNavigationBarItem(
-          icon: Icon(Icons.terminal),
+          icon: Icon(Icons.terminal_outlined),
+          activeIcon: Icon(Icons.terminal_rounded),
           label: '终端',
         ),
         const BottomNavigationBarItem(
-          icon: Icon(Icons.settings),
+          icon: Icon(Icons.settings_outlined),
+          activeIcon: Icon(Icons.settings_rounded),
           label: '设置',
         ),
       ];
 
-      return BottomNavigationBar(
-        currentIndex: currentIndex >= navItems.length
-            ? navItems.length - 1
-            : currentIndex,
-        onTap: onTap,
-        type: BottomNavigationBarType.shifting,
-        backgroundColor: Colors.white,
-        selectedItemColor: Theme.of(context).primaryColor,
-        unselectedItemColor: Colors.grey,
-        items: navItems,
+      final theme = Theme.of(context);
+      final primaryColor = theme.colorScheme.primary;
+
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(
+              color: Colors.black.withValues(alpha: 0.06),
+              width: 1,
+            ),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: currentIndex >= navItems.length
+              ? navItems.length - 1
+              : currentIndex,
+          onTap: onTap,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          selectedItemColor: primaryColor,
+          unselectedItemColor: Colors.black45,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
+          items: navItems,
+        ),
       );
     });
   }

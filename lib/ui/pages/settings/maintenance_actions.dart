@@ -212,9 +212,9 @@ class MaintenanceActions {
       AlertDialog(
         title: const Text('确认清除数据'),
         content: const Text(
-          '此操作将深度删除所有 MaiBot 数据、系统配置以及适配器配置，\n'
-          '重启后将自动从最近备份恢复或进行全新干净的零参数初始化。\n\n'
-          '是否继续？',
+          '此操作将删除 MaiBot 的本地数据、系统配置及适配器配置。\n'
+          '重启后将从最近备份自动恢复或以默认配置重新初始化。\n\n'
+          '是否确定清除？',
         ),
         actions: [
           TextButton(
@@ -262,7 +262,7 @@ class MaintenanceActions {
         if (deletedAny) {
           Get.snackbar(
             '清除成功',
-            'MaiBot 数据与配置已彻底清除，应用即将自动退出',
+            'MaiBot 数据与配置已清除，应用即将退出',
             snackPosition: SnackPosition.BOTTOM,
             duration: const Duration(seconds: 2),
           );
