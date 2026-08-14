@@ -458,29 +458,15 @@ class _WebViewPageState extends State<WebViewPage> {
     const String jsCode = '''
       (function() {
         var meta = document.querySelector('meta[name="viewport"]');
-        if (meta) {
-          meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-        } else {
+        if (!meta) {
           meta = document.createElement('meta');
           meta.name = 'viewport';
-          meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+          meta.content = 'width=device-width, initial-scale=1.0, user-scalable=yes';
           document.head.appendChild(meta);
         }
-
-        // 禁用双击缩放
-        var lastTouchEnd = 0;
-        document.addEventListener('touchend', function(event) {
-          var now = Date.now();
-          if (now - lastTouchEnd <= 300) {
-            event.preventDefault();
-          }
-          lastTouchEnd = now;
-        }, false);
-
-        // 禁用手势缩放
-        document.addEventListener('gesturestart', function(event) {
-          event.preventDefault();
-        }, false);
+        // Ensure horizontal scroll is allowed if content overflows
+        document.body.style.overflowX = 'auto';
+        document.documentElement.style.overflowX = 'auto';
       })();
     ''';
     controller.runJavaScript(jsCode);

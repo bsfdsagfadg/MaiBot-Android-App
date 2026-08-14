@@ -81,8 +81,9 @@ class SocketStreamClient {
       event = event.replaceAll('\x02__HIST_END__\x03', '');
       _replaying = false;
     }
-
-    onData?.call(event);
+    // Normalize \n to \r\n for raw pipe stdout into xterm terminal
+    final normalizedEvent = event.replaceAllMapped(RegExp(r'(?<!\r)\n'), (m) => '\r\n');
+    onData?.call(normalizedEvent);
 
     _lineBuffer += event;
     final lines = _lineBuffer.split('\n');

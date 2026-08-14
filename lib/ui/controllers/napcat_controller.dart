@@ -13,7 +13,7 @@ class NapcatController extends GetxController {
   final RxString napCatWebUiToken = ''.obs; // 存储 NapCat WebUI Token
   final RxString maiBotWebUiToken = ''.obs; // 存储 MaiBot WebUI Token
   final RxBool _isQrcodeShowing = false.obs;
-
+  final RxInt _qrcodeRefreshTrigger = 0.obs;
   Setting napCatWebUiEnabled = 'napcat_webui_enabled'.setting;
   final RxBool napCatWebUiEnabledRx = false.obs;
 
@@ -82,6 +82,11 @@ class NapcatController extends GetxController {
         case NapcatLogEventType.qrcodeSaved:
           if (!_isQrcodeShowing.value) {
             await _showQrcodeDialog();
+          } else {
+            // Refresh existing QR code
+            final qrcodePath = '$ubuntuPath/root/napcat/cache/qrcode.png';
+            await FileImage(File(qrcodePath)).evict();
+            _qrcodeRefreshTrigger.value++;
           }
           break;
 
@@ -156,12 +161,17 @@ class NapcatController extends GetxController {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            Image.file(
-              qrcodeFile,
-              width: 200,
-              height: 200,
-              fit: BoxFit.contain,
-            ),
+            Obx(() {
+              // Trigger rebuild when refreshed
+              final _ = _qrcodeRefreshTrigger.value;
+              return Image.file(
+                qrcodeFile,
+                key: ValueKey(DateTime.now().millisecondsSinceEpoch),
+                width: 200,
+                height: 200,
+                fit: BoxFit.contain,
+              );
+            }),
           ],
         ),
       ),
