@@ -96,7 +96,8 @@ public class ProotService extends Service {
                     Log.e(TAG, "killall proot failed", e);
                 }
 
-                maibotProcess = new ProotProcess("MaiBot", 20001, binPath, homePath, tmpPath, ubuntuPath, "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nexport UV_LINK_MODE=copy\nexport PYTHONUNBUFFERED=1\ncd /root/MaiBot\n/root/.local/bin/uv run bot.py\n");
+                String maibotCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nexport UV_LINK_MODE=copy\nexport PYTHONUNBUFFERED=1\ncd /root/MaiBot\nif [ -f EULA.md ]; then export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}'); fi\nif [ -f PRIVACY.md ]; then export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}'); fi\n/root/.local/bin/uv run bot.py\n";
+                maibotProcess = new ProotProcess("MaiBot", 20001, binPath, homePath, tmpPath, ubuntuPath, maibotCmd);
                 maibotProcess.start();
                 
                 napcatProcess = new ProotProcess("NapCat", 20002, binPath, homePath, tmpPath, ubuntuPath, "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\ncd /root\nbash /root/launcher.sh\n");
@@ -215,7 +216,7 @@ public class ProotService extends Service {
                 history.clear();
                 historyLength = 0;
                 
-                List<String> cmd = new ArrayList<>(java.util.Arrays.asList(binPath + "/proot", "-0", "-r", ubuntuPath, "--link2symlink", "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", tmpPath + ":/tmp", "-w", "/root"));
+                List<String> cmd = new ArrayList<>(java.util.Arrays.asList(binPath + "/proot", "-0", "-r", ubuntuPath, "--link2symlink", "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", tmpPath + ":/tmp", "-b", tmpPath + ":/dev/shm", "-w", "/root"));
                 
                 // Fake sysdata bindings to prevent Python/uv crashes on restricted Android /proc
                 String[] fakeProcs = {".loadavg", ".stat", ".uptime", ".version", ".vmstat", ".sysctl_entry_cap_last_cap", ".sysctl_inotify_max_user_watches"};
@@ -236,8 +237,6 @@ public class ProotService extends Service {
                 pb.environment().put("PROOT_LOADER", binPath + "/loader");
                 pb.environment().put("LD_LIBRARY_PATH", binPath);
                 pb.environment().put("TERM", "xterm-256color");
-                pb.environment().put("EULA_AGREE", "agreed");
-                pb.environment().put("PRIVACY_AGREE", "agreed");
                 pb.redirectErrorStream(true);
                 process = pb.start();
 

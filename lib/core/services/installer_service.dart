@@ -359,6 +359,7 @@ class InstallerService {
       '--link2symlink',
       '-b', '/dev', '-b', '/proc', '-b', '/sys',
       '-b', '${RuntimeEnvir.tmpPath}:/tmp',
+      '-b', '${RuntimeEnvir.tmpPath}:/dev/shm',
       '-w', '/root',
       '/bin/sh', '-c',
       'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export UV_LINK_MODE=copy; $command'
