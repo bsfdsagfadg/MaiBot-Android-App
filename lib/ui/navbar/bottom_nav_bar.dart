@@ -55,15 +55,28 @@ class WebViewBottomNavBar extends StatelessWidget {
           label: '设置',
         ),
       ];
-
       final int selectedIndex = currentIndex >= destinations.length
           ? destinations.length - 1
-          : currentIndex;
+          : (currentIndex < 0 ? 0 : currentIndex);
 
-      return NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: onTap,
-        destinations: destinations,
+      final theme = Theme.of(context);
+
+      return Container(
+        decoration: BoxDecoration(
+          color: theme.navigationBarTheme.backgroundColor ?? theme.colorScheme.surfaceContainer,
+          border: Border(
+            top: BorderSide(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+              width: 1,
+            ),
+          ),
+        ),
+        child: NavigationBar(
+          height: 66,
+          selectedIndex: selectedIndex,
+          onDestinationSelected: onTap,
+          destinations: destinations,
+        ),
       );
     });
   }

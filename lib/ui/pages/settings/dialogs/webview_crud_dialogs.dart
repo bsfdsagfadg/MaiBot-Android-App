@@ -11,6 +11,7 @@ void showAddWebViewDialog(WebviewController controller) {
 
   Get.dialog(
     AlertDialog(
+      icon: const Icon(Icons.add_link_rounded, size: 28),
       title: const Text('添加自定义 WebView'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -18,19 +19,19 @@ void showAddWebViewDialog(WebviewController controller) {
           TextField(
             controller: titleController,
             decoration: const InputDecoration(
-              labelText: '标题',
+              labelText: '面板标题',
               hintText: '例如：我的仪表盘',
-              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.title_rounded),
             ),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: urlController,
             decoration: InputDecoration(
-              labelText: 'URL',
+              labelText: 'URL 地址',
               hintText: '例如：${Ports.napcatWebUi}/webui?token=***',
-              helperText: '自动添加前缀 http://127.0.0.1: \n若需使用https，请手动输入完整URL',
-              border: const OutlineInputBorder(),
+              helperText: '默认自动补全 http://127.0.0.1:',
+              prefixIcon: const Icon(Icons.link_rounded),
             ),
             keyboardType: TextInputType.url,
           ),
@@ -38,7 +39,7 @@ void showAddWebViewDialog(WebviewController controller) {
       ),
       actions: [
         TextButton(onPressed: () => Get.back(), child: const Text('取消')),
-        TextButton(
+        FilledButton(
           onPressed: () {
             final title = titleController.text.trim();
             var url = urlController.text.trim();
@@ -103,6 +104,7 @@ void showEditWebViewDialog(
 
   Get.dialog(
     AlertDialog(
+      icon: const Icon(Icons.edit_rounded, size: 28),
       title: const Text('编辑自定义 WebView'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -110,17 +112,17 @@ void showEditWebViewDialog(
           TextField(
             controller: titleController,
             decoration: const InputDecoration(
-              labelText: '标题',
-              border: OutlineInputBorder(),
+              labelText: '面板标题',
+              prefixIcon: Icon(Icons.title_rounded),
             ),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: urlController,
             decoration: const InputDecoration(
-              labelText: 'URL',
-              helperText: '自动添加前缀 http://127.0.0.1: \n若需使用https,请手动输入完整URL',
-              border: OutlineInputBorder(),
+              labelText: 'URL 地址',
+              helperText: '默认自动补全 http://127.0.0.1:',
+              prefixIcon: Icon(Icons.link_rounded),
             ),
             keyboardType: TextInputType.url,
           ),
@@ -128,7 +130,7 @@ void showEditWebViewDialog(
       ),
       actions: [
         TextButton(onPressed: () => Get.back(), child: const Text('取消')),
-        TextButton(
+        FilledButton(
           onPressed: () {
             final title = titleController.text.trim();
             var url = urlController.text.trim();
@@ -181,11 +183,13 @@ void showConfirmDeleteWebView(
     WebviewController controller, int index, String title) {
   Get.dialog(
     AlertDialog(
+      icon: const Icon(Icons.delete_outline_rounded, size: 28, color: Colors.red),
       title: const Text('确认删除'),
       content: Text('确定要删除自定义 WebView "$title" 吗？'),
       actions: [
         TextButton(onPressed: () => Get.back(), child: const Text('取消')),
-        TextButton(
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Colors.red),
           onPressed: () {
             controller.removeCustomWebView(index);
             Get.back();
@@ -197,7 +201,7 @@ void showConfirmDeleteWebView(
               duration: const Duration(seconds: 2),
             );
           },
-          child: const Text('删除', style: TextStyle(color: Colors.red)),
+          child: const Text('删除'),
         ),
       ],
     ),

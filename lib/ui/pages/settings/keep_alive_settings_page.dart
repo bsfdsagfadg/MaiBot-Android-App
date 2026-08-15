@@ -269,7 +269,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('后台保活设置', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+        title: const Text('后台保活设置', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => Get.back(),
@@ -279,21 +279,26 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.25)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline_rounded, color: Colors.blue, size: 20),
-                const SizedBox(width: 10),
+                Icon(Icons.info_outline_rounded, color: theme.colorScheme.primary, size: 22),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     '为确保后台常驻运行不中断，建议完成下方系统权限设置，并在多任务界面为 MaiBot 加锁。',
-                    style: TextStyle(color: Colors.blue.shade900, fontSize: 13, height: 1.4),
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimaryContainer,
+                      fontSize: 13,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -312,10 +317,10 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 ),
                 child: const Icon(Icons.battery_saver_rounded, color: Colors.green, size: 22),
               ),
-              title: const Text('电池优化豁免', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              title: Text('电池优化豁免', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
               subtitle: Text(
                 _isBatteryOptimizationIgnored ? '已获得豁免权限，允许后台运行' : '未授权：系统可能在息屏时休眠进程',
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               trailing: _isBatteryOptimizationIgnored
                   ? const Icon(Icons.check_circle_rounded, color: Colors.green, size: 22)
@@ -340,8 +345,11 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 ),
                 child: const Icon(Icons.wifi_lock_rounded, color: Colors.indigo, size: 22),
               ),
-              title: const Text('保持 Wi-Fi 连接 (WLAN 锁)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-              subtitle: const Text('息屏时避免系统 Wi-Fi 进入休眠，保障网络连接稳定', style: TextStyle(fontSize: 12, color: Colors.black54)),
+              title: Text('保持 Wi-Fi 连接 (WLAN 锁)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                '息屏时避免系统 Wi-Fi 进入休眠，保障网络连接稳定',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
               value: _enableWifiLock.get() ?? true,
               activeThumbColor: primaryColor,
               onChanged: (bool value) {
@@ -363,19 +371,19 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 ),
                 child: const Icon(Icons.link_rounded, color: Colors.purple, size: 22),
               ),
-              title: const Text('Shizuku 运行状态', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              title: Text('Shizuku 运行状态', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
               subtitle: Text(
                 !_shizukuAvailable
                     ? '未运行：请先启动 Shizuku 应用'
                     : (_shizukuPermissionGranted ? '已连接并获得授权' : '已检测到服务，点击请求授权'),
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               trailing: Icon(
                 !_shizukuAvailable
                     ? Icons.cancel_rounded
                     : (_shizukuPermissionGranted ? Icons.check_circle_rounded : Icons.info_rounded),
                 color: !_shizukuAvailable
-                    ? Colors.grey
+                    ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
                     : (_shizukuPermissionGranted ? Colors.green : Colors.orange),
                 size: 22,
               ),
@@ -394,8 +402,11 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 ),
                 child: const Icon(Icons.flash_on_rounded, color: Colors.teal, size: 22),
               ),
-              title: const Text('写入系统 Doze 白名单', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-              subtitle: const Text('通过 Shell 命令直接将应用注册至系统低电耗白名单', style: TextStyle(fontSize: 12, color: Colors.black54)),
+              title: Text('写入系统 Doze 白名单', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                '通过 Shell 命令直接将应用注册至系统低电耗白名单',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
               value: _shizukuDozeWhitelist,
               activeThumbColor: primaryColor,
               onChanged: (bool value) => _toggleDozeWhitelist(value),
@@ -410,8 +421,11 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 ),
                 child: const Icon(Icons.tune_rounded, color: Colors.deepOrange, size: 22),
               ),
-              title: const Text('无限制后台运行 (AppOps)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-              subtitle: const Text('开启 RUN_ANY_IN_BACKGROUND 权限，允许应用在后台持续运行', style: TextStyle(fontSize: 12, color: Colors.black54)),
+              title: Text('无限制后台运行 (AppOps)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                '开启 RUN_ANY_IN_BACKGROUND 权限，允许应用在后台持续运行',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
               value: _shizukuRunAnyInBackground,
               activeThumbColor: primaryColor,
               onChanged: (bool value) => _toggleRunAnyInBackground(value),
@@ -426,8 +440,11 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 ),
                 child: const Icon(Icons.memory_rounded, color: Colors.blueGrey, size: 22),
               ),
-              title: const Text('提高幻影进程限制 (Android 12+)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-              subtitle: const Text('将系统幻影进程上限提升至 64，避免 Linux 容器子进程被系统清理', style: TextStyle(fontSize: 12, color: Colors.black54)),
+              title: Text('提高幻影进程限制 (Android 12+)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                '将系统幻影进程上限提升至 64，避免 Linux 容器子进程被系统清理',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
               value: _shizukuPhantomProcessLimit,
               activeThumbColor: primaryColor,
               onChanged: (bool value) => _togglePhantomProcess(value),
@@ -446,10 +463,10 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 ),
                 child: Icon(Icons.lock_outline_rounded, color: Colors.amber.shade800, size: 22),
               ),
-              title: const Text('多任务锁定建议', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-              subtitle: const Text(
+              title: Text('多任务锁定建议', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
                 '在系统的最近任务列表中长按或下拉 MaiBot 卡片添加锁定图标，防止一键清理任务时被关闭。',
-                style: TextStyle(fontSize: 12, color: Colors.black54),
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
             const Divider(height: 1, indent: 56),
@@ -462,8 +479,11 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
                 ),
                 child: const Icon(Icons.visibility_off_rounded, color: Colors.red, size: 22),
               ),
-              title: const Text('从最近任务列表中隐藏', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-              subtitle: const Text('隐藏后应用不在多任务列表显示。在系统内存紧张时可能降低保活优先级。', style: TextStyle(fontSize: 12, color: Colors.black54)),
+              title: Text('从最近任务列表中隐藏', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                '隐藏后应用不在多任务列表显示。在系统内存紧张时可能降低保活优先级。',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
               value: Get.find<HomeController>().hideFromRecents.get() ?? false,
               activeThumbColor: primaryColor,
               onChanged: (bool value) {
@@ -485,13 +505,14 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
       child: Row(
         children: [
           Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Text(
             title,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.onSurfaceVariant,
+              letterSpacing: 0.3,
             ),
           ),
         ],
@@ -501,12 +522,14 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
 
   Widget _buildCard(List<Widget> children) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Card(
       elevation: 0,
-      color: theme.colorScheme.surfaceContainerLow,
+      color: theme.cardTheme.color ?? theme.colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.35 : 0.45)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

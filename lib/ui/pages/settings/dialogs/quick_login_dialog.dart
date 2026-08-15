@@ -63,6 +63,7 @@ Future<void> showQuickLoginDialog() async {
 
   final result = await Get.dialog<bool>(
     AlertDialog(
+      icon: const Icon(Icons.account_circle_rounded, size: 28),
       title: const Text('快速登录 QQ'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -70,9 +71,9 @@ Future<void> showQuickLoginDialog() async {
           TextField(
             controller: qqController,
             decoration: const InputDecoration(
-              labelText: 'QQ号',
-              hintText: '请输入QQ号',
-              border: OutlineInputBorder(),
+              labelText: 'QQ 账号',
+              hintText: '请输入用于免扫码登录的 QQ 号',
+              prefixIcon: Icon(Icons.numbers_rounded),
             ),
             keyboardType: TextInputType.number,
           ),
@@ -83,7 +84,7 @@ Future<void> showQuickLoginDialog() async {
           onPressed: () => Get.back(result: false),
           child: const Text('取消'),
         ),
-        TextButton(
+        FilledButton(
           onPressed: () => Get.back(result: true),
           child: const Text('保存'),
         ),

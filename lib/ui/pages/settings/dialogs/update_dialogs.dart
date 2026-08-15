@@ -103,76 +103,89 @@ class UpdateChecker {
   void _showUpdateDialog(
       String version, String releaseNotes, Map<String, dynamic> releaseData) {
     Get.dialog(
-      Dialog(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
+      Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500, maxHeight: 560),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    '发现新版本 $version',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.new_releases_rounded, color: colorScheme.onPrimaryContainer, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '发现新版本 v$version',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Get.back(),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Get.back(),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20.0),
+                      child: MarkdownBody(
+                        data: releaseNotes,
+                        styleSheet: MarkdownStyleSheet(
+                          h1: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                          h2: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                          h3: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                          p: TextStyle(fontSize: 14, color: colorScheme.onSurface, height: 1.45),
+                          listBullet: TextStyle(fontSize: 14, color: colorScheme.primary),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Get.back(),
+                          child: const Text('稍后再说'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: () {
+                            Get.back();
+                            _showDownloadSourceDialog(releaseData);
+                          },
+                          child: const Text('去下载'),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: MarkdownBody(
-                  data: releaseNotes,
-                  styleSheet: MarkdownStyleSheet(
-                    h1: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    h2: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    h3: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    p: const TextStyle(fontSize: 14),
-                    listBullet: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Get.back(),
-                    child: const Text('关闭'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      Get.back();
-                      _showDownloadSourceDialog(releaseData);
-                    },
-                    child: const Text('去下载'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -226,66 +239,82 @@ class UpdateChecker {
       ...Config.downloadMirrors.map((mirror) => {
             'name': mirror['name']!,
             'icon':
-                mirror['icon'] == 'speed' ? Icons.speed : Icons.cloud_download,
+                mirror['icon'] == 'speed' ? Icons.speed : Icons.cloud_download_rounded,
             'url': '${mirror['url']}/$_originalDownloadUrl',
           }),
       {
-        'name': 'GitHub原始链接',
-        'icon': Icons.cloud_download,
+        'name': 'GitHub 官方直连',
+        'icon': Icons.cloud_download_rounded,
         'url': _originalDownloadUrl!,
-        'description': '直接从GitHub官方服务器下载，速度可能较慢',
+        'description': '直接从 GitHub 服务器下载',
       },
     ];
 
     Get.dialog(
-      AlertDialog(
-        title: const Text('选择下载源'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '请选择适合您网络环境的下载源',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            ...sources.map((source) {
-              return ListTile(
-                leading: Icon(source['icon'] as IconData),
-                title: Text(source['name'] as String),
-                subtitle: source['description'] != null
-                    ? Text(
-                        source['description'] as String,
-                        style: const TextStyle(fontSize: 12),
-                      )
-                    : null,
-                onTap: () async {
-                  final url = source['url'] as String;
-                  final uri = Uri.parse(url);
+      Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
 
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    Get.back();
-                  } else {
-                    Get.snackbar(
-                      '打开失败',
-                      '无法打开浏览器',
-                      snackPosition: SnackPosition.BOTTOM,
-                      backgroundColor: Colors.red,
-                      colorText: Colors.white,
-                    );
-                  }
-                },
-              );
-            }),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('取消'),
-          ),
-        ],
+          return AlertDialog(
+            icon: const Icon(Icons.cloud_download_rounded, size: 28),
+            title: const Text('选择下载源'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '请选择适合您网络环境的下载镜像源',
+                  style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 14),
+                ...sources.map((source) {
+                  return ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(source['icon'] as IconData, size: 20, color: colorScheme.onPrimaryContainer),
+                    ),
+                    title: Text(source['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    subtitle: source['description'] != null
+                        ? Text(
+                            source['description'] as String,
+                            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                          )
+                        : null,
+                    onTap: () async {
+                      final url = source['url'] as String;
+                      final uri = Uri.parse(url);
+
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        Get.back();
+                      } else {
+                        Get.snackbar(
+                          '打开失败',
+                          '无法打开浏览器',
+                          snackPosition: SnackPosition.BOTTOM,
+                          backgroundColor: Colors.red,
+                          colorText: Colors.white,
+                        );
+                      }
+                    },
+                  );
+                }),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('取消'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

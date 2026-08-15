@@ -16,6 +16,7 @@ class MaintenanceActions {
     // 首先询问是否需要备份
     final backupChoice = await Get.dialog<String>(
       AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded, size: 28, color: Colors.orange),
         title: const Text('重新安装 MaiBot'),
         content: const Text('重新安装将删除所有 MaiBot 数据，\n是否需要先备份当前数据？'),
         actions: [
@@ -23,19 +24,13 @@ class MaintenanceActions {
             onPressed: () => Get.back(result: 'cancel'),
             child: const Text('取消'),
           ),
-          TextButton(
+          OutlinedButton(
             onPressed: () => Get.back(result: 'no_backup'),
-            child: const Text(
-              '直接重装',
-              style: TextStyle(color: Colors.orange),
-            ),
+            child: const Text('直接重装'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Get.back(result: 'backup'),
-            child: const Text(
-              '备份后重装',
-              style: TextStyle(color: Colors.blue),
-            ),
+            child: const Text('备份后重装'),
           ),
         ],
       ),
@@ -152,19 +147,17 @@ class MaintenanceActions {
     // 显示确认对话框
     final confirm = await Get.dialog<bool>(
       AlertDialog(
-        title: const Text('确认重新安装'),
-        content: const Text('此操作将删除 NapcatQQ 安装文件（保留配置文件）并重新安装，确定继续吗？'),
+        icon: const Icon(Icons.refresh_rounded, size: 28, color: Colors.orange),
+        title: const Text('确认重新安装 NapCat'),
+        content: const Text('此操作将删除 NapcatQQ 安装文件（保留配置文件）并在启动时重新安装，确定继续吗？'),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
             child: const Text('取消'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Get.back(result: true),
-            child: const Text(
-              '确定',
-              style: TextStyle(color: Colors.orange),
-            ),
+            child: const Text('确定重装'),
           ),
         ],
       ),
@@ -210,6 +203,7 @@ class MaintenanceActions {
     // 显示确认对话框
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
+        icon: const Icon(Icons.delete_forever_rounded, size: 28, color: Colors.red),
         title: const Text('确认清除数据'),
         content: const Text(
           '此操作将删除 MaiBot 的本地数据、系统配置及适配器配置。\n'
@@ -221,12 +215,10 @@ class MaintenanceActions {
             onPressed: () => Get.back(result: false),
             child: const Text('取消'),
           ),
-          TextButton(
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Get.back(result: true),
-            child: const Text(
-              '确定',
-              style: TextStyle(color: Colors.orange),
-            ),
+            child: const Text('确定清除'),
           ),
         ],
       ),
@@ -295,10 +287,11 @@ class MaintenanceActions {
     // 显示确认对话框
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
-        title: const Text('确认重置'),
+        icon: const Icon(Icons.restart_alt_rounded, size: 28, color: Colors.orange),
+        title: const Text('确认重置 Python 环境'),
         content: const Text(
           '此操作将删除 Python 虚拟环境（.venv 目录）并退出应用。\n'
-          '下次启动时会自动重建环境并安装所有插件依赖。\n\n'
+          '下次启动时会自动重建环境并重新安装所有依赖。\n\n'
           '是否继续？',
         ),
         actions: [
@@ -306,12 +299,9 @@ class MaintenanceActions {
             onPressed: () => Get.back(result: false),
             child: const Text('取消'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Get.back(result: true),
-            child: const Text(
-              '确定',
-              style: TextStyle(color: Colors.orange),
-            ),
+            child: const Text('确定重置'),
           ),
         ],
       ),
@@ -366,19 +356,18 @@ class MaintenanceActions {
     // 显示确认对话框
     final confirm = await Get.dialog<bool>(
       AlertDialog(
-        title: const Text('确认退出'),
-        content: const Text('确定要退出应用吗？'),
+        icon: const Icon(Icons.power_settings_new_rounded, size: 28, color: Colors.redAccent),
+        title: const Text('确认退出应用'),
+        content: const Text('退出应用将终止后台常驻服务与 Linux 容器环境，确定要退出吗？'),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
             child: const Text('取消'),
           ),
-          TextButton(
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () => Get.back(result: true),
-            child: const Text(
-              '退出',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: const Text('退出应用'),
           ),
         ],
       ),

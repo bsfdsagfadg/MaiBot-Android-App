@@ -184,7 +184,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.blue,
                     title: '回到 MaiBot 主页',
                     subtitle: '重置并刷新 MaiBot 页面',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () {
                       widget.maiBotController.loadRequest(
                         Uri.parse('http://127.0.0.1:${Ports.maibotWeb}'),
@@ -204,7 +204,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.indigo,
                     title: '快速登录 QQ',
                     subtitle: '配置自动免扫码登录的 QQ 账号',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () => showQuickLoginDialog(),
                   ),
                   const Divider(height: 1, indent: 56),
@@ -213,7 +213,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.amber.shade800,
                     title: '查看数据目录与文件',
                     subtitle: '通过系统文件管理或 MT 管理器浏览 Ubuntu 环境目录',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () => _openFileManager(),
                   ),
                 ]),
@@ -234,7 +234,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       title: const Text('NapCat 控制面板', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                       subtitle: Text(
                         enabled ? '已开启：可在底部导航栏访问 NapCat 控制台' : '已关闭：底部导航栏不显示 NapCat 面板',
-                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                       ),
                       value: enabled,
                       activeThumbColor: primaryColor,
@@ -280,7 +280,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.green,
                     title: '后台保活设置',
                     subtitle: '电池优化、WLAN 保持连接及后台运行配置',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () {
                       Get.to(() => const KeepAliveSettingsPage());
                     },
@@ -291,7 +291,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.cyan.shade700,
                     title: '自定义 Git Clone 链接',
                     subtitle: '配置自定义或 Fork 的 MaiBot 仓库地址',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () => showCustomGitCloneDialog(),
                   ),
                   const Divider(height: 1, indent: 56),
@@ -300,7 +300,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.orange,
                     title: '清空 WebView 缓存',
                     subtitle: '清理内置网页与控制台的临时缓存',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () async {
                       try {
                         await widget.maiBotController.clearCache();
@@ -334,7 +334,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.blue.shade700,
                     title: '备份 MaiBot 数据',
                     subtitle: '打包本地配置、插件及数据至手机下载目录',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () async {
                       await BackupService.performBackup(showLoadingDialog: true);
                     },
@@ -345,7 +345,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.indigo.shade600,
                     title: '从备份恢复数据',
                     subtitle: '选择本地备份存档，支持按模块细粒度还原',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () async {
                       await BackupService.showRestoreDialog();
                     },
@@ -356,7 +356,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.orange.shade800,
                     title: '重置 Python 环境',
                     subtitle: '删除虚拟环境并在启动时重新构建依赖',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: MaintenanceActions.resetPythonEnv,
                   ),
                   const Divider(height: 1, indent: 56),
@@ -365,7 +365,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.deepOrange,
                     title: '重新安装 NapCat 组件',
                     subtitle: '清除 NapCat 文件并触发重新安装',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: MaintenanceActions.reinstallNapcat,
                   ),
                   const Divider(height: 1, indent: 56),
@@ -374,7 +374,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.deepOrange.shade700,
                     title: '重新安装 MaiBot',
                     subtitle: '重新拉取并安装 MaiBot 代码',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: MaintenanceActions.reinstallMaiBot,
                   ),
                   const Divider(height: 1, indent: 56),
@@ -383,10 +383,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.red,
                     title: '清除 MaiBot 数据',
                     subtitle: '清除本地数据与配置，恢复初始状态',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: MaintenanceActions.clearMaiBotData,
                   ),
-                ], backgroundColor: Colors.red.withValues(alpha: 0.02), borderColor: Colors.red.withValues(alpha: 0.15)),
+                ], backgroundColor: Colors.red.withValues(alpha: 0.03), borderColor: Colors.red.withValues(alpha: 0.2)),
                 const SizedBox(height: 16),
                 _buildSectionHeader('关于与支持', Icons.info_outline_rounded),
                 _buildCard([
@@ -398,7 +398,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     trailing: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: primaryColor.withValues(alpha: 0.1),
+                        color: primaryColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text('检查更新', style: TextStyle(fontSize: 12, color: primaryColor, fontWeight: FontWeight.bold)),
@@ -411,7 +411,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.blueGrey,
                     title: '隐私政策',
                     subtitle: '查看应用隐私保护与开源协议条款',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () async {
                       try {
                         final privacyContent =
@@ -419,7 +419,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         if (context.mounted) {
                           Get.dialog(
                             Dialog(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -469,7 +469,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: Colors.redAccent,
                     title: '退出应用',
                     subtitle: '完全终止前台守护服务与容器进程',
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: MaintenanceActions.exitApp,
                   ),
                 ]),
@@ -572,24 +572,25 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildSectionHeader(String title, IconData icon, {bool isDanger = false}) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final color = isDanger
-        ? (isDark ? const Color(0xFFFF8A80) : Colors.red.shade700)
-        : theme.colorScheme.onSurfaceVariant;
+        ? (isDark ? const Color(0xFFFF8A80) : colorScheme.error)
+        : colorScheme.onSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
       child: Row(
         children: [
           Icon(icon, size: 18, color: color),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Text(
             title,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: color,
-              letterSpacing: 0.2,
+              letterSpacing: 0.3,
             ),
           ),
         ],
@@ -603,11 +604,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
     return Card(
       elevation: 0,
-      color: backgroundColor ?? (isDark ? theme.colorScheme.surfaceContainerLow : theme.colorScheme.surfaceContainerLow),
+      color: backgroundColor ?? theme.cardTheme.color ?? theme.colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         side: BorderSide(
-          color: borderColor ?? theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.3 : 0.4),
+          color: borderColor ?? theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.35 : 0.45),
           width: 1,
         ),
       ),
@@ -621,11 +622,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildThemeCard(ThemeController controller) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     return _buildCard([
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -634,23 +636,34 @@ class _SettingsPageState extends State<SettingsPage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                    color: colorScheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.color_lens_rounded, color: theme.colorScheme.primary, size: 22),
+                  child: Icon(Icons.color_lens_rounded, color: colorScheme.primary, size: 22),
                 ),
                 const SizedBox(width: 14),
-                const Text(
+                Text(
                   '主题色调',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
                 const Spacer(),
-                Obx(() => Text(
-                      controller.currentSeedName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: controller.currentSeedColor,
+                Obx(() => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: controller.currentSeedColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        controller.currentSeedName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: controller.currentSeedColor,
+                        ),
                       ),
                     )),
               ],
@@ -667,7 +680,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   return Obx(() {
                     final isSelected = controller.selectedColorIndex.value == index;
                     final displayColor = item.isDynamic
-                        ? (controller.isDynamicSelected ? theme.colorScheme.primary : const Color(0xFF6750A4))
+                        ? (controller.isDynamicSelected ? colorScheme.primary : const Color(0xFF6750A4))
                         : item.color!;
 
                     return GestureDetector(
@@ -680,7 +693,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           color: displayColor,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: isSelected ? theme.colorScheme.onSurface : Colors.transparent,
+                            color: isSelected ? colorScheme.onSurface : Colors.transparent,
                             width: 2.5,
                           ),
                           boxShadow: isSelected
@@ -726,16 +739,20 @@ class _SettingsPageState extends State<SettingsPage> {
               child: const Icon(Icons.brightness_medium_rounded, color: Colors.amber, size: 22),
             ),
             const SizedBox(width: 14),
-            const Text(
+            Text(
               '显示模式',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                color: colorScheme.onSurface,
+              ),
             ),
             const Spacer(),
             Obx(() {
               final mode = controller.currentThemeMode.value;
               return SegmentedButton<ThemeMode>(
                 showSelectedIcon: false,
-                style: ButtonStyle(
+                style: const ButtonStyle(
                   visualDensity: VisualDensity.compact,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -770,9 +787,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: const Icon(Icons.contrast_rounded, color: Colors.blueGrey, size: 22),
                 ),
                 title: const Text('AMOLED 纯黑暗色', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                subtitle: const Text('纯黑底色背景，降低 OLED 屏幕功耗', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                subtitle: Text(
+                  '纯黑底色背景，降低 OLED 屏幕功耗',
+                  style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                ),
                 value: controller.isAmoledDark.value,
-                activeThumbColor: theme.colorScheme.primary,
+                activeThumbColor: colorScheme.primary,
                 onChanged: (bool value) => controller.setAmoledDark(value),
               ),
             ],
@@ -791,6 +811,9 @@ class _SettingsPageState extends State<SettingsPage> {
     Widget? trailing,
     VoidCallback? onTap,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       leading: Container(
@@ -803,11 +826,18 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+          color: colorScheme.onSurface,
+        ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(fontSize: 12, color: Colors.black54),
+        style: TextStyle(
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
       ),
       trailing: trailing,
       onTap: onTap,
@@ -820,7 +850,10 @@ class _SettingsPageState extends State<SettingsPage> {
     required String title,
     required String token,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final bool hasToken = token.isNotEmpty;
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       leading: Container(
@@ -833,13 +866,17 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+          color: colorScheme.onSurface,
+        ),
       ),
       subtitle: Text(
         hasToken ? (token.length > 20 ? '${token.substring(0, 16)}••••' : token) : '暂未捕获到 Token',
         style: TextStyle(
           fontSize: 12,
-          color: hasToken ? Colors.black87 : Colors.black38,
+          color: hasToken ? colorScheme.onSurface : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
           fontFamily: hasToken ? 'monospace' : null,
         ),
       ),
@@ -879,6 +916,9 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildCustomWebViewsSection() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Obx(() {
       final customWebViews = homeController.webviewController.customWebViews;
       return Column(
@@ -897,9 +937,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: const Icon(Icons.language_rounded, color: Colors.blue, size: 22),
                 ),
                 const SizedBox(width: 14),
-                const Text(
+                Text(
                   '自定义 WebView 面板',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
                 const Spacer(),
                 FilledButton.tonalIcon(
@@ -917,11 +961,14 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           if (customWebViews.isEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 16),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               child: Text(
                 '可添加外部插件的 Web 控制面板并显示在底部导航栏',
-                style: TextStyle(color: Colors.black38, fontSize: 12),
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  fontSize: 12,
+                ),
               ),
             )
           else
@@ -932,18 +979,31 @@ class _SettingsPageState extends State<SettingsPage> {
                   const Divider(height: 1, indent: 56),
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                    title: Text(webview['title'] ?? 'WebUI', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                    subtitle: Text(webview['url'] ?? '', style: const TextStyle(fontSize: 12, color: Colors.black45)),
+                    title: Text(
+                      webview['title'] ?? 'WebUI',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    subtitle: Text(
+                      webview['url'] ?? '',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.edit_rounded, size: 18, color: Colors.black54),
+                          icon: Icon(Icons.edit_rounded, size: 18, color: colorScheme.onSurfaceVariant),
                           onPressed: () => showEditWebViewDialog(homeController.webviewController, index, webview),
                           tooltip: '编辑',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                          icon: Icon(Icons.delete_outline_rounded, size: 18, color: colorScheme.error),
                           onPressed: () => showConfirmDeleteWebView(homeController.webviewController, index, webview['title'] ?? 'WebUI'),
                           tooltip: '删除',
                         ),

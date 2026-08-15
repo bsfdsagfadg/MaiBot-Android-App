@@ -150,33 +150,73 @@ class NapcatController extends GetxController {
     await FileImage(qrcodeFile).evict();
 
     _qrcodeDialog = Dialog(
-      backgroundColor: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '请用手机QQ扫码登录',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(Icons.qr_code_scanner_rounded, color: colorScheme.onPrimaryContainer, size: 28),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  '请用手机 QQ 扫码登录',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '扫码成功后将自动跳转进入控制台',
+                  style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Obx(() {
+                    final _ = _qrcodeRefreshTrigger.value;
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(
+                        qrcodeFile,
+                        key: ValueKey(DateTime.now().millisecondsSinceEpoch),
+                        width: 200,
+                        height: 200,
+                        fit: BoxFit.contain,
+                      ),
+                    );
+                  }),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Obx(() {
-              // Trigger rebuild when refreshed
-              final _ = _qrcodeRefreshTrigger.value;
-              return Image.file(
-                qrcodeFile,
-                key: ValueKey(DateTime.now().millisecondsSinceEpoch),
-                width: 200,
-                height: 200,
-                fit: BoxFit.contain,
-              );
-            }),
-          ],
-        ),
+          );
+        },
       ),
     );
-
     // 检查异步等待期间是否已经触发了登录成功
     if (isQrcodeProcessed) {
       _isQrcodeShowing.value = false;
@@ -247,6 +287,7 @@ class NapcatController extends GetxController {
         // 弹出对话框询问
         Get.dialog(
           AlertDialog(
+            icon: const Icon(Icons.account_circle_rounded, size: 28),
             title: const Text('快速登录设置'),
             content: Text(
                 '检测到您已登录 QQ: $loggedInQQ\n是否将其保存为快速登录账号？\n设置后下次启动将免扫码自动登录。'),
@@ -255,7 +296,7 @@ class NapcatController extends GetxController {
                 onPressed: () => Get.back(),
                 child: const Text('取消'),
               ),
-              TextButton(
+              FilledButton(
                 onPressed: () async {
                   webuiConfig['autoLoginAccount'] = loggedInQQ;
                   await webuiFile.writeAsString(

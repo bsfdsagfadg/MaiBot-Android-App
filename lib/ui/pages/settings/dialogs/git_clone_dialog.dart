@@ -12,46 +12,54 @@ Future<void> showCustomGitCloneDialog() async {
   final commandController = TextEditingController(text: currentCommand);
 
   final result = await Get.dialog<bool>(
-    AlertDialog(
-      title: const Text('自定义 Git Clone 链接'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '自定义克隆仓库链接，以使用 fork 的 MaiBot 仓库。\n留空则使用默认逻辑（从镜像源获取官方最新版）。',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+    Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+
+        return AlertDialog(
+          icon: const Icon(Icons.code_rounded, size: 28),
+          title: const Text('自定义 Git Clone 链接'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '自定义克隆仓库链接，以使用 fork 的 MaiBot 仓库。\n留空则使用默认逻辑（从镜像源获取官方最新版）。',
+                  style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant, height: 1.4),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '示例：\nhttps://github.com/MaiM-with-u/MaiBot.git',
+                  style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8), fontFamily: 'monospace'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: commandController,
+                  decoration: const InputDecoration(
+                    labelText: 'Git Repository URL',
+                    hintText: '留空使用默认官方逻辑',
+                    prefixIcon: Icon(Icons.link_rounded),
+                  ),
+                  maxLines: 2,
+                  keyboardType: TextInputType.url,
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              '示例：\nhttps://github.com/MaiM-with-u/MaiBot.git',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: const Text('取消'),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: commandController,
-              decoration: const InputDecoration(
-                labelText: 'Git Repository URL',
-                hintText: '留空使用默认逻辑',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-              keyboardType: TextInputType.url,
+            FilledButton(
+              onPressed: () => Get.back(result: true),
+              child: const Text('保存'),
             ),
           ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Get.back(result: false),
-          child: const Text('取消'),
-        ),
-        TextButton(
-          onPressed: () => Get.back(result: true),
-          child: const Text('保存'),
-        ),
-      ],
+        );
+      },
     ),
   );
 

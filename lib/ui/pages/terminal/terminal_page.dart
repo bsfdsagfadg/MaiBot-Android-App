@@ -92,14 +92,14 @@ class _TerminalPageState extends State<TerminalPage> {
                   Positioned.fill(
                     child: Column(
                       children: [
-                        // 顶栏控制条（使用正统 Material 3 surfaceContainer 主题，保持自然）
+                        // 顶栏控制条
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainer,
                             border: Border(
                               bottom: BorderSide(
-                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                                 width: 1,
                               ),
                             ),
@@ -110,18 +110,18 @@ class _TerminalPageState extends State<TerminalPage> {
                                 segments: [
                                   const ButtonSegment<int>(
                                     value: 0,
-                                    icon: Icon(Icons.dashboard_outlined, size: 16),
+                                    icon: Icon(Icons.dashboard_rounded, size: 16),
                                     label: Text('看板'),
                                   ),
                                   const ButtonSegment<int>(
                                     value: 1,
-                                    icon: Icon(Icons.smart_toy_outlined, size: 16),
+                                    icon: Icon(Icons.smart_toy_rounded, size: 16),
                                     label: Text('MaiBot'),
                                   ),
                                   if (controller.napcatClient.isConnected)
                                     const ButtonSegment<int>(
                                       value: 2,
-                                      icon: Icon(Icons.pets_outlined, size: 16),
+                                      icon: Icon(Icons.pets_rounded, size: 16),
                                       label: Text('NapCat'),
                                     ),
                                 ],
@@ -138,7 +138,7 @@ class _TerminalPageState extends State<TerminalPage> {
                               ),
                               const Spacer(),
                               IconButton(
-                                icon: Icon(Icons.copy_all_rounded, size: 18, color: colorScheme.onSurfaceVariant),
+                                icon: Icon(Icons.copy_all_rounded, size: 19, color: colorScheme.onSurfaceVariant),
                                 tooltip: '复制日志',
                                 onPressed: () async {
                                   final activeTerminal = _displayMode == 2
@@ -149,7 +149,7 @@ class _TerminalPageState extends State<TerminalPage> {
                                     await Clipboard.setData(ClipboardData(text: text));
                                     Get.snackbar(
                                       '已复制',
-                                      '${_displayMode == 2 ? 'NapCat' : 'MaiBot'} 终端内容已复制',
+                                      '${_displayMode == 2 ? 'NapCat' : 'MaiBot'} 终端内容已复制到剪贴板',
                                       snackPosition: SnackPosition.BOTTOM,
                                       duration: const Duration(seconds: 2),
                                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -158,7 +158,7 @@ class _TerminalPageState extends State<TerminalPage> {
                                 },
                               ),
                               IconButton(
-                                icon: Icon(Icons.cleaning_services_rounded, size: 18, color: colorScheme.onSurfaceVariant),
+                                icon: Icon(Icons.cleaning_services_rounded, size: 19, color: colorScheme.onSurfaceVariant),
                                 tooltip: '清屏',
                                 onPressed: () {
                                   final activeTerminal = _displayMode == 2
@@ -169,7 +169,7 @@ class _TerminalPageState extends State<TerminalPage> {
                                 },
                               ),
                               IconButton(
-                                icon: Icon(Icons.close_fullscreen_rounded, size: 18, color: colorScheme.onSurfaceVariant),
+                                icon: Icon(Icons.close_fullscreen_rounded, size: 19, color: colorScheme.onSurfaceVariant),
                                 tooltip: '返回看板',
                                 onPressed: () {
                                   setState(() {
@@ -180,7 +180,7 @@ class _TerminalPageState extends State<TerminalPage> {
                             ],
                           ),
                         ),
-                        // 终端渲染视图（画布背景严格使用深黑/纯黑）
+                        // 终端渲染视图
                         Expanded(
                           child: Container(
                             color: getAppTerminalTheme(context).background,
@@ -199,53 +199,68 @@ class _TerminalPageState extends State<TerminalPage> {
                     ),
                   ),
 
-                // 2. 形态 0: Material You 核心一体化看板（直接融入背景，拒绝悬浮框）
+                // 2. 形态 0: Material You 核心一体化看板
                 if (!isTerminalVisible)
                   Center(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 480),
+                        constraints: const BoxConstraints(maxWidth: 460),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // 品牌图标（纯正 Material You 纯色圆角容器）
+                            // 品牌图标（Material 3 容器与平滑阴影）
                             Container(
-                              width: 88,
-                              height: 88,
+                              width: 92,
+                              height: 92,
                               decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    colorScheme.primaryContainer,
+                                    colorScheme.secondaryContainer,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
                                 borderRadius: BorderRadius.circular(28),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: colorScheme.primary.withValues(alpha: 0.18),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
                               ),
                               child: Icon(
                                 Icons.smart_toy_rounded,
-                                size: 44,
+                                size: 48,
                                 color: colorScheme.onPrimaryContainer,
                               ),
                             ),
-                            const SizedBox(height: 28),
+                            const SizedBox(height: 24),
 
                             // 标题与副标题
                             Text(
                               'MaiBot',
                               style: theme.textTheme.headlineMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: -0.5,
+                                letterSpacing: -0.3,
                                 color: colorScheme.onSurface,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Text(
                               '正在初始化后台运行环境与核心组件',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
+                                letterSpacing: 0.1,
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 40),
+                            const SizedBox(height: 32),
 
-                            // 一体化进度展示区域
+                            // 一体化进度展示卡片
                             GetBuilder<HomeController>(
                               builder: (ctrl) {
                                 final progressVal = ctrl.progress.clamp(0.0, 1.0);
@@ -254,56 +269,72 @@ class _TerminalPageState extends State<TerminalPage> {
                                     ? ctrl.currentProgress.trim()
                                     : '正在准备环境...';
 
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            stepText,
-                                            style: theme.textTheme.titleSmall?.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                              color: colorScheme.onSurface,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: colorScheme.secondaryContainer,
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Text(
-                                            '$pct%',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: colorScheme.onSecondaryContainer,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                return Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerLow,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                      width: 1,
                                     ),
-                                    const SizedBox(height: 14),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: LinearProgressIndicator(
-                                        value: progressVal > 0 ? progressVal : null,
-                                        minHeight: 10,
-                                        backgroundColor: colorScheme.surfaceContainerHighest,
-                                        valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            pct >= 100 ? Icons.check_circle_rounded : Icons.sync_rounded,
+                                            size: 18,
+                                            color: colorScheme.primary,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              stepText,
+                                              style: theme.textTheme.titleSmall?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                color: colorScheme.onSurface,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: colorScheme.primaryContainer,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              '$pct%',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: colorScheme.onPrimaryContainer,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 14),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: LinearProgressIndicator(
+                                          value: progressVal > 0 ? progressVal : null,
+                                          minHeight: 8,
+                                          backgroundColor: colorScheme.surfaceContainerHighest,
+                                          valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 );
                               },
                             ),
-                            const SizedBox(height: 36),
+                            const SizedBox(height: 28),
 
                             // 终端日志切换操作组
                             Row(
@@ -318,9 +349,9 @@ class _TerminalPageState extends State<TerminalPage> {
                                   icon: const Icon(Icons.terminal_rounded, size: 18),
                                   label: const Text('MaiBot 日志'),
                                   style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
                                 ),
@@ -335,14 +366,22 @@ class _TerminalPageState extends State<TerminalPage> {
                                     icon: const Icon(Icons.pets_rounded, size: 18),
                                     label: const Text('NapCat 日志'),
                                     style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(14),
                                       ),
                                     ),
                                   ),
                                 ],
                               ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '点击任意空白处切换控制台视图',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                              ),
                             ),
                           ],
                         ),
