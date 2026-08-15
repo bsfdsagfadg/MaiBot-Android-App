@@ -130,13 +130,12 @@ class InstallerService {
       final adapterConfig = File('${adapterDir.path}/config.toml');
       if (adapterConfig.existsSync()) adapterConfig.deleteSync();
     }
-    // 5. 同步 Python 依赖库
+    // 5. 同步 Python 依赖库 (仅在缺失虚拟环境或就绪标记时执行，日常启动 0 耗时秒级跳过)
     final venvDir = Directory('${scripts.ubuntuPath}/root/MaiBot/.venv');
     final venvMarker = File('${scripts.ubuntuPath}/root/MaiBot/.venv_sync_ready');
-    final pythonBin = File('${venvDir.path}/bin/python');
-    if (!venvDir.existsSync() || !venvMarker.existsSync() || !pythonBin.existsSync()) {
-      if (venvDir.existsSync() && !venvMarker.existsSync()) {
-        // 说明上次依赖安装到一半被中断，清理未完成的残破虚拟环境以防幽灵缺失
+    final bool hasVenv = venvDir.existsSync() && venvMarker.existsSync();
+    if (!hasVenv) {
+      if (venvDir.existsSync()) {
         await _runInProot('rm -rf /root/MaiBot/.venv');
       }
       onProgress('正在同步 Python 依赖库 (国内镜像加速)...');
@@ -149,10 +148,6 @@ class InstallerService {
           'fi';
       final success = await _runInProot(uvSyncCmd, onLog: onLog);
       if (!success) return false;
-      final pipBin = File('${venvDir.path}/bin/pip');
-      if (!pipBin.existsSync()) {
-        await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pip', onLog: onLog);
-      }
       venvMarker.writeAsStringSync('ready');
     }
     // 6. 安装 NapCat
