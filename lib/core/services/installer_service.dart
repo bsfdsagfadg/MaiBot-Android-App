@@ -266,25 +266,27 @@ class InstallerService {
         '                }\n'
         '            }\' "\$TMP_URI_FILE" > "\$TMP_LIST_FILE"\n'
         '            if [ -s "\$TMP_LIST_FILE" ]; then\n'
-        '                echo -e "\\e[32m[apt-fast]\\e[0m 使用 aria2c 多连接并发下载软件包..."\n'
-        '                aria2c \\\n'
-        '                    --no-conf \\\n'
-        '                    -i "\$TMP_LIST_FILE" \\\n'
-        '                    -j 8 \\\n'
-        '                    -x 8 \\\n'
-        '                    -s 8 \\\n'
-        '                    -k 1M \\\n'
-        '                    --allow-overwrite=true \\\n'
-        '                    --auto-file-renaming=false \\\n'
-        '                    --file-allocation=none \\\n'
-        '                    --console-log-level=warn \\\n'
-        '                    --summary-interval=0 \\\n'
-        '                    --connect-timeout=10 \\\n'
-        '                    --timeout=30 \\\n'
-        '                    --max-tries=5 \\\n'
-        '                    --retry-wait=2 \\\n'
-        '                    --dir=/var/cache/apt/archives || true\n'
-        '            fi\n'
+            '                echo -e "\\e[32m[apt-fast]\\e[0m 使用 aria2c 多连接并发下载软件包..."\n'
+            '                aria2c \\\n'
+            '                    --no-conf \\\n'
+            '                    --async-dns=false \\\n'
+            '                    --disable-ipv6=true \\\n'
+            '                    -i "\$TMP_LIST_FILE" \\\n'
+            '                    -j 8 \\\n'
+            '                    -x 8 \\\n'
+            '                    -s 8 \\\n'
+            '                    -k 1M \\\n'
+            '                    --allow-overwrite=true \\\n'
+            '                    --auto-file-renaming=false \\\n'
+            '                    --file-allocation=none \\\n'
+            '                    --console-log-level=warn \\\n'
+            '                    --summary-interval=0 \\\n'
+            '                    --connect-timeout=10 \\\n'
+            '                    --timeout=30 \\\n'
+            '                    --max-tries=5 \\\n'
+            '                    --retry-wait=2 \\\n'
+            '                    --dir=/var/cache/apt/archives || true\n'
+            '            fi\n'
         '            rm -f "\$TMP_URI_FILE" "\$TMP_LIST_FILE"\n'
         '        fi\n'
         '        exec "\$APT_REAL" "\$@"\n'
@@ -295,7 +297,6 @@ class InstallerService {
         'esac\n'
       );
       Process.runSync('${RuntimeEnvir.binPath}/busybox', ['chmod', '+x', aptFastScript.path]);
-      
       // 创建 apt-get 与 apt 的覆盖软连接至 /usr/local/bin
       final aptGetLink = Link('${localBinDir.path}/apt-get');
       if (!aptGetLink.existsSync()) {
@@ -306,6 +307,72 @@ class InstallerService {
         try { aptLink.createSync('apt-fast'); } catch (_) {}
       }
 
+      // 部署透明高速 curl 包装器（自动为 GitHub Releases/Raw/Zip 加上高速镜像）
+      final curlWrapper = File('${localBinDir.path}/curl');
+      curlWrapper.writeAsStringSync(
+        '#!/bin/bash\n'
+        'REAL_CURL="/usr/bin/curl"\n'
+        '[ ! -x "\$REAL_CURL" ] && REAL_CURL="curl"\n\n'
+        'ARGS=()\n'
+        'for arg in "\$@"; do\n'
+        '    if [[ "\$arg" =~ ^https://(github\\.com|raw\\.githubusercontent\\.com|objects\\.githubusercontent\\.com)/.* ]] && [[ ! "\$arg" =~ ghfast\\.top ]] && [[ ! "\$arg" =~ gh-proxy\\.com ]] && [[ ! "\$arg" =~ ghproxy ]]; then\n'
+        '        ARGS+=("https://ghfast.top/\$arg")\n'
+        '    else\n'
+        '        ARGS+=("\$arg")\n'
+        '    fi\n'
+        'done\n\n'
+        'exec "\$REAL_CURL" "\${ARGS[@]}"\n'
+      );
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['chmod', '+x', curlWrapper.path]);
+
+      // 部署透明高速 wget 包装器
+      final wgetWrapper = File('${localBinDir.path}/wget');
+      wgetWrapper.writeAsStringSync(
+        '#!/bin/bash\n'
+        'REAL_WGET="/usr/bin/wget"\n'
+        '[ ! -x "\$REAL_WGET" ] && REAL_WGET="wget"\n\n'
+        'ARGS=()\n'
+        'for arg in "\$@"; do\n'
+        '    if [[ "\$arg" =~ ^https://(github\\.com|raw\\.githubusercontent\\.com|objects\\.githubusercontent\\.com)/.* ]] && [[ ! "\$arg" =~ ghfast\\.top ]] && [[ ! "\$arg" =~ gh-proxy\\.com ]] && [[ ! "\$arg" =~ ghproxy ]]; then\n'
+        '        ARGS+=("https://ghfast.top/\$arg")\n'
+        '    else\n'
+        '        ARGS+=("\$arg")\n'
+        '    fi\n'
+        'done\n\n'
+        'exec "\$REAL_WGET" "\${ARGS[@]}"\n'
+      );
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['chmod', '+x', wgetWrapper.path]);
+
+      // 全局 Git 高速镜像与防卡死配置 (/etc/gitconfig)
+      final gitConfig = File('${scripts.ubuntuPath}/etc/gitconfig');
+      gitConfig.writeAsStringSync(
+        '[url "https://ghfast.top/https://github.com/"]\n'
+        '    insteadOf = https://github.com/\n'
+        '[url "https://ghfast.top/https://raw.githubusercontent.com/"]\n'
+        '    insteadOf = https://raw.githubusercontent.com/\n'
+        '[http]\n'
+        '    lowSpeedLimit = 1000\n'
+        '    lowSpeedTime = 15\n'
+        '    postBuffer = 524288000\n'
+      );
+
+      // 全局 Python Pip 国内镜像源配置 (/etc/pip.conf)
+      final pipConfig = File('${scripts.ubuntuPath}/etc/pip.conf');
+      pipConfig.writeAsStringSync(
+        '[global]\n'
+        'index-url = https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple\n'
+        'extra-index-url = https://pypi.tuna.tsinghua.edu.cn/simple https://mirrors.aliyun.com/pypi/simple/\n'
+        'timeout = 30\n'
+      );
+
+      // 全局 NPM / Node.js 镜像源配置 (/root/.npmrc)
+      final npmrc = File('${scripts.ubuntuPath}/root/.npmrc');
+      npmrc.writeAsStringSync(
+        'registry=https://registry.npmmirror.com\n'
+        'disturl=https://npmmirror.com/mirrors/node\n'
+        'canvas_binary_host_mirror=https://npmmirror.com/mirrors/canvas\n'
+      );
+
       // UV 国内镜像与加速配置
       final uvConfigDir = Directory('${scripts.ubuntuPath}/root/.config/uv');
       if (!uvConfigDir.existsSync()) uvConfigDir.createSync(recursive: true);
@@ -315,7 +382,6 @@ class InstallerService {
         'url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"\n'
         'default = true\n'
       );
-      onLog?.call('\x1b[32m[Sysdata]\x1b[0m 正在配置伪装系统信息...\r\n');
       final procDir = Directory('${scripts.ubuntuPath}/proc');
       if (!procDir.existsSync()) procDir.createSync(recursive: true);
       final loadavg = File('${procDir.path}/.loadavg');
