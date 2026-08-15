@@ -341,6 +341,17 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const Divider(height: 1, indent: 56),
                   _buildSettingTile(
+                    icon: Icons.settings_backup_restore_rounded,
+                    iconColor: Colors.indigo.shade600,
+                    title: '从备份恢复数据',
+                    subtitle: '选择本地备份存档，支持按模块细粒度还原',
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                    onTap: () async {
+                      await BackupService.showRestoreDialog();
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
                     icon: Icons.restart_alt_rounded,
                     iconColor: Colors.orange.shade800,
                     title: '重置 Python 环境',

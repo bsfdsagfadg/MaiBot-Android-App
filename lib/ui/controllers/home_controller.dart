@@ -11,6 +11,7 @@ import 'package:settings/settings.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/services/backup_service.dart';
 import '../../core/services/foreground_service.dart';
 import '../../core/services/installer_service.dart';
 import '../../core/services/progress_tracker.dart';
@@ -125,8 +126,25 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       Log.e('安装流水线执行失败', tag: 'MaiBot');
       return;
     }
+    // 首次全新安装完成时，若检测到本地存在历史备份，提示用户是否选择性恢复备份
+    if (InstallerService.lastInstallWasFresh) {
+      final backups = BackupService.getAvailableBackups();
+      if (backups.isNotEmpty) {
+        await BackupService.showRestoreDialog(
+          isInitialInstall: true,
+          onCompleted: () async {
+            await _startBackendServices();
+          },
+        );
+        return;
+      }
+    }
 
-    // 安装成功，启动常驻服务
+    await _startBackendServices();
+  }
+
+  /// 启动常驻后台服务并建立 Socket 连接
+  Future<void> _startBackendServices() async {
     progressTracker.setProgress('正在启动后台运行环境...');
 
     // 启动原生后台守护服务

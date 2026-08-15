@@ -8,13 +8,63 @@ import '../constants/scripts.dart' as scripts;
 import 'foreground_service.dart';
 import '../utils/file_utils.dart';
 
-/// 备份服务：将 MaiBot 数据打包到手机下载目录
+/// 备份与恢复服务：支持 MaiBot / NapCat 全量备份与细粒度选择性模块恢复
 class BackupService {
+  /// 获取本地现有的所有有效备份文件（按修改时间倒序排列，最新的排在最前）
+  static List<File> getAvailableBackups() {
+    try {
+      final backupDir = getMaiBotBackupDirectory();
+      if (!backupDir.existsSync()) return [];
+
+      final files = backupDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.tar.gz') && f.lengthSync() > 1024)
+          .toList();
+
+      files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      return files;
+    } catch (e) {
+      Log.e('扫描备份文件失败: $e', tag: 'BackupService');
+      return [];
+    }
+  }
+
+  /// 探测备份文件内部包含的具体模块
+  static Future<Map<String, bool>> inspectBackupContents(File backupFile) async {
+    final result = {
+      'data': false,
+      'config': false,
+      'plugins': false,
+      'napcat': false,
+    };
+
+    try {
+      final proc = await Process.run('${RuntimeEnvir.binPath}/busybox', [
+        'tar',
+        '-tzf',
+        backupFile.path,
+      ]);
+
+      if (proc.exitCode == 0) {
+        final lines = proc.stdout.toString().split('\n');
+        for (final line in lines) {
+          if (line.startsWith('MaiBot/data/')) result['data'] = true;
+          if (line.startsWith('MaiBot/config/')) result['config'] = true;
+          if (line.startsWith('MaiBot/plugins/')) result['plugins'] = true;
+          if (line.startsWith('napcat/config/')) result['napcat'] = true;
+        }
+      }
+    } catch (e) {
+      Log.w('解析备份目录结构异常: $e', tag: 'BackupService');
+      // 解析异常时默认全选
+      return {'data': true, 'config': true, 'plugins': true, 'napcat': true};
+    }
+
+    return result;
+  }
+
   /// 执行备份操作
-  ///
-  /// 备份前会暂停前台服务并终止容器进程，保证打包时数据一致；
-  /// 结束后（无论成败）若 [restoreService] 为 true 则自动恢复服务并重新拉起容器。
-  /// 重装等紧随其后会再次停止服务的流程应传 false，并在取消时自行恢复。
   static Future<bool> performBackup({
     bool showLoadingDialog = false,
     bool restoreService = true,
@@ -22,7 +72,7 @@ class BackupService {
     bool dialogShown = false;
     void closeDialog() {
       if (dialogShown) {
-        Get.back(); // 关闭加载对话框
+        Get.back();
         dialogShown = false;
       }
     }
@@ -33,7 +83,6 @@ class BackupService {
       if (!status.isGranted) {
         status = await Permission.manageExternalStorage.request();
         if (!status.isGranted) {
-          // 如果 MANAGE_EXTERNAL_STORAGE 未授予，尝试传统的存储权限
           var storageStatus = await Permission.storage.status;
           if (!storageStatus.isGranted) {
             storageStatus = await Permission.storage.request();
@@ -52,7 +101,6 @@ class BackupService {
         }
       }
 
-      // ---- 前置检查：在暂停服务前完成，避免无谓停服 ----
       final dataPath = '${scripts.ubuntuPath}/root/MaiBot/data';
       final dataDir = Directory(dataPath);
       if (!await dataDir.exists()) {
@@ -66,13 +114,11 @@ class BackupService {
         return false;
       }
 
-      // 备份文件路径（保存到下载文件夹）
       final backupDir = getMaiBotBackupDirectory();
       if (!await backupDir.exists()) {
         await backupDir.create(recursive: true);
       }
 
-      // 获取当前时间戳
       final now = DateTime.now();
       final timestamp =
           '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
@@ -80,23 +126,20 @@ class BackupService {
       final backupFileName = 'MaiBot-backup-$timestamp.tar.gz';
       final backupPath = '${backupDir.path}/$backupFileName';
 
-      // ---- 暂停容器保证备份一致性：停服终止 PTY，再终止残留容器进程 ----
-      Log.i('备份前暂停前台服务，确保数据一致性', tag: 'MaiBot');
+      Log.i('备份前暂停前台服务，确保数据一致性', tag: 'BackupService');
       await ForegroundServiceManager.stopService();
       try {
         await Process.run('${RuntimeEnvir.binPath}/busybox',
             ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
         
-        // 清理 X11 锁文件，防止下次启动 NapCat 时报 "Display :1 already exists"
         final x1Lock = File('${RuntimeEnvir.tmpPath}/.X1-lock');
         if (x1Lock.existsSync()) x1Lock.deleteSync();
         final x11Unix = Directory('${RuntimeEnvir.tmpPath}/.X11-unix');
         if (x11Unix.existsSync()) x11Unix.deleteSync(recursive: true);
       } catch (e) {
-        Log.w('清理残留进程与锁文件失败: $e', tag: 'MaiBot');
+        Log.w('清理残留进程与锁文件失败: $e', tag: 'BackupService');
       }
 
-      // 权限获取成功后，如果需要显示加载对话框
       if (showLoadingDialog) {
         Get.dialog(
           const Center(child: CircularProgressIndicator()),
@@ -105,7 +148,6 @@ class BackupService {
         dialogShown = true;
       }
 
-      // 确保备份的其他目标文件夹都存在，避免 tar 报错
       final List<String> pathsToCreate = [
         '${scripts.ubuntuPath}/root/MaiBot/config',
         '${scripts.ubuntuPath}/root/MaiBot/plugins',
@@ -118,7 +160,6 @@ class BackupService {
         }
       }
 
-      // 执行备份命令，工作目录设为 /root
       final result = await Process.run('${RuntimeEnvir.binPath}/busybox', [
         'tar',
         '-czf',
@@ -145,11 +186,10 @@ class BackupService {
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 3),
         );
-        Log.i('备份成功: $backupPath (${fileSizeMB}MB)', tag: 'MaiBot');
+        Log.i('备份成功: $backupPath (${fileSizeMB}MB)', tag: 'BackupService');
         return true;
       } else {
         closeDialog();
-
         Get.snackbar(
           '备份失败',
           '错误: ${result.stderr}',
@@ -157,12 +197,11 @@ class BackupService {
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
-        Log.e('备份失败: ${result.stderr}', tag: 'MaiBot');
+        Log.e('备份失败: ${result.stderr}', tag: 'BackupService');
         return false;
       }
     } catch (e) {
       closeDialog();
-
       Get.snackbar(
         '备份失败',
         e.toString(),
@@ -170,15 +209,354 @@ class BackupService {
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-      Log.e('备份异常: $e', tag: 'MaiBot');
+      Log.e('备份异常: $e', tag: 'BackupService');
       return false;
     } finally {
-      // 兜底：任何遗漏路径都要关闭加载对话框
       closeDialog();
-      // 无论成败都恢复容器（除非调用方要求保持停止）
       if (restoreService) {
         await ForegroundServiceManager.restartContainer();
       }
     }
+  }
+
+  /// 执行细粒度选择性备份恢复
+  static Future<bool> performSelectiveRestore({
+    required File backupFile,
+    bool restoreData = true,
+    bool restoreConfig = true,
+    bool restorePlugins = true,
+    bool restoreNapcat = true,
+    bool restartService = true,
+  }) async {
+    if (!backupFile.existsSync()) {
+      Get.snackbar('恢复失败', '备份文件不存在', snackPosition: SnackPosition.BOTTOM);
+      return false;
+    }
+
+    try {
+      Log.i('开始执行选择性备份恢复: ${backupFile.path}', tag: 'BackupService');
+      await ForegroundServiceManager.stopService();
+
+      try {
+        await Process.run('${RuntimeEnvir.binPath}/busybox',
+            ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
+        final x1Lock = File('${RuntimeEnvir.tmpPath}/.X1-lock');
+        if (x1Lock.existsSync()) x1Lock.deleteSync();
+        final x11Unix = Directory('${RuntimeEnvir.tmpPath}/.X11-unix');
+        if (x11Unix.existsSync()) x11Unix.deleteSync(recursive: true);
+      } catch (_) {}
+
+      final extractTargets = <String>[];
+      if (restoreData) extractTargets.add('MaiBot/data');
+      if (restoreConfig) extractTargets.add('MaiBot/config');
+      if (restorePlugins) extractTargets.add('MaiBot/plugins');
+      if (restoreNapcat) extractTargets.add('napcat/config');
+
+      if (extractTargets.isEmpty) {
+        Get.snackbar('提示', '未选择任何要恢复的模块', snackPosition: SnackPosition.BOTTOM);
+        return true;
+      }
+
+      // 确保目标父目录结构完整
+      Directory('${scripts.ubuntuPath}/root/MaiBot').createSync(recursive: true);
+      Directory('${scripts.ubuntuPath}/root/napcat').createSync(recursive: true);
+
+      final args = [
+        'tar',
+        '-xzf',
+        backupFile.path,
+        '-C',
+        '${scripts.ubuntuPath}/root',
+        ...extractTargets,
+      ];
+
+      final res = await Process.run('${RuntimeEnvir.binPath}/busybox', args);
+      if (res.exitCode == 0) {
+        Log.i('选择性恢复成功: $extractTargets', tag: 'BackupService');
+        Get.snackbar(
+          '恢复成功',
+          '已成功还原选定的数据与配置模块',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
+        return true;
+      } else {
+        Log.e('恢复失败: ${res.stderr}', tag: 'BackupService');
+        Get.snackbar('恢复失败', '解压文件失败: ${res.stderr}', snackPosition: SnackPosition.BOTTOM);
+        return false;
+      }
+    } catch (e) {
+      Log.e('恢复过程异常: $e', tag: 'BackupService');
+      Get.snackbar('恢复异常', e.toString(), snackPosition: SnackPosition.BOTTOM);
+      return false;
+    } finally {
+      if (restartService) {
+        await ForegroundServiceManager.restartContainer();
+      }
+    }
+  }
+
+  /// 显示 Material You 风格的备份恢复选择对话框
+  static Future<void> showRestoreDialog({
+    bool isInitialInstall = false,
+    VoidCallback? onCompleted,
+  }) async {
+    final backups = getAvailableBackups();
+    if (backups.isEmpty) {
+      if (!isInitialInstall) {
+        Get.snackbar('提示', '未在手机下载目录中找到任何备份存档', snackPosition: SnackPosition.BOTTOM);
+      }
+      onCompleted?.call();
+      return;
+    }
+
+    int selectedBackupIndex = 0;
+    bool restoreData = true;
+    bool restoreConfig = true;
+    bool restorePlugins = true;
+    bool restoreNapcat = true;
+    bool isRestoring = false;
+
+    await Get.dialog(
+      StatefulBuilder(
+        builder: (context, setState) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+          final currentFile = backups[selectedBackupIndex];
+          return AlertDialog(
+            backgroundColor: colorScheme.surfaceContainerHigh,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.settings_backup_restore_rounded, color: colorScheme.onPrimaryContainer, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isInitialInstall ? '检测到历史备份' : '恢复数据备份',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        isInitialInstall ? '是否恢复历史存档与配置？' : '选择要还原的存档与模块',
+                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: isRestoring
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          Text('正在恢复选定模块数据...', style: theme.textTheme.bodyMedium),
+                        ],
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. 备份文件选择器
+                          Text('选择备份存档 (${backups.length} 个可用)',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              )),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainer,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                            ),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: backups.length > 4 ? 4 : backups.length,
+                              separatorBuilder: (_, __) => Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                              itemBuilder: (context, idx) {
+                                final f = backups[idx];
+                                final isSelected = idx == selectedBackupIndex;
+                                final isLatest = idx == 0;
+                                final fStat = f.statSync();
+                                final fDate =
+                                    '${fStat.modified.month.toString().padLeft(2, '0')}-${fStat.modified.day.toString().padLeft(2, '0')} ${fStat.modified.hour.toString().padLeft(2, '0')}:${fStat.modified.minute.toString().padLeft(2, '0')}';
+                                final fMB = (fStat.size / 1024 / 1024).toStringAsFixed(1);
+
+                                return ListTile(
+                                  dense: true,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  selected: isSelected,
+                                  selectedTileColor: colorScheme.secondaryContainer.withValues(alpha: 0.4),
+                                  leading: Radio<int>(
+                                    value: idx,
+                                    groupValue: selectedBackupIndex,
+                                    onChanged: (val) {
+                                      if (val != null) setState(() => selectedBackupIndex = val);
+                                    },
+                                  ),
+                                  title: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          f.uri.pathSegments.last,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (isLatest) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.primaryContainer,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text('最新备份',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: colorScheme.onPrimaryContainer,
+                                              )),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  subtitle: Text('$fDate · ${fMB}MB', style: const TextStyle(fontSize: 11)),
+                                  onTap: () => setState(() => selectedBackupIndex = idx),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 2. 选择性恢复子模块 Checkbox
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('选择要恢复的模块内容',
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                  )),
+                              TextButton(
+                                onPressed: () {
+                                  final allSelected = restoreData && restoreConfig && restorePlugins && restoreNapcat;
+                                  setState(() {
+                                    restoreData = !allSelected;
+                                    restoreConfig = !allSelected;
+                                    restorePlugins = !allSelected;
+                                    restoreNapcat = !allSelected;
+                                  });
+                                },
+                                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                child: Text(
+                                  (restoreData && restoreConfig && restorePlugins && restoreNapcat) ? '取消全选' : '全选',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainer,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                            ),
+                            child: Column(
+                              children: [
+                                CheckboxListTile(
+                                  dense: true,
+                                  title: const Text('聊天记录与记忆库', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  subtitle: const Text('MaiBot/data (SQLite 数据库、长期记忆、用户画像)', style: TextStyle(fontSize: 11)),
+                                  value: restoreData,
+                                  onChanged: (v) => setState(() => restoreData = v ?? true),
+                                ),
+                                Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                                CheckboxListTile(
+                                  dense: true,
+                                  title: const Text('核心配置与密钥', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  subtitle: const Text('MaiBot/config (bot.toml、模型 API Key、WebUI 令牌)', style: TextStyle(fontSize: 11)),
+                                  value: restoreConfig,
+                                  onChanged: (v) => setState(() => restoreConfig = v ?? true),
+                                ),
+                                Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                                CheckboxListTile(
+                                  dense: true,
+                                  title: const Text('已装插件与适配器', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  subtitle: const Text('MaiBot/plugins (NapCat 适配器与自定义插件)', style: TextStyle(fontSize: 11)),
+                                  value: restorePlugins,
+                                  onChanged: (v) => setState(() => restorePlugins = v ?? true),
+                                ),
+                                Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                                CheckboxListTile(
+                                  dense: true,
+                                  title: const Text('NapCat QQ 账号配置', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  subtitle: const Text('napcat/config (OneBot11 通信令牌与面板凭证)', style: TextStyle(fontSize: 11)),
+                                  value: restoreNapcat,
+                                  onChanged: (v) => setState(() => restoreNapcat = v ?? true),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+            actions: isRestoring
+                ? null
+                : [
+                    TextButton(
+                      onPressed: () {
+                        Get.back();
+                        onCompleted?.call();
+                      },
+                      child: Text(isInitialInstall ? '跳过 (全新初始化)' : '取消'),
+                    ),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: const Text('开始恢复'),
+                      onPressed: () async {
+                        setState(() => isRestoring = true);
+                        await performSelectiveRestore(
+                          backupFile: currentFile,
+                          restoreData: restoreData,
+                          restoreConfig: restoreConfig,
+                          restorePlugins: restorePlugins,
+                          restoreNapcat: restoreNapcat,
+                          restartService: !isInitialInstall,
+                        );
+                        Get.back();
+                        onCompleted?.call();
+                      },
+                    ),
+                  ],
+          );
+        },
+      ),
+      barrierDismissible: false,
+    );
   }
 }

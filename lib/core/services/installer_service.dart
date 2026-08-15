@@ -6,8 +6,10 @@ import 'package:settings/settings.dart';
 
 import '../config/app_config.dart';
 import '../constants/scripts.dart' as scripts;
-import '../utils/file_utils.dart';
 class InstallerService {
+  /// 记录当前流水线是否为首次/全新安装
+  static bool lastInstallWasFresh = false;
+
   static Future<bool> runInstallPipeline({
     required Function(String) onProgress,
     Function(String)? onLog,
@@ -24,6 +26,8 @@ class InstallerService {
         isExtracted = true;
       }
     }
+    
+    lastInstallWasFresh = !isExtracted;
     
     if (!isExtracted) {
       if (ubuntuDir.existsSync()) {
@@ -85,41 +89,7 @@ class InstallerService {
       return false;
     }
     try {
-      // 1.5 备份解析与恢复扫描
-    bool hasBackupData = false;
-    bool hasBackupConfig = false;
-    bool hasBackupPlugins = false;
-    bool hasBackupNapcat = false;
-    
-    final backupDir = getMaiBotBackupDirectory();
-    final restoreTempDir = Directory('${RuntimeEnvir.tmpPath}/backup_restore');
-    final restoreMarker = File('${RuntimeEnvir.tmpPath}/.restore_complete');
-    
-    if (!restoreMarker.existsSync() && backupDir.existsSync()) {
-      // 获取最新的备份文件
-      final backups = backupDir.listSync().where((e) => e.path.endsWith('.tar.gz')).toList();
-      if (backups.isNotEmpty) {
-        backups.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
-        final latestBackup = backups.first;
-        
-        onProgress('检测到历史备份，正在扫描解析...');
-        if (restoreTempDir.existsSync()) restoreTempDir.deleteSync(recursive: true);
-        restoreTempDir.createSync(recursive: true);
-        
-        final res = await Process.run('${RuntimeEnvir.binPath}/busybox', [
-          'tar', '-xzf', latestBackup.path, '-C', restoreTempDir.path
-        ]);
-        
-        if (res.exitCode == 0) {
-          if (Directory('${restoreTempDir.path}/MaiBot/data').existsSync()) hasBackupData = true;
-          if (Directory('${restoreTempDir.path}/MaiBot/config').existsSync()) hasBackupConfig = true;
-          if (Directory('${restoreTempDir.path}/MaiBot/plugins').existsSync()) hasBackupPlugins = true;
-          if (Directory('${restoreTempDir.path}/napcat/config').existsSync()) hasBackupNapcat = true;
-        }
-      }
-    }
-
-    // 3. 校验并安装 uv
+      // 3. 校验并安装 uv
     final uvExecutable = File('${scripts.ubuntuPath}/root/.local/bin/uv');
     final uvxExecutable = File('${scripts.ubuntuPath}/root/.local/bin/uvx');
     if (!uvExecutable.existsSync() || uvExecutable.lengthSync() < 10000 || !uvxExecutable.existsSync()) {
@@ -141,18 +111,11 @@ class InstallerService {
       if (!success) return false;
     }
 
-    // 4.5 恢复插件与默认适配器克隆
+    // 4.5 默认适配器克隆
     final pluginsDir = Directory('${scripts.ubuntuPath}/root/MaiBot/plugins');
     final adapterDir = Directory('${pluginsDir.path}/MaiBot-Napcat-Adapter');
     final adapterMain = File('${adapterDir.path}/adapter.py');
     final adapterInit = File('${adapterDir.path}/__init__.py');
-    
-    if (hasBackupPlugins) {
-      onProgress('正在从备份中恢复插件...');
-      await _runInProot('rm -rf /root/MaiBot/plugins/*');
-      if (!pluginsDir.existsSync()) pluginsDir.createSync(recursive: true);
-      await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/plugins/', '${scripts.ubuntuPath}/root/MaiBot/']);
-    }
     
     if (!adapterDir.existsSync() || (!adapterMain.existsSync() && !adapterInit.existsSync())) {
       if (adapterDir.existsSync()) {
@@ -166,30 +129,6 @@ class InstallerService {
       }
       final adapterConfig = File('${adapterDir.path}/config.toml');
       if (adapterConfig.existsSync()) adapterConfig.deleteSync();
-      
-      // 如果有备份，尝试恢复适配器的配置
-      final backupAdapterConfig = File('${restoreTempDir.path}/MaiBot/plugins/MaiBot-Napcat-Adapter/config.toml');
-      if (hasBackupPlugins && backupAdapterConfig.existsSync()) {
-        backupAdapterConfig.copySync(adapterConfig.path);
-      }
-    }
-    // 4.6 恢复数据与配置
-    final dataDir = Directory('${scripts.ubuntuPath}/root/MaiBot/data');
-    if (!dataDir.existsSync() || dataDir.listSync().isEmpty) {
-      if (hasBackupData) {
-        onProgress('正在从备份中恢复数据...');
-        if (!dataDir.existsSync()) dataDir.createSync(recursive: true);
-        await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/data/*', '${dataDir.path}/']);
-      }
-    }
-
-    final configDir = Directory('${scripts.ubuntuPath}/root/MaiBot/config');
-    if (!configDir.existsSync() || configDir.listSync().isEmpty) {
-      if (hasBackupConfig) {
-        onProgress('正在从备份中恢复应用配置...');
-        if (!configDir.existsSync()) configDir.createSync(recursive: true);
-        await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/MaiBot/config/*', '${configDir.path}/']);
-      }
     }
     // 5. 同步 Python 依赖库
     final venvDir = Directory('${scripts.ubuntuPath}/root/MaiBot/.venv');
@@ -234,20 +173,7 @@ class InstallerService {
       );
       if (!success) return false;
     }
-
-    // 6.5 恢复 NapCat 配置
-    final napcatConfigDir = Directory('${napcatDir.path}/config');
-    final napcatJson = File('${napcatConfigDir.path}/onebot11.json');
-    if (!napcatJson.existsSync() && hasBackupNapcat) {
-      onProgress('正在从备份中恢复 NapCat 配置...');
-      if (!napcatConfigDir.existsSync()) napcatConfigDir.createSync(recursive: true);
-      await Process.run('${RuntimeEnvir.binPath}/busybox', ['cp', '-r', '${restoreTempDir.path}/napcat/config/*', '${napcatConfigDir.path}/']);
-    }
-
-    // 7. 清理
-    if (restoreTempDir.existsSync()) restoreTempDir.deleteSync(recursive: true);
-    restoreMarker.writeAsStringSync('done');
-    onProgress('初始化完成，正在启动后台服务...');
+    onProgress('初始化完成，正在准备启动...');
     return true;
   } catch (e) {
     Log.e('后续配置执行异常: $e', tag: 'InstallerService');
