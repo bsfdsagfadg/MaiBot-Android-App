@@ -198,7 +198,6 @@ class Buffer {
     currentLine.isWrapped = false;
     currentLine.eraseRange(0, viewWidth, terminal.cursor);
   }
-
   /// Erases [count] cells starting at the cursor position.
   void eraseChars(int count) {
     final start = _cursorX;

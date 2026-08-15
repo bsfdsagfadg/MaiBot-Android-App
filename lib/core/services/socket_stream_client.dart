@@ -26,13 +26,13 @@ class SocketStreamClient {
 
   Socket? _socket;
   String _lineBuffer = '';
+  bool _lastCharWasCr = false;
   bool _replaying = false;
   bool _disposed = false;
   Timer? _reconnectTimer;
   StreamSubscription? _subscription;
 
   bool _isConnecting = false;
-
   /// 当前是否处于历史缓冲区回放阶段
   bool get isReplaying => _replaying;
 
@@ -81,8 +81,8 @@ class SocketStreamClient {
       event = event.replaceAll('\x02__HIST_END__\x03', '');
       _replaying = false;
     }
-    // Normalize \n to \r\n for raw pipe stdout into xterm terminal
-    final normalizedEvent = event.replaceAllMapped(RegExp(r'(?<!\r)\n'), (m) => '\r\n');
+    // 采用有状态换行规范化，防止 \r\n 跨包拆分时破坏动态进度条的单行 \r 原地重绘
+    final normalizedEvent = _normalizeNewlines(event);
     onData?.call(normalizedEvent);
 
     _lineBuffer += event;
@@ -106,6 +106,25 @@ class SocketStreamClient {
     if (_disposed) return;
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(const Duration(seconds: 2), connect);
+  }
+
+  String _normalizeNewlines(String chunk) {
+    if (chunk.isEmpty) return chunk;
+    final buffer = StringBuffer();
+    for (int i = 0; i < chunk.length; i++) {
+      final char = chunk[i];
+      if (char == '\n') {
+        if (!_lastCharWasCr && (i == 0 || chunk[i - 1] != '\r')) {
+          buffer.write('\r\n');
+        } else {
+          buffer.write('\n');
+        }
+      } else {
+        buffer.write(char);
+      }
+      _lastCharWasCr = (char == '\r');
+    }
+    return buffer.toString();
   }
 
   /// 关闭连接并停止自动重连
