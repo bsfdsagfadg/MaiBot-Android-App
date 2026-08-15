@@ -235,8 +235,12 @@ public class ProotService extends Service {
                                     try {
                                         OutputStream out = client.getOutputStream();
                                         out.write("\u0002__HIST_START__\u0003".getBytes());
+                                        List<byte[]> historySnapshot;
                                         synchronized (clients) {
-                                            for (byte[] chunk : history) out.write(chunk);
+                                            historySnapshot = new ArrayList<>(history);
+                                        }
+                                        for (byte[] chunk : historySnapshot) {
+                                            out.write(chunk);
                                         }
                                         out.write("\u0002__HIST_END__\u0003".getBytes());
                                         
@@ -317,6 +321,7 @@ public class ProotService extends Service {
                 stdin.write((command + "\n").getBytes());
                 stdin.flush();
 
+                final long processStartTime = System.currentTimeMillis();
                 InputStream stdout = process.getInputStream();
                 new Thread(() -> {
                     byte[] buffer = new byte[4096];
@@ -354,6 +359,9 @@ public class ProotService extends Service {
                     }
                     
                     if (!isStopped) {
+                        if (System.currentTimeMillis() - processStartTime > 60000L) {
+                            restartCount = 0;
+                        }
                         scheduleRestart();
                     }
                 }).start();
@@ -393,6 +401,7 @@ public class ProotService extends Service {
 
         public void stop() {
             isStopped = true;
+            restartCount = 0;
             if (restartTimer != null) restartTimer.cancel();
             if (process != null) process.destroy();
             if (serverSocket != null) {

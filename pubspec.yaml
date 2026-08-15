@@ -27,8 +27,6 @@ dependencies:
   file_picker: ^12.0.0-beta.5
   flutter_markdown: ^0.7.4+3
   toml: ^0.18.0
-  archive: ^4.0.0
-  ffi: ^2.1.2
 
   # get repo
   xterm: ^4.0.0

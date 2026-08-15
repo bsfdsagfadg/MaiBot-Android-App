@@ -181,7 +181,7 @@ public class UbuntuDocumentsProvider extends DocumentsProvider {
         try {
             String path = target.getCanonicalPath();
             String rootPath = getUbuntuRootPath().getCanonicalPath();
-            if (!path.startsWith(rootPath)) {
+            if (!path.equals(rootPath) && !path.startsWith(rootPath + File.separator)) {
                 throw new FileNotFoundException("Path traversal denied");
             }
         } catch (IOException e) {

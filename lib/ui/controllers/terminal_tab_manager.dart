@@ -129,12 +129,31 @@ class TerminalTabManager extends GetxController {
     final newTerminal = Terminal(maxLines: 5000);
     final prootPath = '${RuntimeEnvir.binPath}/proot';
     Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
+    final fakeProcs = [
+      ['.loadavg', '/proc/loadavg'],
+      ['.stat', '/proc/stat'],
+      ['.uptime', '/proc/uptime'],
+      ['.version', '/proc/version'],
+      ['.vmstat', '/proc/vmstat'],
+      ['.sysctl_entry_cap_last_cap', '/proc/sys/kernel/cap_last_cap'],
+      ['.sysctl_inotify_max_user_watches', '/proc/sys/fs/inotify/max_user_watches'],
+    ];
+
+    final procBinds = <String>[];
+    for (final pair in fakeProcs) {
+      final fakeFile = File('${scripts.ubuntuPath}/proc/${pair[0]}');
+      if (fakeFile.existsSync()) {
+        procBinds.addAll(['-b', '${fakeFile.path}:${pair[1]}']);
+      }
+    }
+
     final args = [
       '-0', '-r', scripts.ubuntuPath,
       '--link2symlink',
       '-b', '/dev', '-b', '/proc', '-b', '/sys',
       '-b', '${RuntimeEnvir.tmpPath}:/tmp',
       '-b', '${RuntimeEnvir.tmpPath}:/dev/shm',
+      ...procBinds,
       '-w', '/root',
       '/bin/bash', '-l'
     ];

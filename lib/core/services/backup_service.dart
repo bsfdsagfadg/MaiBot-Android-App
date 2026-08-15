@@ -16,14 +16,20 @@ class BackupService {
       final backupDir = getMaiBotBackupDirectory();
       if (!backupDir.existsSync()) return [];
 
-      final files = backupDir
-          .listSync()
-          .whereType<File>()
-          .where((f) => f.path.endsWith('.tar.gz') && f.lengthSync() > 1024)
-          .toList();
+      final fileEntries = <({File file, DateTime modified})>[];
+      for (final entity in backupDir.listSync()) {
+        if (entity is File && entity.path.endsWith('.tar.gz')) {
+          try {
+            final stat = entity.statSync();
+            if (stat.size > 1024) {
+              fileEntries.add((file: entity, modified: stat.modified));
+            }
+          } catch (_) {}
+        }
+      }
 
-      files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
-      return files;
+      fileEntries.sort((a, b) => b.modified.compareTo(a.modified));
+      return fileEntries.map((e) => e.file).toList();
     } catch (e) {
       Log.e('扫描备份文件失败: $e', tag: 'BackupService');
       return [];
