@@ -142,7 +142,7 @@ class InstallerService {
       final uvSyncCmd =
           'cd /root/MaiBot && '
           'if command -v script >/dev/null 2>&1; then '
-          '  script -q -e -c "/root/.local/bin/uv sync --color always --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" /dev/null; '
+          '  script -q -e -c "stty cols 45 rows 24 2>/dev/null; /root/.local/bin/uv sync --color always --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" /dev/null; '
           'else '
           '  /root/.local/bin/uv sync --color always --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple; '
           'fi';
@@ -568,8 +568,8 @@ class InstallerService {
       'export UV_NO_PROGRESS=0; '
       'export UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple; '
       'export PIP_NO_COLOR=0; '
-      'export COLUMNS=100; '
-      'export LINES=30; '
+      'export COLUMNS=50; '
+      'export LINES=24; '
       'export LANG=C.UTF-8; '
       'export LC_ALL=C.UTF-8; '
       'export DEBIAN_FRONTEND=noninteractive; '
@@ -600,8 +600,8 @@ class InstallerService {
       'UV_NO_PROGRESS': '0',
       'UV_INDEX_URL': 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple',
       'PIP_NO_COLOR': '0',
-      'COLUMNS': '100',
-      'LINES': '30',
+      'COLUMNS': '50',
+      'LINES': '24',
       'LANG': 'C.UTF-8',
       'LC_ALL': 'C.UTF-8',
       'TMPDIR': '/tmp',
@@ -611,12 +611,32 @@ class InstallerService {
     if (onLog != null) {
       final process = await Process.start(prootPath, args, environment: env);
       
+      bool lastCharWasCr = false;
+      String normalizeChunk(String chunk) {
+        if (chunk.isEmpty) return chunk;
+        final buf = StringBuffer();
+        for (int i = 0; i < chunk.length; i++) {
+          final char = chunk[i];
+          if (char == '\n') {
+            if (!lastCharWasCr && (i == 0 || chunk[i - 1] != '\r')) {
+              buf.write('\r\n');
+            } else {
+              buf.write('\n');
+            }
+          } else {
+            buf.write(char);
+          }
+          lastCharWasCr = (char == '\r');
+        }
+        return buf.toString();
+      }
+
       process.stdout.transform(const Utf8Decoder(allowMalformed: true)).listen(
-        (data) => onLog(data.replaceAll('\n', '\r\n')),
+        (data) => onLog(normalizeChunk(data)),
         onError: (_) {},
       );
       process.stderr.transform(const Utf8Decoder(allowMalformed: true)).listen(
-        (data) => onLog(data.replaceAll('\n', '\r\n')),
+        (data) => onLog(normalizeChunk(data)),
         onError: (_) {},
       );
       

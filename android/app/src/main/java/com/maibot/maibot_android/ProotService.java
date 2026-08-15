@@ -128,7 +128,7 @@ public class ProotService extends Service {
                         "if [ -f EULA.md ]; then export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}'); fi\n" +
                         "if [ -f PRIVACY.md ]; then export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}'); fi\n" +
                         "if command -v script >/dev/null 2>&1; then\n" +
-                        "    exec script -q -e -c \"/root/.local/bin/uv run --color always bot.py\" /dev/null\n" +
+                        "    exec script -q -e -c \"stty cols 45 rows 24 2>/dev/null; /root/.local/bin/uv run --color always bot.py\" /dev/null\n" +
                         "else\n" +
                         "    exec /root/.local/bin/uv run --color always bot.py\n" +
                         "fi\n";
