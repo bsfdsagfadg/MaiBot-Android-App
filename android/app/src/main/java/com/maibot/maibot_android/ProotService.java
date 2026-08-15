@@ -77,9 +77,9 @@ public class ProotService extends Service {
             String ubuntuPath = intent.getStringExtra("ubuntuPath");
             
             if (binPath != null && homePath != null) {
-                // 检测是否已经存在存活的容器进程，如果是 DartVM 崩溃后重连，则直接放行，不杀进程
-                if (maibotProcess != null && !maibotProcess.isStopped && 
-                    napcatProcess != null && !napcatProcess.isStopped) {
+                // 检测是否已经存在存活的容器进程，如果是 DartVM 退出/重启后重连，则直接放行，不杀进程
+                if (maibotProcess != null && maibotProcess.isAlive() && 
+                    napcatProcess != null && napcatProcess.isAlive()) {
                     Log.i(TAG, "Native Backend 依然存活，拦截重复的启动请求，保护底层 PRoot 容器免受重置。");
                     return START_REDELIVER_INTENT;
                 }
@@ -104,10 +104,26 @@ public class ProotService extends Service {
                         "export COLORTERM=truecolor\n" +
                         "export FORCE_COLOR=1\n" +
                         "export CLICOLOR_FORCE=1\n" +
+                        "export CLICOLOR=1\n" +
                         "export PYTHONUNBUFFERED=1\n" +
+                        "export PYTHONIOENCODING=utf-8\n" +
+                        "export PYTHON_COLORS=1\n" +
+                        "export RICH_FORCE_COLOR=1\n" +
+                        "export LOGURU_COLORIZE=true\n" +
+                        "export UV_COLOR=always\n" +
+                        "export UV_PROGRESS_MODE=visual\n" +
+                        "export UV_NO_PROGRESS=0\n" +
+                        "export UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple\n" +
+                        "export PIP_NO_COLOR=0\n" +
+                        "export COLUMNS=100\n" +
+                        "export LINES=30\n" +
                         "export LANG=C.UTF-8\n" +
                         "export LC_ALL=C.UTF-8\n" +
                         "export UV_LINK_MODE=copy\n" +
+                        "export TMPDIR=/tmp\n" +
+                        "export TEMP=/tmp\n" +
+                        "export TMP=/tmp\n" +
+                        "mkdir -p /tmp /var/tmp\n" +
                         "cd /root/MaiBot\n" +
                         "if [ -f EULA.md ]; then export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}'); fi\n" +
                         "if [ -f PRIVACY.md ]; then export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}'); fi\n" +
@@ -120,8 +136,15 @@ public class ProotService extends Service {
                         "export COLORTERM=truecolor\n" +
                         "export FORCE_COLOR=1\n" +
                         "export CLICOLOR_FORCE=1\n" +
+                        "export CLICOLOR=1\n" +
+                        "export COLUMNS=100\n" +
+                        "export LINES=30\n" +
                         "export LANG=C.UTF-8\n" +
                         "export LC_ALL=C.UTF-8\n" +
+                        "export TMPDIR=/tmp\n" +
+                        "export TEMP=/tmp\n" +
+                        "export TMP=/tmp\n" +
+                        "mkdir -p /tmp /var/tmp\n" +
                         "cd /root\n" +
                         "bash /root/launcher.sh\n";
                 napcatProcess = new ProotProcess("NapCat", 20002, binPath, homePath, tmpPath, ubuntuPath, napcatCmd);
@@ -266,12 +289,26 @@ public class ProotService extends Service {
                 pb.environment().put("COLORTERM", "truecolor");
                 pb.environment().put("FORCE_COLOR", "1");
                 pb.environment().put("CLICOLOR_FORCE", "1");
+                pb.environment().put("CLICOLOR", "1");
                 pb.environment().put("PYTHONUNBUFFERED", "1");
+                pb.environment().put("PYTHONIOENCODING", "utf-8");
+                pb.environment().put("PYTHON_COLORS", "1");
+                pb.environment().put("RICH_FORCE_COLOR", "1");
+                pb.environment().put("LOGURU_COLORIZE", "true");
+                pb.environment().put("UV_COLOR", "always");
+                pb.environment().put("UV_PROGRESS_MODE", "visual");
+                pb.environment().put("UV_NO_PROGRESS", "0");
+                pb.environment().put("UV_INDEX_URL", "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple");
+                pb.environment().put("PIP_NO_COLOR", "0");
+                pb.environment().put("COLUMNS", "100");
+                pb.environment().put("LINES", "30");
                 pb.environment().put("LANG", "C.UTF-8");
                 pb.environment().put("LC_ALL", "C.UTF-8");
+                pb.environment().put("TMPDIR", "/tmp");
+                pb.environment().put("TEMP", "/tmp");
+                pb.environment().put("TMP", "/tmp");
                 pb.redirectErrorStream(true);
                 process = pb.start();
-
                 OutputStream stdin = process.getOutputStream();
                 stdin.write((command + "\n").getBytes());
                 stdin.flush();
@@ -335,6 +372,19 @@ public class ProotService extends Service {
                     start();
                 }
             }, delay * 1000L);
+        }
+
+        public boolean isAlive() {
+            if (isStopped || process == null) return false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                return process.isAlive();
+            }
+            try {
+                process.exitValue();
+                return false;
+            } catch (IllegalThreadStateException e) {
+                return true;
+            }
         }
 
         public void stop() {

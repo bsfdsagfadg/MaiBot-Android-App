@@ -200,10 +200,10 @@ class InstallerService {
         // 说明上次依赖安装到一半被中断，清理未完成的残破虚拟环境以防幽灵缺失
         await _runInProot('rm -rf /root/MaiBot/.venv');
       }
-      onProgress('正在同步 Python 依赖库 (可能需要几分钟)...');
-      final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync', onLog: onLog);
+      onProgress('正在同步 Python 依赖库 (国内镜像加速)...');
+      final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple', onLog: onLog);
       if (!success) return false;
-      await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install pip', onLog: onLog);
+      await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pip', onLog: onLog);
       if (!success) return false;
       venvMarker.writeAsStringSync('ready');
     }
@@ -257,15 +257,49 @@ class InstallerService {
 
   static void _writeNetworkConfigs(Function(String)? onLog) {
     try {
+      // 确保系统目录与临时目录存在且权限正确，彻底杜绝 ca-certificates 或 dpkg 找不到路径
+      Directory('${scripts.ubuntuPath}/tmp').createSync(recursive: true);
+      Directory('${scripts.ubuntuPath}/var/tmp').createSync(recursive: true);
+      Directory('${scripts.ubuntuPath}/etc/ssl/certs').createSync(recursive: true);
+      Directory('${scripts.ubuntuPath}/var/cache/apt/archives/partial').createSync(recursive: true);
+      Directory('${scripts.ubuntuPath}/var/lib/apt/lists/partial').createSync(recursive: true);
+      Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
+
       onLog?.call('\x1b[32m[DNS]\x1b[0m 正在写入 resolv.conf...\r\n');
       final resolvConf = File('${scripts.ubuntuPath}/etc/resolv.conf');
-      resolvConf.writeAsStringSync('nameserver 223.5.5.5\nnameserver 114.114.114.114\nnameserver 8.8.8.8\n');
+      resolvConf.writeAsStringSync('nameserver 223.5.5.5\nnameserver 119.29.29.29\nnameserver 114.114.114.114\nnameserver 8.8.8.8\n');
 
       final aptConfDir = Directory('${scripts.ubuntuPath}/etc/apt/apt.conf.d');
       if (!aptConfDir.existsSync()) aptConfDir.createSync(recursive: true);
       
-      final networkConf = File('${aptConfDir.path}/99custom-network');
-      networkConf.writeAsStringSync('Acquire::http::Pipeline-Depth "0";\nAcquire::Retries "3";\n');
+      // APT 极限加速：禁用多语言翻译索引下载（节约70%更新体积）、关闭管道深度避免网络卡死、禁用文件系统缓存开销
+      final speedupConf = File('${aptConfDir.path}/99speedup');
+      speedupConf.writeAsStringSync(
+        'Acquire::Languages "none";\n'
+        'Acquire::Check-Valid-Until "false";\n'
+        'Acquire::http::Timeout "10";\n'
+        'Acquire::https::Timeout "10";\n'
+        'Acquire::Retries "2";\n'
+        'Acquire::http::Pipeline-Depth "0";\n'
+        'Dir::Cache::pkgcache "";\n'
+        'Dir::Cache::srcpkgcache "";\n'
+      );
+
+      // DPKG 加速：在 PRoot 虚拟文件系统中跳过耗时的逐文件物理 fsync，提升安装解压速度 3-5 倍
+      final dpkgConfDir = Directory('${scripts.ubuntuPath}/etc/dpkg/dpkg.cfg.d');
+      if (!dpkgConfDir.existsSync()) dpkgConfDir.createSync(recursive: true);
+      final dpkgSpeedup = File('${dpkgConfDir.path}/02apt-speedup');
+      dpkgSpeedup.writeAsStringSync('force-unsafe-io\n');
+
+      // UV 国内镜像与加速配置
+      final uvConfigDir = Directory('${scripts.ubuntuPath}/root/.config/uv');
+      if (!uvConfigDir.existsSync()) uvConfigDir.createSync(recursive: true);
+      final uvToml = File('${uvConfigDir.path}/uv.toml');
+      uvToml.writeAsStringSync(
+        '[[index]]\n'
+        'url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"\n'
+        'default = true\n'
+      );
       
       onLog?.call('\x1b[32m[Sysdata]\x1b[0m 正在配置伪装系统信息...\r\n');
       final procDir = Directory('${scripts.ubuntuPath}/proc');
@@ -318,14 +352,17 @@ class InstallerService {
       'http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/',
       'http://mirrors.ustc.edu.cn/ubuntu-ports/',
       'http://mirrors.aliyun.com/ubuntu-ports/',
+      'http://mirrors.volces.com/ubuntu-ports/',
       'http://ports.ubuntu.com/ubuntu-ports/',
     ];
 
     for (final mirror in aptMirrors) {
       _writeSourcesList(mirror, onLog);
       
-      // 包含自动解 dpkg 锁、修复破损包与非交互式安装
+      // 显式在容器内创建临时目录并强制重设 TMPDIR=/tmp，彻底根治 CA 证书安装去宿主 cache 目录寻找临时文件的异常
       final repairCmd = 
+          'mkdir -p /tmp /var/tmp /etc/ssl/certs && chmod 1777 /tmp /var/tmp; '
+          'export TMPDIR=/tmp; export TEMP=/tmp; export TMP=/tmp; export DEBIAN_FRONTEND=noninteractive; '
           'dpkg --configure -a || true; '
           'apt-get --fix-broken install -y || true; '
           'apt-get update && apt-get install -y --no-install-recommends sudo wget git curl ca-certificates';
@@ -426,6 +463,8 @@ class InstallerService {
 
   static Future<bool> _runInProot(String command, {Function(String)? onLog, Duration timeout = const Duration(minutes: 10)}) async {
     final prootPath = '${RuntimeEnvir.binPath}/proot';
+    Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
+    
     final args = [
       '-0', '-r', scripts.ubuntuPath,
       '--link2symlink',
@@ -439,12 +478,28 @@ class InstallerService {
       'export COLORTERM=truecolor; '
       'export FORCE_COLOR=1; '
       'export CLICOLOR_FORCE=1; '
+      'export CLICOLOR=1; '
       'export PYTHONUNBUFFERED=1; '
+      'export PYTHONIOENCODING=utf-8; '
+      'export PYTHON_COLORS=1; '
+      'export RICH_FORCE_COLOR=1; '
+      'export LOGURU_COLORIZE=true; '
+      'export UV_COLOR=always; '
+      'export UV_PROGRESS_MODE=visual; '
+      'export UV_NO_PROGRESS=0; '
+      'export UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple; '
+      'export PIP_NO_COLOR=0; '
+      'export COLUMNS=100; '
+      'export LINES=30; '
       'export LANG=C.UTF-8; '
       'export LC_ALL=C.UTF-8; '
       'export DEBIAN_FRONTEND=noninteractive; '
       'export GIT_TERMINAL_PROMPT=0; '
       'export UV_LINK_MODE=copy; '
+      'export TMPDIR=/tmp; '
+      'export TEMP=/tmp; '
+      'export TMP=/tmp; '
+      'mkdir -p /tmp /var/tmp; '
       '$command'
     ];
     final env = {
@@ -455,9 +510,24 @@ class InstallerService {
       'COLORTERM': 'truecolor',
       'FORCE_COLOR': '1',
       'CLICOLOR_FORCE': '1',
+      'CLICOLOR': '1',
       'PYTHONUNBUFFERED': '1',
+      'PYTHONIOENCODING': 'utf-8',
+      'PYTHON_COLORS': '1',
+      'RICH_FORCE_COLOR': '1',
+      'LOGURU_COLORIZE': 'true',
+      'UV_COLOR': 'always',
+      'UV_PROGRESS_MODE': 'visual',
+      'UV_NO_PROGRESS': '0',
+      'UV_INDEX_URL': 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple',
+      'PIP_NO_COLOR': '0',
+      'COLUMNS': '100',
+      'LINES': '30',
       'LANG': 'C.UTF-8',
       'LC_ALL': 'C.UTF-8',
+      'TMPDIR': '/tmp',
+      'TEMP': '/tmp',
+      'TMP': '/tmp',
     };
     if (onLog != null) {
       final process = await Process.start(prootPath, args, environment: env);

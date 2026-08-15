@@ -14,11 +14,12 @@ class AppThemeColor {
 class ThemeController extends GetxController {
   static const List<AppThemeColor> presetColors = [
     AppThemeColor('系统动态 (Monet)', null, isDynamic: true),
-    AppThemeColor('麦麦绿 (Mint)', Color(0xFF00A86B)),
+    AppThemeColor('麦麦橙 (Mai Orange)', Color(0xFFFF8C00)),
+    AppThemeColor('落日橙 (Sunset)', Color(0xFFF57C00)),
     AppThemeColor('经典蓝 (Classic)', Color(0xFF1976D2)),
     AppThemeColor('深靛蓝 (Indigo)', Color(0xFF3F51B5)),
     AppThemeColor('松石青 (Teal)', Color(0xFF00897B)),
-    AppThemeColor('落日橙 (Orange)', Color(0xFFF57C00)),
+    AppThemeColor('麦苗绿 (Mint)', Color(0xFF00A86B)),
     AppThemeColor('樱花粉 (Pink)', Color(0xFFE91E63)),
     AppThemeColor('优雅紫 (Purple)', Color(0xFF7B1FA2)),
     AppThemeColor('极客绿 (Forest)', Color(0xFF2E7D32)),
@@ -71,9 +72,8 @@ class ThemeController extends GetxController {
   bool get isDynamicSelected => presetColors[selectedColorIndex.value].isDynamic;
 
   Color get currentSeedColor {
-    return presetColors[selectedColorIndex.value].color ?? const Color(0xFF00A86B);
+    return presetColors[selectedColorIndex.value].color ?? const Color(0xFFFF8C00);
   }
-
   String get currentSeedName => presetColors[selectedColorIndex.value].name;
 
   void setColorIndex(int index) {

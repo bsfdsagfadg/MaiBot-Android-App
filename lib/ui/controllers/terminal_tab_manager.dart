@@ -127,8 +127,8 @@ class TerminalTabManager extends GetxController {
     final newId = 'system_${DateTime.now().millisecondsSinceEpoch}';
     final newTitle = '终端 ${tabs.length + 1}';
     final newTerminal = Terminal(maxLines: 5000);
-
     final prootPath = '${RuntimeEnvir.binPath}/proot';
+    Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
     final args = [
       '-0', '-r', scripts.ubuntuPath,
       '--link2symlink',
@@ -146,10 +146,25 @@ class TerminalTabManager extends GetxController {
       'COLORTERM': 'truecolor',
       'FORCE_COLOR': '1',
       'CLICOLOR_FORCE': '1',
+      'CLICOLOR': '1',
+      'PYTHONUNBUFFERED': '1',
+      'PYTHONIOENCODING': 'utf-8',
+      'PYTHON_COLORS': '1',
+      'RICH_FORCE_COLOR': '1',
+      'LOGURU_COLORIZE': 'true',
+      'UV_COLOR': 'always',
+      'UV_PROGRESS_MODE': 'visual',
+      'UV_NO_PROGRESS': '0',
+      'UV_INDEX_URL': 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple',
+      'PIP_NO_COLOR': '0',
+      'COLUMNS': '100',
+      'LINES': '30',
       'LANG': 'C.UTF-8',
       'LC_ALL': 'C.UTF-8',
+      'TMPDIR': '/tmp',
+      'TEMP': '/tmp',
+      'TMP': '/tmp',
     };
-
     try {
       final process = await Process.start(prootPath, args, environment: env);
 
