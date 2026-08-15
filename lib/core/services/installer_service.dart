@@ -272,24 +272,106 @@ class InstallerService {
       final aptConfDir = Directory('${scripts.ubuntuPath}/etc/apt/apt.conf.d');
       if (!aptConfDir.existsSync()) aptConfDir.createSync(recursive: true);
       
-      // APT 极限加速：禁用多语言翻译索引下载（节约70%更新体积）、关闭管道深度避免网络卡死、禁用文件系统缓存开销
+      // APT 极限加速：全局阻断冗余推荐包风暴、禁用多语言翻译索引下载（节约70%更新体积）、关闭管道深度避免网络卡死、禁用文件系统缓存开销
       final speedupConf = File('${aptConfDir.path}/99speedup');
       speedupConf.writeAsStringSync(
+        'APT::Install-Recommends "false";\n'
+        'APT::Install-Suggests "false";\n'
         'Acquire::Languages "none";\n'
         'Acquire::Check-Valid-Until "false";\n'
         'Acquire::http::Timeout "10";\n'
         'Acquire::https::Timeout "10";\n'
-        'Acquire::Retries "2";\n'
+        'Acquire::Retries "3";\n'
         'Acquire::http::Pipeline-Depth "0";\n'
         'Dir::Cache::pkgcache "";\n'
         'Dir::Cache::srcpkgcache "";\n'
       );
 
-      // DPKG 加速：在 PRoot 虚拟文件系统中跳过耗时的逐文件物理 fsync，提升安装解压速度 3-5 倍
+      // DPKG 加速：在 PRoot 虚拟文件系统中跳过耗时的逐文件物理 fsync，并跳过数万个无用文档小文件写入
       final dpkgConfDir = Directory('${scripts.ubuntuPath}/etc/dpkg/dpkg.cfg.d');
       if (!dpkgConfDir.existsSync()) dpkgConfDir.createSync(recursive: true);
       final dpkgSpeedup = File('${dpkgConfDir.path}/02apt-speedup');
       dpkgSpeedup.writeAsStringSync('force-unsafe-io\n');
+      
+      final dpkgNoDoc = File('${dpkgConfDir.path}/01nodoc');
+      dpkgNoDoc.writeAsStringSync(
+        'path-exclude /usr/share/doc/*\n'
+        'path-exclude /usr/share/man/*\n'
+        'path-exclude /usr/share/groff/*\n'
+        'path-exclude /usr/share/info/*\n'
+        'path-exclude /usr/share/lintian/*\n'
+        'path-exclude /usr/share/linda/*\n'
+        'path-exclude /usr/share/locale/*\n'
+      );
+
+      // 部署 apt-fast (基于 aria2c 的多连接并发下载加速器)
+      final localBinDir = Directory('${scripts.ubuntuPath}/usr/local/bin');
+      if (!localBinDir.existsSync()) localBinDir.createSync(recursive: true);
+      final aptFastScript = File('${localBinDir.path}/apt-fast');
+      aptFastScript.writeAsStringSync(
+        '#!/bin/bash\n'
+        '# apt-fast: high-speed multi-connection wrapper for apt-get using aria2c\n'
+        'set -e\n'
+        'APT_REAL="/usr/bin/apt-get"\n'
+        '[ ! -x "\$APT_REAL" ] && APT_REAL="apt-get"\n\n'
+        'if ! command -v aria2c >/dev/null 2>&1 || [ \$# -eq 0 ]; then\n'
+        '    exec "\$APT_REAL" "\$@"\n'
+        'fi\n\n'
+        'case "\$1" in\n'
+        '    install|reinstall|dist-upgrade|upgrade|build-dep|source)\n'
+        '        TMP_URI_FILE="/tmp/apt-fast-\$\$.uris"\n'
+        '        TMP_LIST_FILE="/tmp/apt-fast-\$\$.list"\n'
+        '        mkdir -p /var/cache/apt/archives/partial\n'
+        '        if "\$APT_REAL" --print-uris -y "\$@" > "\$TMP_URI_FILE" 2>/dev/null; then\n'
+        '            awk \'{\n'
+        '                if (\$1 ~ /^\\\'https?:\\/\\// || \$1 ~ /^\\\'http:\\/\\// || \$1 ~ /^\\\'ftp:\\/\\//) {\n'
+        '                    gsub(/\\\'/, "", \$1);\n'
+        '                    gsub(/\\\'/, "", \$2);\n'
+        '                    print \$1;\n'
+        '                    print "  dir=/var/cache/apt/archives";\n'
+        '                    print "  out=" \$2;\n'
+        '                }\n'
+        '            }\' "\$TMP_URI_FILE" > "\$TMP_LIST_FILE"\n'
+        '            if [ -s "\$TMP_LIST_FILE" ]; then\n'
+        '                echo -e "\\e[32m[apt-fast]\\e[0m 使用 aria2c 多连接并发下载软件包..."\n'
+        '                aria2c \\\n'
+        '                    --no-conf \\\n'
+        '                    -i "\$TMP_LIST_FILE" \\\n'
+        '                    -j 8 \\\n'
+        '                    -x 8 \\\n'
+        '                    -s 8 \\\n'
+        '                    -k 1M \\\n'
+        '                    --allow-overwrite=true \\\n'
+        '                    --auto-file-renaming=false \\\n'
+        '                    --file-allocation=none \\\n'
+        '                    --console-log-level=warn \\\n'
+        '                    --summary-interval=0 \\\n'
+        '                    --connect-timeout=10 \\\n'
+        '                    --timeout=30 \\\n'
+        '                    --max-tries=5 \\\n'
+        '                    --retry-wait=2 \\\n'
+        '                    --dir=/var/cache/apt/archives || true\n'
+        '            fi\n'
+        '            rm -f "\$TMP_URI_FILE" "\$TMP_LIST_FILE"\n'
+        '        fi\n'
+        '        exec "\$APT_REAL" "\$@"\n'
+        '        ;;\n'
+        '    *)\n'
+        '        exec "\$APT_REAL" "\$@"\n'
+        '        ;;\n'
+        'esac\n'
+      );
+      Process.runSync('${RuntimeEnvir.binPath}/busybox', ['chmod', '+x', aptFastScript.path]);
+      
+      // 创建 apt-get 与 apt 的覆盖软连接至 /usr/local/bin
+      final aptGetLink = Link('${localBinDir.path}/apt-get');
+      if (!aptGetLink.existsSync()) {
+        try { aptGetLink.createSync('apt-fast'); } catch (_) {}
+      }
+      final aptLink = Link('${localBinDir.path}/apt');
+      if (!aptLink.existsSync()) {
+        try { aptLink.createSync('apt-fast'); } catch (_) {}
+      }
 
       // UV 国内镜像与加速配置
       final uvConfigDir = Directory('${scripts.ubuntuPath}/root/.config/uv');
@@ -300,7 +382,6 @@ class InstallerService {
         'url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"\n'
         'default = true\n'
       );
-      
       onLog?.call('\x1b[32m[Sysdata]\x1b[0m 正在配置伪装系统信息...\r\n');
       final procDir = Directory('${scripts.ubuntuPath}/proc');
       if (!procDir.existsSync()) procDir.createSync(recursive: true);
@@ -339,13 +420,15 @@ class InstallerService {
     final curlBinary = File('${scripts.ubuntuPath}/usr/bin/curl');
     final wgetBinary = File('${scripts.ubuntuPath}/usr/bin/wget');
     final sudoBinary = File('${scripts.ubuntuPath}/usr/bin/sudo');
+    final aria2Binary = File('${scripts.ubuntuPath}/usr/bin/aria2c');
 
     // 核心依赖全部完好，直接跳过（零耗时，秒级通过）
-    if (gitBinary.existsSync() && curlBinary.existsSync() && wgetBinary.existsSync() && sudoBinary.existsSync()) {
+    if (gitBinary.existsSync() && curlBinary.existsSync() && wgetBinary.existsSync() && sudoBinary.existsSync() && aria2Binary.existsSync()) {
+      _writeNetworkConfigs(onLog);
       return true;
     }
 
-    onProgress('正在检查并安装系统运行依赖 (git/curl/wget)...');
+    onProgress('正在检查并安装系统运行依赖 (git/curl/aria2)...');
     _writeNetworkConfigs(onLog);
 
     const aptMirrors = [
@@ -365,10 +448,11 @@ class InstallerService {
           'export TMPDIR=/tmp; export TEMP=/tmp; export TMP=/tmp; export DEBIAN_FRONTEND=noninteractive; '
           'dpkg --configure -a || true; '
           'apt-get --fix-broken install -y || true; '
-          'apt-get update && apt-get install -y --no-install-recommends sudo wget git curl ca-certificates';
+          'apt-get update && apt-get install -y --no-install-recommends sudo wget git curl ca-certificates aria2';
       
       final success = await _runInProot(repairCmd, onLog: onLog, timeout: const Duration(minutes: 5));
       if (success && gitBinary.existsSync() && curlBinary.existsSync()) {
+        _writeNetworkConfigs(onLog);
         return true;
       }
     }
