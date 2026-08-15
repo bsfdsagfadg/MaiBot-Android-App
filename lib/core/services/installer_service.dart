@@ -132,7 +132,7 @@ class InstallerService {
     }
     // 5. 同步 Python 依赖库
     final venvDir = Directory('${scripts.ubuntuPath}/root/MaiBot/.venv');
-    final venvMarker = File('${venvDir.path}/.venv_sync_done');
+    final venvMarker = File('${scripts.ubuntuPath}/root/MaiBot/.venv_sync_ready');
     final pythonBin = File('${venvDir.path}/bin/python');
     if (!venvDir.existsSync() || !venvMarker.existsSync() || !pythonBin.existsSync()) {
       if (venvDir.existsSync() && !venvMarker.existsSync()) {
@@ -149,11 +149,12 @@ class InstallerService {
           'fi';
       final success = await _runInProot(uvSyncCmd, onLog: onLog);
       if (!success) return false;
-      final pipSuccess = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pip', onLog: onLog);
-      if (!pipSuccess) return false;
+      final pipBin = File('${venvDir.path}/bin/pip');
+      if (!pipBin.existsSync()) {
+        await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pip', onLog: onLog);
+      }
       venvMarker.writeAsStringSync('ready');
     }
-
     // 6. 安装 NapCat
     final napcatDir = Directory('${scripts.ubuntuPath}/root/napcat');
     final qqBinary = File('${scripts.ubuntuPath}/opt/QQ/qq');

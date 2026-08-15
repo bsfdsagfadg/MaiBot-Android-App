@@ -329,9 +329,8 @@ class MaintenanceActions {
                 ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
           } catch (_) {}
           await Process.run(
-              '${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', venvPath]);
-          Log.i('已删除 Python 虚拟环境: $venvPath', tag: 'MaiBot');
-
+              '${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', venvPath, '${scripts.ubuntuPath}/root/MaiBot/.venv_sync_ready']);
+          Log.i('已删除 Python 虚拟环境与就绪标记: $venvPath', tag: 'MaiBot');
           Get.snackbar(
             '重置成功',
             'Python 环境已删除，应用即将退出',
