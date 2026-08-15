@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:global_repository/global_repository.dart';
 import 'package:xterm/xterm.dart';
-
 import '../config/app_config.dart';
 
 // 为了获取Apk So库路径，我们需要一个MethodChannel
@@ -23,19 +23,31 @@ Directory getMaiBotBackupDirectory() {
     '/storage/self/primary/Download/MaiBot',
   ];
   for (final path in candidates) {
-    final dir = Directory(path);
-    if (dir.existsSync()) {
-      return dir;
-    }
+    try {
+      final dir = Directory(path);
+      if (dir.existsSync()) {
+        return dir;
+      }
+    } catch (_) {}
   }
-  // 默认选用首选路径
-  final primary = Directory(candidates.first);
+  // 尝试创建首选公开下载目录
+  for (final path in candidates) {
+    try {
+      final dir = Directory(path);
+      if (!dir.existsSync()) {
+        dir.createSync(recursive: true);
+      }
+      return dir;
+    } catch (_) {}
+  }
+  // 若外部公共存储受限无法写入，安全回退至应用内部持久化目录
+  final fallback = Directory('${RuntimeEnvir.homePath}/backups');
   try {
-    if (!primary.existsSync()) {
-      primary.createSync(recursive: true);
+    if (!fallback.existsSync()) {
+      fallback.createSync(recursive: true);
     }
   } catch (_) {}
-  return primary;
+  return fallback;
 }
 
 

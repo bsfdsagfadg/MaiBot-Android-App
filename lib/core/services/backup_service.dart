@@ -13,18 +13,26 @@ class BackupService {
   /// 获取本地现有的所有有效备份文件（按修改时间倒序排列，最新的排在最前）
   static List<File> getAvailableBackups() {
     try {
-      final backupDir = getMaiBotBackupDirectory();
-      if (!backupDir.existsSync()) return [];
-
+      final backupDirs = [
+        getMaiBotBackupDirectory(),
+        Directory('${RuntimeEnvir.homePath}/backups'),
+      ];
+      final seenPaths = <String>{};
       final fileEntries = <({File file, DateTime modified})>[];
-      for (final entity in backupDir.listSync()) {
-        if (entity is File && entity.path.endsWith('.tar.gz')) {
-          try {
-            final stat = entity.statSync();
-            if (stat.size > 1024) {
-              fileEntries.add((file: entity, modified: stat.modified));
-            }
-          } catch (_) {}
+
+      for (final backupDir in backupDirs) {
+        if (!backupDir.existsSync()) continue;
+        for (final entity in backupDir.listSync()) {
+          if (entity is File && entity.path.endsWith('.tar.gz')) {
+            if (seenPaths.contains(entity.path)) continue;
+            seenPaths.add(entity.path);
+            try {
+              final stat = entity.statSync();
+              if (stat.size > 1024) {
+                fileEntries.add((file: entity, modified: stat.modified));
+              }
+            } catch (_) {}
+          }
         }
       }
 

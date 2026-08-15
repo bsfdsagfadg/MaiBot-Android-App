@@ -61,10 +61,12 @@ public class ProotService extends Service {
         if (intent != null) {
             String action = intent.getAction();
             if ("STOP".equals(action)) {
+                if (maibotProcess != null) maibotProcess.stop();
+                if (napcatProcess != null) napcatProcess.stop();
                 String bin = intent.getStringExtra("binPath");
                 if (bin != null) {
                     try {
-                        Runtime.getRuntime().exec(new String[]{bin + "/busybox", "killall", "-9", "proot"}).waitFor();
+                        Runtime.getRuntime().exec(new String[]{bin + "/busybox", "killall", "-9", "proot", "qq", "python", "python3", "node", "bash", "sh"}).waitFor();
                     } catch (Exception e) {}
                 }
                 stopSelf();
@@ -94,9 +96,9 @@ public class ProotService extends Service {
 
                 // Strict cleanup according to memory
                 try {
-                    Runtime.getRuntime().exec(new String[]{binPath + "/busybox", "killall", "-9", "proot"}).waitFor();
+                    Runtime.getRuntime().exec(new String[]{binPath + "/busybox", "killall", "-9", "proot", "qq", "python", "python3", "node", "bash", "sh"}).waitFor();
                 } catch (Exception e) {
-                    Log.e(TAG, "killall proot failed", e);
+                    Log.e(TAG, "killall processes failed", e);
                 }
 
                 String maibotCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" +
@@ -372,8 +374,12 @@ public class ProotService extends Service {
             }
         }
 
-        private void scheduleRestart() {
-            if (restartCount >= 10) return;
+        private synchronized void scheduleRestart() {
+            if (isStopped || restartCount >= 10) return;
+            if (restartTimer != null) {
+                restartTimer.cancel();
+                restartTimer = null;
+            }
             int delay = Math.min(3 * (1 << restartCount), 60);
             restartCount++;
             Log.i(TAG, name + " exited, restarting in " + delay + "s");
@@ -381,7 +387,11 @@ public class ProotService extends Service {
             restartTimer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    start();
+                    synchronized (ProotProcess.this) {
+                        if (!isStopped) {
+                            start();
+                        }
+                    }
                 }
             }, delay * 1000L);
         }
@@ -399,13 +409,20 @@ public class ProotService extends Service {
             }
         }
 
-        public void stop() {
+        public synchronized void stop() {
             isStopped = true;
             restartCount = 0;
-            if (restartTimer != null) restartTimer.cancel();
-            if (process != null) process.destroy();
+            if (restartTimer != null) {
+                restartTimer.cancel();
+                restartTimer = null;
+            }
+            if (process != null) {
+                process.destroy();
+                process = null;
+            }
             if (serverSocket != null) {
                 try { serverSocket.close(); } catch (IOException e) {}
+                serverSocket = null;
             }
             synchronized (clients) {
                 for (Socket client : clients) {
