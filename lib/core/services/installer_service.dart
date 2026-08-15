@@ -140,7 +140,14 @@ class InstallerService {
         await _runInProot('rm -rf /root/MaiBot/.venv');
       }
       onProgress('正在同步 Python 依赖库 (国内镜像加速)...');
-      final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync --color always --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple', onLog: onLog);
+      final uvSyncCmd =
+          'cd /root/MaiBot && '
+          'if command -v script >/dev/null 2>&1; then '
+          '  script -q -e -c "/root/.local/bin/uv sync --color always --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" /dev/null; '
+          'else '
+          '  /root/.local/bin/uv sync --color always --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple; '
+          'fi';
+      final success = await _runInProot(uvSyncCmd, onLog: onLog);
       if (!success) return false;
       final pipSuccess = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pip', onLog: onLog);
       if (!pipSuccess) return false;
