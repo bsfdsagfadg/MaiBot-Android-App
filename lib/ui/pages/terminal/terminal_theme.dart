@@ -1,64 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart';
 
-/// 根据当前 Material 3 主题动态生成终端色彩配置（支持浅色/深色/AMOLED自适应）
+/// 根据当前 Material 3 主题动态生成终端色彩配置（统一采用深色/纯黑沉浸画布，杜绝亮白刺眼）
 TerminalTheme getAppTerminalTheme(BuildContext context) {
   final theme = Theme.of(context);
   final isDark = theme.brightness == Brightness.dark;
 
-  if (isDark) {
-    return TerminalTheme(
-      cursor: theme.colorScheme.primary,
-      selection: theme.colorScheme.primary.withValues(alpha: 0.35),
-      foreground: const Color(0xFFECEFF4),
-      background: theme.colorScheme.surface,
-      black: const Color(0xFF3B4252),
-      white: const Color(0xFFE5E9F0),
-      red: const Color(0xFFFF6B6B),
-      green: const Color(0xFF51CF66),
-      yellow: const Color(0xFFFCC419),
-      blue: const Color(0xFF339AF0),
-      magenta: const Color(0xFFCC5DE8),
-      cyan: const Color(0xFF22B8CF),
-      brightBlack: const Color(0xFF868E96),
-      brightRed: const Color(0xFFFF8787),
-      brightGreen: const Color(0xFF69DB7C),
-      brightYellow: const Color(0xFFFFD43B),
-      brightBlue: const Color(0xFF4DABF7),
-      brightMagenta: const Color(0xFFDA77F2),
-      brightCyan: const Color(0xFF3BC9DB),
-      brightWhite: const Color(0xFFFFFFFF),
-      searchHitBackground: theme.colorScheme.primary,
-      searchHitBackgroundCurrent: theme.colorScheme.secondary,
-      searchHitForeground: Colors.black,
-    );
-  } else {
-    return TerminalTheme(
-      cursor: theme.colorScheme.primary,
-      selection: theme.colorScheme.primary.withValues(alpha: 0.25),
-      foreground: const Color(0xFF212529),
-      background: theme.colorScheme.surface,
-      black: const Color(0xFF212529),
-      white: const Color(0xFF868E96),
-      red: const Color(0xFFE03131),
-      green: const Color(0xFF2F9E44),
-      yellow: const Color(0xFFE67700),
-      blue: const Color(0xFF1971C2),
-      magenta: const Color(0xFF9C36B5),
-      cyan: const Color(0xFF0C8599),
-      brightBlack: const Color(0xFF495057),
-      brightRed: const Color(0xFFC92A2A),
-      brightGreen: const Color(0xFF2B8A3E),
-      brightYellow: const Color(0xFFD9480F),
-      brightBlue: const Color(0xFF1864AB),
-      brightMagenta: const Color(0xFF862E9C),
-      brightCyan: const Color(0xFF0B7285),
-      brightWhite: const Color(0xFF1A1D20),
-      searchHitBackground: theme.colorScheme.primary,
-      searchHitBackgroundCurrent: theme.colorScheme.secondary,
-      searchHitForeground: Colors.white,
-    );
-  }
+  // 终端统一使用深黑/纯黑画布背景，防止浅色主题下终端背景变为亮白刺眼
+  final Color terminalBg = isDark
+      ? (theme.colorScheme.surface == Colors.black ? Colors.black : const Color(0xFF121214))
+      : const Color(0xFF161618);
+
+  return TerminalTheme(
+    cursor: theme.colorScheme.primary,
+    selection: theme.colorScheme.primary.withValues(alpha: 0.35),
+    foreground: const Color(0xFFECEFF4),
+    background: terminalBg,
+    black: const Color(0xFF2E3440),
+    white: const Color(0xFFE5E9F0),
+    red: const Color(0xFFFF6B6B),
+    green: const Color(0xFF51CF66),
+    yellow: const Color(0xFFFCC419),
+    blue: const Color(0xFF339AF0),
+    magenta: const Color(0xFFCC5DE8),
+    cyan: const Color(0xFF22B8CF),
+    brightBlack: const Color(0xFF7B889B),
+    brightRed: const Color(0xFFFF8787),
+    brightGreen: const Color(0xFF69DB7C),
+    brightYellow: const Color(0xFFFFD43B),
+    brightBlue: const Color(0xFF4DABF7),
+    brightMagenta: const Color(0xFFDA77F2),
+    brightCyan: const Color(0xFF3BC9DB),
+    brightWhite: const Color(0xFFFFFFFF),
+    searchHitBackground: theme.colorScheme.primary,
+    searchHitBackgroundCurrent: theme.colorScheme.secondary,
+    searchHitForeground: Colors.black,
+  );
 }
 
 class ManjaroTerminalTheme extends TerminalTheme {
@@ -66,7 +43,7 @@ class ManjaroTerminalTheme extends TerminalTheme {
     super.cursor = const Color(0xaaf6f5f4),
     super.selection = const Color(0XAAAEAFAD),
     super.foreground = const Color(0xffe5e5e5),
-    super.background = const Color(0xff1c1c1e),
+    super.background = const Color(0xff141416),
     super.black = const Color(0xff241f31),
     super.white = const Color(0xffc0bfbc),
     super.red = const Color(0xffc01c28),

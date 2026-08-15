@@ -405,12 +405,14 @@ class BackupService {
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                   selected: isSelected,
                                   selectedTileColor: colorScheme.secondaryContainer.withValues(alpha: 0.4),
-                                  leading: Radio<int>(
-                                    value: idx,
-                                    groupValue: selectedBackupIndex,
-                                    onChanged: (val) {
-                                      if (val != null) setState(() => selectedBackupIndex = val);
-                                    },
+                                  leading: Icon(
+                                    isSelected
+                                        ? Icons.radio_button_checked_rounded
+                                        : Icons.radio_button_unchecked_rounded,
+                                    color: isSelected
+                                        ? colorScheme.primary
+                                        : colorScheme.onSurfaceVariant,
+                                    size: 20,
                                   ),
                                   title: Row(
                                     children: [

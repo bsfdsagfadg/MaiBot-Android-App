@@ -140,10 +140,10 @@ class InstallerService {
         await _runInProot('rm -rf /root/MaiBot/.venv');
       }
       onProgress('正在同步 Python 依赖库 (国内镜像加速)...');
-      final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple', onLog: onLog);
+      final success = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv sync --color always --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple', onLog: onLog);
       if (!success) return false;
-      await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pip', onLog: onLog);
-      if (!success) return false;
+      final pipSuccess = await _runInProot('cd /root/MaiBot && /root/.local/bin/uv pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pip', onLog: onLog);
+      if (!pipSuccess) return false;
       venvMarker.writeAsStringSync('ready');
     }
 
@@ -250,9 +250,9 @@ class InstallerService {
         '        mkdir -p /var/cache/apt/archives/partial\n'
         '        if "\$APT_REAL" --print-uris -y "\$@" > "\$TMP_URI_FILE" 2>/dev/null; then\n'
         '            awk \'{\n'
-        '                if (\$1 ~ /^\\\'https?:\\/\\// || \$1 ~ /^\\\'http:\\/\\// || \$1 ~ /^\\\'ftp:\\/\\//) {\n'
-        '                    gsub(/\\\'/, "", \$1);\n'
-        '                    gsub(/\\\'/, "", \$2);\n'
+        '                gsub(/\\047/, "", \$1);\n'
+        '                gsub(/\\047/, "", \$2);\n'
+        '                if (\$1 ~ /^https?:\\/\\// || \$1 ~ /^ftp:\\/\\//) {\n'
         '                    print \$1;\n'
         '                    print "  dir=/var/cache/apt/archives";\n'
         '                    print "  out=" \$2;\n'
