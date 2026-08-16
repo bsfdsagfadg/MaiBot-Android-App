@@ -60,7 +60,7 @@ class WebviewController extends GetxController {
   void navigateToWebview() {
     if (!webviewHasOpen) {
       Future.microtask(() {
-        Get.toNamed(AppRoutes.webview);
+        Get.offAllNamed(AppRoutes.webview);
         webviewHasOpen = true;
       });
     }

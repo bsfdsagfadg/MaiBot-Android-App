@@ -12,50 +12,17 @@ Future<void> showQuickLoginDialog() async {
   final webuiJsonPath = '${scripts.ubuntuPath}/root/napcat/config/webui.json';
   final webuiJsonFile = File(webuiJsonPath);
 
-  // 检查文件是否存在
-  if (!await webuiJsonFile.exists()) {
-    Get.snackbar(
-      '错误',
-      'webui.json 文件不存在',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 3),
-    );
-    return;
-  }
-
-  // 读取并解析 JSON 文件
+  // 读取并解析 JSON 文件（若不存在则自动初始化）
   String currentQQ = '';
-  Map<String, dynamic> jsonData;
-  try {
-    final jsonContent = await webuiJsonFile.readAsString();
-    jsonData = jsonDecode(jsonContent) as Map<String, dynamic>;
-
-    // 检查是否存在 autoLoginAccount 字段
-    if (!jsonData.containsKey('autoLoginAccount')) {
-      Get.snackbar(
-        '错误',
-        '未找到 autoLoginAccount 字段',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
-      );
-      return;
+  Map<String, dynamic> jsonData = {};
+  if (await webuiJsonFile.exists()) {
+    try {
+      final jsonContent = await webuiJsonFile.readAsString();
+      jsonData = jsonDecode(jsonContent) as Map<String, dynamic>;
+      currentQQ = jsonData['autoLoginAccount']?.toString() ?? '';
+    } catch (e) {
+      Log.w('读取 webui.json 失败，使用默认配置: $e', tag: 'MaiBot');
     }
-
-    currentQQ = jsonData['autoLoginAccount']?.toString() ?? '';
-  } catch (e) {
-    Get.snackbar(
-      '错误',
-      '读取或解析 webui.json 失败: $e',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 3),
-    );
-    return;
   }
 
   // 显示编辑对话框

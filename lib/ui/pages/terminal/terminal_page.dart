@@ -106,39 +106,47 @@ class _TerminalPageState extends State<TerminalPage> {
                           ),
                           child: Row(
                             children: [
-                              SegmentedButton<int>(
-                                segments: [
-                                  const ButtonSegment<int>(
-                                    value: 0,
-                                    icon: Icon(Icons.dashboard_rounded, size: 16),
-                                    label: Text('看板'),
-                                  ),
-                                  const ButtonSegment<int>(
-                                    value: 1,
-                                    icon: Icon(Icons.smart_toy_rounded, size: 16),
-                                    label: Text('MaiBot'),
-                                  ),
-                                  if (controller.napcatClient.isConnected)
-                                    const ButtonSegment<int>(
-                                      value: 2,
-                                      icon: Icon(Icons.pets_rounded, size: 16),
-                                      label: Text('NapCat'),
+                              Flexible(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: SegmentedButton<int>(
+                                    showSelectedIcon: false,
+                                    segments: [
+                                      const ButtonSegment<int>(
+                                        value: 0,
+                                        icon: Icon(Icons.dashboard_rounded, size: 15),
+                                        label: Text('看板', style: TextStyle(fontSize: 12)),
+                                      ),
+                                      const ButtonSegment<int>(
+                                        value: 1,
+                                        icon: Icon(Icons.smart_toy_rounded, size: 15),
+                                        label: Text('MaiBot', style: TextStyle(fontSize: 12)),
+                                      ),
+                                      if (controller.napcatClient.isConnected)
+                                        const ButtonSegment<int>(
+                                          value: 2,
+                                          icon: Icon(Icons.pets_rounded, size: 15),
+                                          label: Text('NapCat', style: TextStyle(fontSize: 12)),
+                                        ),
+                                    ],
+                                    selected: {_displayMode},
+                                    onSelectionChanged: (Set<int> newSelection) {
+                                      setState(() {
+                                        _displayMode = newSelection.first;
+                                      });
+                                    },
+                                    style: const ButtonStyle(
+                                      visualDensity: VisualDensity.compact,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                ],
-                                selected: {_displayMode},
-                                onSelectionChanged: (Set<int> newSelection) {
-                                  setState(() {
-                                    _displayMode = newSelection.first;
-                                  });
-                                },
-                                style: const ButtonStyle(
-                                  visualDensity: VisualDensity.compact,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
                                 ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 4),
                               IconButton(
-                                icon: Icon(Icons.copy_all_rounded, size: 19, color: colorScheme.onSurfaceVariant),
+                                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                padding: const EdgeInsets.all(6),
+                                icon: Icon(Icons.copy_all_rounded, size: 18, color: colorScheme.onSurfaceVariant),
                                 tooltip: '复制日志',
                                 onPressed: () async {
                                   final activeTerminal = _displayMode == 2
@@ -158,7 +166,9 @@ class _TerminalPageState extends State<TerminalPage> {
                                 },
                               ),
                               IconButton(
-                                icon: Icon(Icons.cleaning_services_rounded, size: 19, color: colorScheme.onSurfaceVariant),
+                                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                padding: const EdgeInsets.all(6),
+                                icon: Icon(Icons.cleaning_services_rounded, size: 18, color: colorScheme.onSurfaceVariant),
                                 tooltip: '清屏',
                                 onPressed: () {
                                   final activeTerminal = _displayMode == 2
@@ -169,7 +179,9 @@ class _TerminalPageState extends State<TerminalPage> {
                                 },
                               ),
                               IconButton(
-                                icon: Icon(Icons.close_fullscreen_rounded, size: 19, color: colorScheme.onSurfaceVariant),
+                                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                padding: const EdgeInsets.all(6),
+                                icon: Icon(Icons.close_fullscreen_rounded, size: 18, color: colorScheme.onSurfaceVariant),
                                 tooltip: '返回看板',
                                 onPressed: () {
                                   setState(() {
@@ -180,7 +192,6 @@ class _TerminalPageState extends State<TerminalPage> {
                             ],
                           ),
                         ),
-                        // 终端渲染视图
                         Expanded(
                           child: Container(
                             color: getAppTerminalTheme(context).background,

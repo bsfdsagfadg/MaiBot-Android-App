@@ -39,6 +39,19 @@ class GitService {
     final prootPath = '${RuntimeEnvir.binPath}/proot';
     Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
 
+    // 继承宿主机的代理配置（支持 VPN / 代理工具环境穿透）
+    final envKeys = [
+      'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
+      'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
+    ];
+    final proxyExports = StringBuffer();
+    for (final key in envKeys) {
+      final val = Platform.environment[key];
+      if (val != null && val.isNotEmpty) {
+        proxyExports.write('export $key="$val"; ');
+      }
+    }
+
     final args = [
       '-0',
       '-r',
@@ -75,10 +88,10 @@ class GitService {
           'export TMPDIR=/tmp; '
           'export TEMP=/tmp; '
           'export TMP=/tmp; '
+          '${proxyExports.toString()}'
           'mkdir -p /tmp /var/tmp; '
           '$command'
     ];
-
     final env = {
       'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
       'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
@@ -149,8 +162,11 @@ class GitService {
     if (!isMaiBotGitRepo()) return [];
 
     onLog?.call('正在同步远程分支信息...\n');
+    // 修复浅克隆可能导致仅有 main 分支 refspec 的问题，放开拉取所有远程分支
     await runInProot(
-      'cd $maiBotPath && git -c gc.auto=0 fetch --all --prune',
+      'cd $maiBotPath && '
+      'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && '
+      'git -c gc.auto=0 fetch --all --prune',
       onLog: onLog,
       timeout: const Duration(seconds: 40),
     );
@@ -196,8 +212,12 @@ class GitService {
     if (!isMaiBotGitRepo()) return [];
 
     onLog?.call('正在同步远程 Release Tags...\n');
+    // 确保拉取远端所有 Tag
     await runInProot(
-      'cd $maiBotPath && git -c gc.auto=0 fetch --tags --prune',
+      'cd $maiBotPath && '
+      'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && '
+      'git -c gc.auto=0 fetch --tags --force origin 2>/dev/null || '
+      'git -c gc.auto=0 fetch --tags --prune',
       onLog: onLog,
       timeout: const Duration(seconds: 40),
     );
@@ -258,6 +278,8 @@ class GitService {
 
     onLog?.call('正在切换至分支: $branchName...\n');
     final cmd = 'cd $maiBotPath && '
+        'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && '
+        '(git -c gc.auto=0 fetch origin "$branchName" 2>/dev/null || true) && '
         '(git -c gc.auto=0 checkout "$branchName" || git -c gc.auto=0 checkout -B "$branchName" "origin/$branchName") && '
         'git -c gc.auto=0 pull --rebase=false && '
         'if [ -f /root/.local/bin/uv ]; then '
@@ -285,6 +307,7 @@ class GitService {
 
     onLog?.call('正在检出 Release 版本: $tagName...\n');
     final cmd = 'cd $maiBotPath && '
+        '(git -c gc.auto=0 fetch --tags origin 2>/dev/null || true) && '
         'git -c gc.auto=0 checkout "tags/$tagName" && '
         'if [ -f /root/.local/bin/uv ]; then '
         'echo "[UV] 检查并同步 Python 依赖库..." && '

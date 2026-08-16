@@ -339,17 +339,15 @@ class InstallerService {
       );
       Process.runSync('${RuntimeEnvir.binPath}/busybox', ['chmod', '+x', wgetWrapper.path]);
 
-      // 全局 Git 高速镜像与防卡死配置 (/etc/gitconfig)
+      // 全局 Git 防卡死与基础配置 (/etc/gitconfig)
       final gitConfig = File('${scripts.ubuntuPath}/etc/gitconfig');
       gitConfig.writeAsStringSync(
-        '[url "https://ghfast.top/https://github.com/"]\n'
-        '    insteadOf = https://github.com/\n'
-        '[url "https://ghfast.top/https://raw.githubusercontent.com/"]\n'
-        '    insteadOf = https://raw.githubusercontent.com/\n'
         '[http]\n'
         '    lowSpeedLimit = 1000\n'
-        '    lowSpeedTime = 15\n'
+        '    lowSpeedTime = 20\n'
         '    postBuffer = 524288000\n'
+        '[credential]\n'
+        '    helper = store\n'
       );
 
       // 全局 Python Pip 国内镜像源配置 (/etc/pip.conf)
@@ -531,7 +529,12 @@ class InstallerService {
       await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', tmpDir]);
       
       // Use -c gc.auto=0 to prevent git auto maintenance from hanging the proot process after clone
-      final success = await _runInProot('git -c gc.auto=0 clone --depth=1 --branch main $repo /root/MaiBot_tmp', onLog: onLog);
+      final success = await _runInProot(
+        'git -c gc.auto=0 clone --depth=1 --branch main $repo /root/MaiBot_tmp && '
+        'cd /root/MaiBot_tmp && '
+        'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"',
+        onLog: onLog,
+      );
       if (success) {
         Directory(tmpDir).renameSync('${scripts.ubuntuPath}/root/MaiBot');
         return true;
@@ -544,6 +547,19 @@ class InstallerService {
     final prootPath = '${RuntimeEnvir.binPath}/proot';
     Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
     
+    // 继承宿主机的代理配置（支持 VPN / 代理工具环境穿透）
+    final envKeys = [
+      'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
+      'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
+    ];
+    final proxyExports = StringBuffer();
+    for (final key in envKeys) {
+      final val = Platform.environment[key];
+      if (val != null && val.isNotEmpty) {
+        proxyExports.write('export $key="$val"; ');
+      }
+    }
+
     final args = [
       '-0', '-r', scripts.ubuntuPath,
       '--link2symlink',
@@ -578,6 +594,7 @@ class InstallerService {
       'export TMPDIR=/tmp; '
       'export TEMP=/tmp; '
       'export TMP=/tmp; '
+      '${proxyExports.toString()}'
       'mkdir -p /tmp /var/tmp; '
       '$command'
     ];

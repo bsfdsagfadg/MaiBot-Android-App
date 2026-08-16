@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
-
 import '../constants/scripts.dart' as scripts;
 import 'foreground_service.dart';
 import '../utils/file_utils.dart';
@@ -653,19 +653,32 @@ class BackupService {
                           restoreConfig: restoreConfig,
                           restorePlugins: restorePlugins,
                           restoreNapcat: restoreNapcat,
-                          restartService: !isInitialInstall,
+                          restartService: isInitialInstall,
                           showSnackbar: false,
                         );
                         if (Get.isDialogOpen == true) {
                           Get.back();
                         }
                         if (success) {
-                          Get.snackbar(
-                            '恢复成功',
-                            '已成功还原选定的数据与配置模块',
-                            snackPosition: SnackPosition.BOTTOM,
-                            duration: const Duration(seconds: 3),
-                          );
+                          if (!isInitialInstall) {
+                            Get.snackbar(
+                              '恢复成功',
+                              '已成功还原数据与配置，应用即将退出，请重新打开',
+                              snackPosition: SnackPosition.BOTTOM,
+                              duration: const Duration(seconds: 3),
+                            );
+                            Future.delayed(const Duration(seconds: 2), () {
+                              SystemNavigator.pop();
+                              exit(0);
+                            });
+                          } else {
+                            Get.snackbar(
+                              '恢复成功',
+                              '已成功还原选定的数据与配置模块',
+                              snackPosition: SnackPosition.BOTTOM,
+                              duration: const Duration(seconds: 3),
+                            );
+                          }
                         } else {
                           Get.snackbar(
                             '恢复失败',

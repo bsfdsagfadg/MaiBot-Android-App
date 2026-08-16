@@ -31,13 +31,19 @@ Future<bool> _runGitTaskWithProgressDialog({
       final res = await task(appendLog);
       isSuccess.value = res.success;
       if (res.success) {
-        appendLog('\n✅ 操作成功完成！');
+        appendLog('\n✅ 操作成功完成！正在自动重启 MaiBot 服务以应用更新...\n');
+        try {
+          await ForegroundServiceManager.restartContainer();
+          appendLog('🚀 MaiBot 服务已自动重启生效！\n');
+        } catch (e) {
+          appendLog('⚠️ 自动重启服务提示: $e\n');
+        }
       } else {
-        appendLog('\n❌ 执行失败 (Exit code: ${res.exitCode})\n${res.stderr}');
+        appendLog('\n❌ 执行失败 (Exit code: ${res.exitCode})\n${res.stderr}\n');
       }
     } catch (e) {
       isSuccess.value = false;
-      appendLog('\n❌ 任务发生异常: $e');
+      appendLog('\n❌ 任务发生异常: $e\n');
     } finally {
       isDone.value = true;
     }
@@ -132,26 +138,17 @@ Future<bool> _runGitTaskWithProgressDialog({
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          TextButton(
-                            onPressed: () => Get.back(result: isSuccess.value),
-                            child: const Text('关闭'),
-                          ),
-                          if (isSuccess.value) ...[
-                            const SizedBox(width: 8),
-                            FilledButton.icon(
-                              onPressed: () async {
-                                Get.back(result: true);
-                                await ForegroundServiceManager.restartContainer();
-                                Get.snackbar(
-                                  '重启容器',
-                                  '正在重启 MaiBot 服务以应用更新',
-                                  snackPosition: SnackPosition.BOTTOM,
-                                );
-                              },
-                              icon: const Icon(Icons.restart_alt_rounded, size: 18),
-                              label: const Text('重启容器以生效'),
+                          if (!isSuccess.value)
+                            TextButton(
+                              onPressed: () => Get.back(result: false),
+                              child: const Text('关闭'),
                             ),
-                          ],
+                          if (isSuccess.value)
+                            FilledButton.icon(
+                              onPressed: () => Get.back(result: true),
+                              icon: const Icon(Icons.check_rounded, size: 18),
+                              label: const Text('完成'),
+                            ),
                         ],
                       );
                     }),
@@ -227,18 +224,22 @@ Future<void> showSwitchBranchDialog() async {
   }
 
   // 1. 显示加载分支中提示
+  // 1. 显示加载分支中提示 (带 PopScope 防止误退栈)
   Get.dialog(
-    const Center(
-      child: Card(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('正在查询远程分支列表...', style: TextStyle(fontSize: 14)),
-            ],
+    const PopScope(
+      canPop: false,
+      child: Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('正在查询远程分支列表...', style: TextStyle(fontSize: 14)),
+              ],
+            ),
           ),
         ),
       ),
@@ -252,11 +253,15 @@ Future<void> showSwitchBranchDialog() async {
     currentRef = await GitService.getCurrentRef();
     branches = await GitService.getAvailableBranches();
   } catch (e) {
-    Get.back();
+    if (Get.isDialogOpen == true) {
+      Get.back();
+    }
     Get.snackbar('查询失败', '无法拉取分支信息: $e', snackPosition: SnackPosition.BOTTOM);
     return;
   }
-  Get.back(); // 关闭加载框
+  if (Get.isDialogOpen == true) {
+    Get.back(); // 关闭加载框
+  }
 
   if (branches.isEmpty) {
     branches = ['main', 'master', 'dev'];
@@ -399,19 +404,22 @@ Future<void> showSwitchReleaseTagDialog() async {
     return;
   }
 
-  // 1. 显示加载 Tags 中提示
+  // 1. 显示加载 Tags 中提示 (带 PopScope 防止误退栈)
   Get.dialog(
-    const Center(
-      child: Card(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('正在获取 Release 版本列表...', style: TextStyle(fontSize: 14)),
-            ],
+    const PopScope(
+      canPop: false,
+      child: Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('正在获取 Release 版本列表...', style: TextStyle(fontSize: 14)),
+              ],
+            ),
           ),
         ),
       ),
@@ -425,11 +433,15 @@ Future<void> showSwitchReleaseTagDialog() async {
     currentRef = await GitService.getCurrentRef();
     tags = await GitService.getReleaseTags();
   } catch (e) {
-    Get.back();
+    if (Get.isDialogOpen == true) {
+      Get.back();
+    }
     Get.snackbar('查询失败', '无法拉取版本信息: $e', snackPosition: SnackPosition.BOTTOM);
     return;
   }
-  Get.back(); // 关闭加载框
+  if (Get.isDialogOpen == true) {
+    Get.back(); // 关闭加载框
+  }
 
   if (tags.isEmpty) {
     Get.snackbar(
