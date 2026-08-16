@@ -149,7 +149,9 @@ class GitService {
     if (!isMaiBotGitRepo()) return '未安装';
 
     final res = await runInProot(
-      'cd $maiBotPath && (git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)',
+      'cd $maiBotPath && '
+      'git config --global --add safe.directory "*" 2>/dev/null || true; '
+      '(git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)',
       timeout: const Duration(seconds: 10),
     );
 
@@ -157,16 +159,20 @@ class GitService {
     return ref.isNotEmpty ? ref : '未知分支';
   }
 
-  /// 动态拉取并获取所有远程分支列表（兼容官方源与自定义 Fork 仓库，非硬编码）
+  /// 动态拉取并获取所有远程分支列表（操作前全面 fetch）
   static Future<List<String>> getAvailableBranches({Function(String)? onLog}) async {
     if (!isMaiBotGitRepo()) return [];
 
-    onLog?.call('正在同步远程分支信息...\n');
-    // 修复浅克隆可能导致仅有 main 分支 refspec 的问题，放开拉取所有远程分支
+    onLog?.call('正在从远端同步最新分支与引用信息 (git fetch)...\n');
     await runInProot(
       'cd $maiBotPath && '
-      'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && '
-      'git -c gc.auto=0 fetch --all --prune',
+      'git config --global --add safe.directory "*" 2>/dev/null || true; '
+      'git config --system --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+      'git config --global --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+      'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" 2>/dev/null || true; '
+      '(git -c gc.auto=0 fetch origin "+refs/heads/*:refs/remotes/origin/*" --prune 2>/dev/null || '
+      'git -c gc.auto=0 fetch --all --prune 2>/dev/null || '
+      'git -c gc.auto=0 fetch origin 2>/dev/null || true)',
       onLog: onLog,
       timeout: const Duration(seconds: 40),
     );
@@ -207,17 +213,20 @@ class GitService {
     return sorted;
   }
 
-  /// 动态获取所有 Release Tags 列表（按版本降序排列，非硬编码）
+  /// 动态获取所有 Release Tags 列表（操作前全面 fetch --tags）
   static Future<List<String>> getReleaseTags({Function(String)? onLog}) async {
     if (!isMaiBotGitRepo()) return [];
 
-    onLog?.call('正在同步远程 Release Tags...\n');
-    // 确保拉取远端所有 Tag
+    onLog?.call('正在从远端同步 Release Tags (git fetch --tags)...\n');
     await runInProot(
       'cd $maiBotPath && '
-      'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && '
-      'git -c gc.auto=0 fetch --tags --force origin 2>/dev/null || '
-      'git -c gc.auto=0 fetch --tags --prune',
+      'git config --global --add safe.directory "*" 2>/dev/null || true; '
+      'git config --system --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+      'git config --global --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+      'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" 2>/dev/null || true; '
+      '(git -c gc.auto=0 fetch --tags --force origin 2>/dev/null || '
+      'git -c gc.auto=0 fetch --tags --prune 2>/dev/null || '
+      'git -c gc.auto=0 fetch origin 2>/dev/null || true)',
       onLog: onLog,
       timeout: const Duration(seconds: 40),
     );
@@ -238,7 +247,7 @@ class GitService {
     return tags;
   }
 
-  /// 执行 git pull 更新 MaiBot，并自动同步依赖
+  /// 执行 git pull 更新 MaiBot（前置全面 fetch 并自动同步依赖）
   static Future<ProotExecResult> pullMaiBot({Function(String)? onLog}) async {
     if (!isMaiBotGitRepo()) {
       return ProotExecResult(
@@ -250,9 +259,18 @@ class GitService {
       );
     }
 
-    onLog?.call('正在拉取 MaiBot 最新代码...\n');
+    onLog?.call('1. 正在同步远程引用与代码 (git fetch & pull)...\n');
     final cmd = 'cd $maiBotPath && '
-        'git -c gc.auto=0 pull --rebase=false && '
+        'git config --global --add safe.directory "*" 2>/dev/null || true; '
+        'git config --system --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+        'git config --global --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+        'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" 2>/dev/null || true; '
+        'echo "[GIT] 同步远端最新分支与 Tag..." && '
+        '(git -c gc.auto=0 fetch origin "+refs/heads/*:refs/remotes/origin/*" --tags --prune 2>/dev/null || '
+        'git -c gc.auto=0 fetch --all --prune 2>/dev/null || true) && '
+        'git stash 2>/dev/null || true; '
+        'echo "[GIT] 合并最新代码..." && '
+        '(git -c gc.auto=0 pull --rebase=false || git -c gc.auto=0 pull --rebase=false origin main || true) && '
         'if [ -f /root/.local/bin/uv ]; then '
         'echo "[UV] 检查并同步 Python 依赖库..." && '
         '/root/.local/bin/uv sync --no-progress; '
@@ -261,7 +279,7 @@ class GitService {
     return await runInProot(cmd, onLog: onLog, timeout: const Duration(minutes: 5));
   }
 
-  /// 切换分支并更新代码与依赖
+  /// 切换分支（前置精准 fetch 目标分支、稳健检出与同步依赖）
   static Future<ProotExecResult> switchBranch(
     String branchName, {
     Function(String)? onLog,
@@ -276,12 +294,32 @@ class GitService {
       );
     }
 
-    onLog?.call('正在切换至分支: $branchName...\n');
+    onLog?.call('1. 正在从远端精准抓取分支: $branchName (git fetch)...\n');
     final cmd = 'cd $maiBotPath && '
-        'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && '
-        '(git -c gc.auto=0 fetch origin "$branchName" 2>/dev/null || true) && '
-        '(git -c gc.auto=0 checkout "$branchName" || git -c gc.auto=0 checkout -B "$branchName" "origin/$branchName") && '
-        'git -c gc.auto=0 pull --rebase=false && '
+        'git config --global --add safe.directory "*" 2>/dev/null || true; '
+        'git config --system --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+        'git config --global --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+        'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" 2>/dev/null || true; '
+        'echo "[GIT] 抓取目标分支 $branchName 远程引用..." && '
+        '(git -c gc.auto=0 fetch origin "+refs/heads/$branchName:refs/remotes/origin/$branchName" 2>/dev/null || '
+        'git -c gc.auto=0 fetch origin "$branchName" 2>/dev/null || '
+        'git -c gc.auto=0 fetch origin "+refs/heads/*:refs/remotes/origin/*" 2>/dev/null || '
+        'git -c gc.auto=0 fetch --all 2>/dev/null || true) && '
+        'git stash 2>/dev/null || true; '
+        'echo "[GIT] 正在检出分支 $branchName..." && '
+        '(if git show-ref --verify --quiet "refs/heads/$branchName"; then '
+        '    git -c gc.auto=0 checkout "$branchName" || git -c gc.auto=0 checkout -f "$branchName"; '
+        'elif git show-ref --verify --quiet "refs/remotes/origin/$branchName"; then '
+        '    git -c gc.auto=0 checkout -b "$branchName" --track "origin/$branchName" 2>/dev/null || '
+        '    git -c gc.auto=0 checkout -B "$branchName" "origin/$branchName" || '
+        '    git -c gc.auto=0 checkout -f "$branchName"; '
+        'elif [ -f .git/FETCH_HEAD ]; then '
+        '    git -c gc.auto=0 checkout -B "$branchName" FETCH_HEAD || git -c gc.auto=0 checkout -f "$branchName"; '
+        'else '
+        '    git -c gc.auto=0 checkout "$branchName" || git -c gc.auto=0 checkout -f "$branchName"; '
+        'fi) && '
+        'echo "[GIT] 同步分支最新提交..." && '
+        '(git -c gc.auto=0 pull --rebase=false origin "$branchName" 2>/dev/null || git -c gc.auto=0 pull --rebase=false 2>/dev/null || true) && '
         'if [ -f /root/.local/bin/uv ]; then '
         'echo "[UV] 检查并同步 Python 依赖库..." && '
         '/root/.local/bin/uv sync --no-progress; '
@@ -290,7 +328,7 @@ class GitService {
     return await runInProot(cmd, onLog: onLog, timeout: const Duration(minutes: 5));
   }
 
-  /// 切换至指定 Release Tag 并同步依赖
+  /// 切换至指定 Release Tag（前置 fetch tags 并同步依赖）
   static Future<ProotExecResult> switchReleaseTag(
     String tagName, {
     Function(String)? onLog,
@@ -305,10 +343,19 @@ class GitService {
       );
     }
 
-    onLog?.call('正在检出 Release 版本: $tagName...\n');
+    onLog?.call('1. 正在从远端拉取 Release Tag: $tagName (git fetch --tags)...\n');
     final cmd = 'cd $maiBotPath && '
-        '(git -c gc.auto=0 fetch --tags origin 2>/dev/null || true) && '
-        'git -c gc.auto=0 checkout "tags/$tagName" && '
+        'git config --global --add safe.directory "*" 2>/dev/null || true; '
+        'git config --system --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+        'git config --global --remove-section url."https://ghfast.top/https://github.com/" 2>/dev/null || true; '
+        'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" 2>/dev/null || true; '
+        'echo "[GIT] 抓取标签 $tagName..." && '
+        '(git -c gc.auto=0 fetch --tags --force origin 2>/dev/null || '
+        'git -c gc.auto=0 fetch origin "refs/tags/$tagName:refs/tags/$tagName" 2>/dev/null || '
+        'git -c gc.auto=0 fetch --tags 2>/dev/null || true) && '
+        'git stash 2>/dev/null || true; '
+        'echo "[GIT] 正在检出 Tag: $tagName..." && '
+        '(git -c gc.auto=0 checkout "tags/$tagName" || git -c gc.auto=0 checkout -f "tags/$tagName" || git -c gc.auto=0 checkout "$tagName") && '
         'if [ -f /root/.local/bin/uv ]; then '
         'echo "[UV] 检查并同步 Python 依赖库..." && '
         '/root/.local/bin/uv sync --no-progress; '

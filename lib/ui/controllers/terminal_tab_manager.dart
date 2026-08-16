@@ -155,29 +155,33 @@ class TerminalTabManager extends GetxController {
       '-b', '${RuntimeEnvir.tmpPath}:/dev/shm',
       ...procBinds,
       '-w', '/root',
-      '/bin/bash', '-l'
+      '/bin/sh', '-c',
+      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; '
+      'export TERM=xterm-256color; '
+      'export COLORTERM=truecolor; '
+      'export FORCE_COLOR=1; '
+      'export CLICOLOR_FORCE=1; '
+      'export CLICOLOR=1; '
+      'export PYTHONUNBUFFERED=1; '
+      'export PYTHONIOENCODING=utf-8; '
+      'export LANG=C.UTF-8; '
+      'export LC_ALL=C.UTF-8; '
+      'export HOME=/root; '
+      'export PS1="\\u@maibot:\\w# "; '
+      'cd /root; '
+      'if command -v script >/dev/null 2>&1; then '
+      '    exec script -q -e -c "/bin/bash -i" /dev/null; '
+      'elif [ -x /bin/bash ]; then '
+      '    exec /bin/bash -i; '
+      'else '
+      '    exec /bin/sh -i; '
+      'fi'
     ];
     final env = {
       'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
       'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
       'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
       'TERM': 'xterm-256color',
-      'COLORTERM': 'truecolor',
-      'FORCE_COLOR': '1',
-      'CLICOLOR_FORCE': '1',
-      'CLICOLOR': '1',
-      'PYTHONUNBUFFERED': '1',
-      'PYTHONIOENCODING': 'utf-8',
-      'PYTHON_COLORS': '1',
-      'RICH_FORCE_COLOR': '1',
-      'LOGURU_COLORIZE': 'true',
-      'UV_COLOR': 'always',
-      'UV_PROGRESS_MODE': 'visual',
-      'UV_NO_PROGRESS': '0',
-      'UV_INDEX_URL': 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple',
-      'PIP_NO_COLOR': '0',
-      'COLUMNS': '100',
-      'LINES': '30',
       'LANG': 'C.UTF-8',
       'LC_ALL': 'C.UTF-8',
       'TMPDIR': '/tmp',
@@ -185,6 +189,7 @@ class TerminalTabManager extends GetxController {
       'TMP': '/tmp',
     };
     try {
+      newTerminal.write('正在启动系统交互终端 (Ubuntu PRoot 环境)...\r\n\r\n');
       final process = await Process.start(prootPath, args, environment: env);
 
       newTerminal.onOutput = (data) {

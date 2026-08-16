@@ -210,7 +210,7 @@ Future<void> showUpdateMaiBotDialog() async {
   }
 }
 
-/// 弹出切换分支对话框 (动态解析远程与本地分支，兼容自定义仓库)
+/// 弹出切换分支对话框 (内置异步加载，杜绝路由跳转/退栈冲突)
 Future<void> showSwitchBranchDialog() async {
   if (!GitService.isMaiBotGitRepo()) {
     Get.snackbar(
@@ -223,51 +223,11 @@ Future<void> showSwitchBranchDialog() async {
     return;
   }
 
-  // 1. 显示加载分支中提示
-  // 1. 显示加载分支中提示 (带 PopScope 防止误退栈)
-  Get.dialog(
-    const PopScope(
-      canPop: false,
-      child: Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 16),
-                Text('正在查询远程分支列表...', style: TextStyle(fontSize: 14)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-    barrierDismissible: false,
-  );
-
   String currentRef = 'main';
-  List<String> branches = [];
-  try {
-    currentRef = await GitService.getCurrentRef();
-    branches = await GitService.getAvailableBranches();
-  } catch (e) {
-    if (Get.isDialogOpen == true) {
-      Get.back();
-    }
-    Get.snackbar('查询失败', '无法拉取分支信息: $e', snackPosition: SnackPosition.BOTTOM);
-    return;
-  }
-  if (Get.isDialogOpen == true) {
-    Get.back(); // 关闭加载框
-  }
-
-  if (branches.isEmpty) {
-    branches = ['main', 'master', 'dev'];
-  }
-
-  String selectedBranch = branches.contains(currentRef) ? currentRef : branches.first;
+  List<String> branches = ['main', 'master', 'dev'];
+  bool isLoading = true;
+  bool hasRequested = false;
+  String selectedBranch = 'main';
   final customBranchController = TextEditingController();
 
   final choice = await Get.dialog<String>(
@@ -275,6 +235,35 @@ Future<void> showSwitchBranchDialog() async {
       builder: (context, setState) {
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
+
+        if (!hasRequested) {
+          hasRequested = true;
+          GitService.getCurrentRef().then((ref) {
+            currentRef = ref;
+            selectedBranch = ref;
+            return GitService.getAvailableBranches();
+          }).then((fetchedBranches) {
+            if (context.mounted) {
+              setState(() {
+                if (fetchedBranches.isNotEmpty) {
+                  branches = fetchedBranches;
+                  if (branches.contains(currentRef)) {
+                    selectedBranch = currentRef;
+                  } else if (branches.isNotEmpty) {
+                    selectedBranch = branches.first;
+                  }
+                }
+                isLoading = false;
+              });
+            }
+          }).catchError((_) {
+            if (context.mounted) {
+              setState(() {
+                isLoading = false;
+              });
+            }
+          });
+        }
 
         return AlertDialog(
           icon: const Icon(Icons.alt_route_rounded, size: 28, color: Colors.teal),
@@ -315,57 +304,80 @@ Future<void> showSwitchBranchDialog() async {
                     style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.3),
                   ),
                   const SizedBox(height: 10),
-                  ...branches.map((branch) {
-                    final isCurrent = branch == currentRef;
-                    final isSelected = branch == selectedBranch;
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                        color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                        size: 20,
-                      ),
-                      title: Text(
-                        branch + (isCurrent ? ' (当前)' : ''),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                  if (isLoading)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(strokeWidth: 2.5),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '正在查询远端分支列表...',
+                              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                            ),
+                          ],
                         ),
                       ),
-                      onTap: () {
-                        setState(() {
-                          selectedBranch = branch;
-                          customBranchController.clear();
-                        });
+                    )
+                  else ...[
+                    ...branches.map((branch) {
+                      final isCurrent = branch == currentRef;
+                      final isSelected = branch == selectedBranch;
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                          color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                          size: 20,
+                        ),
+                        title: Text(
+                          branch + (isCurrent ? ' (当前)' : ''),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                          ),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            selectedBranch = branch;
+                            customBranchController.clear();
+                          });
+                        },
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: customBranchController,
+                       decoration: const InputDecoration(
+                        labelText: '或输入其他分支名',
+                        hintText: '例如: feat/new-adapter',
+                        prefixIcon: Icon(Icons.edit_road_rounded, size: 20),
+                        isDense: true,
+                      ),
+                      onChanged: (val) {
+                        if (val.trim().isNotEmpty) {
+                          setState(() {
+                            selectedBranch = val.trim();
+                          });
+                        }
                       },
-                    );
-                  }),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: customBranchController,
-                    decoration: const InputDecoration(
-                      labelText: '或输入其他分支名',
-                      hintText: '例如: feat/new-adapter',
-                      prefixIcon: Icon(Icons.edit_road_rounded, size: 20),
-                      isDense: true,
                     ),
-                    onChanged: (val) {
-                      if (val.trim().isNotEmpty) {
-                        setState(() {
-                          selectedBranch = val.trim();
-                        });
-                      }
-                    },
-                  ),
+                  ],
                 ],
               ),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Get.back(result: null),
+              onPressed: () => Navigator.of(context).pop(null),
               child: const Text('取消'),
             ),
             FilledButton(
@@ -373,7 +385,7 @@ Future<void> showSwitchBranchDialog() async {
                 final target = customBranchController.text.trim().isNotEmpty
                     ? customBranchController.text.trim()
                     : selectedBranch;
-                Get.back(result: target);
+                Navigator.of(context).pop(target);
               },
               child: const Text('确定切换'),
             ),
@@ -391,7 +403,7 @@ Future<void> showSwitchBranchDialog() async {
   }
 }
 
-/// 弹出切换 Release 版本对话框 (按 Tags 切换，注明与分支互斥)
+/// 弹出切换 Release 版本对话框 (内置异步加载，杜绝路由跳转/退栈冲突)
 Future<void> showSwitchReleaseTagDialog() async {
   if (!GitService.isMaiBotGitRepo()) {
     Get.snackbar(
@@ -404,61 +416,41 @@ Future<void> showSwitchReleaseTagDialog() async {
     return;
   }
 
-  // 1. 显示加载 Tags 中提示 (带 PopScope 防止误退栈)
-  Get.dialog(
-    const PopScope(
-      canPop: false,
-      child: Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 16),
-                Text('正在获取 Release 版本列表...', style: TextStyle(fontSize: 14)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-    barrierDismissible: false,
-  );
-
   String currentRef = '';
   List<String> tags = [];
-  try {
-    currentRef = await GitService.getCurrentRef();
-    tags = await GitService.getReleaseTags();
-  } catch (e) {
-    if (Get.isDialogOpen == true) {
-      Get.back();
-    }
-    Get.snackbar('查询失败', '无法拉取版本信息: $e', snackPosition: SnackPosition.BOTTOM);
-    return;
-  }
-  if (Get.isDialogOpen == true) {
-    Get.back(); // 关闭加载框
-  }
-
-  if (tags.isEmpty) {
-    Get.snackbar(
-      '提示',
-      '当前仓库未检索到任何 Release Tag 标签',
-      snackPosition: SnackPosition.BOTTOM,
-    );
-    return;
-  }
-
-  String selectedTag = tags.first;
+  bool isLoading = true;
+  bool hasRequested = false;
+  String selectedTag = '';
 
   final choice = await Get.dialog<String>(
     StatefulBuilder(
       builder: (context, setState) {
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
+
+        if (!hasRequested) {
+          hasRequested = true;
+          GitService.getCurrentRef().then((ref) {
+            currentRef = ref;
+            return GitService.getReleaseTags();
+          }).then((fetchedTags) {
+            if (context.mounted) {
+              setState(() {
+                tags = fetchedTags;
+                if (tags.isNotEmpty) {
+                  selectedTag = tags.first;
+                }
+                isLoading = false;
+              });
+            }
+          }).catchError((_) {
+            if (context.mounted) {
+              setState(() {
+                isLoading = false;
+              });
+            }
+          });
+        }
 
         return AlertDialog(
           icon: const Icon(Icons.sell_rounded, size: 28, color: Colors.purple),
@@ -501,45 +493,78 @@ Future<void> showSwitchReleaseTagDialog() async {
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 6),
-                  ...tags.map((tag) {
-                    final isCurrent = tag == currentRef;
-                    final isSelected = tag == selectedTag;
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                        color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                        size: 20,
-                      ),
-                      title: Text(
-                        tag + (isCurrent ? ' (当前)' : ''),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                  if (isLoading)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(strokeWidth: 2.5),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '正在查询远端 Release Tags...',
+                              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                            ),
+                          ],
                         ),
                       ),
-                      onTap: () {
-                        setState(() {
-                          selectedTag = tag;
-                        });
-                      },
-                    );
-                  }),
+                    )
+                  else if (tags.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: Text(
+                          '当前未检索到任何 Release Tag 标签',
+                          style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                        ),
+                      ),
+                    )
+                  else
+                    ...tags.map((tag) {
+                      final isCurrent = tag == currentRef;
+                      final isSelected = tag == selectedTag;
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                          color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                          size: 20,
+                        ),
+                        title: Text(
+                          tag + (isCurrent ? ' (当前)' : ''),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                          ),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            selectedTag = tag;
+                          });
+                        },
+                      );
+                    }),
                 ],
               ),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Get.back(result: null),
+              onPressed: () => Navigator.of(context).pop(null),
               child: const Text('取消'),
             ),
-            FilledButton(
-              onPressed: () => Get.back(result: selectedTag),
-              child: const Text('确定检出'),
-            ),
+            if (!isLoading && tags.isNotEmpty)
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(selectedTag),
+                child: const Text('确定检出'),
+              ),
           ],
         );
       },
