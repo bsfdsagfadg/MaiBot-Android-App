@@ -20,6 +20,7 @@ import 'napcat_controller.dart';
 import 'napcat_log_parser.dart';
 import 'terminal_tab_manager.dart';
 import 'webview_controller.dart';
+import '../pages/permission_request_page.dart';
 
 class HomeController extends GetxController with WidgetsBindingObserver {
   // 终端标签页管理器
@@ -194,12 +195,6 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     // 为 Google Play 上架做准备
     // For Google Play
     Future.delayed(Duration.zero, () async {
-      // 请求通知权限
-      var status = await Permission.notification.status;
-      if (status.isDenied || status.isPermanentlyDenied) {
-        await Permission.notification.request();
-      }
-
       if (privacySetting.get() == null) {
         await Get.to(PrivacyAgreePage(
           onAgreeTap: () {
@@ -209,11 +204,30 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         ));
       }
 
+      // 检查必须权限（通知权限与存储权限）
+      if (Platform.isAndroid) {
+        final notifStatus = await Permission.notification.status;
+        final manageStorageStatus = await Permission.manageExternalStorage.status;
+        final storageStatus = await Permission.storage.status;
+        final bool hasStorage = manageStorageStatus.isGranted || storageStatus.isGranted;
+        final bool hasNotif = notifStatus.isGranted;
+
+        if (!hasNotif || !hasStorage) {
+          final completer = Completer<void>();
+          await Get.to(PermissionRequestPage(
+            onPermissionsGranted: () {
+              Get.back();
+              if (!completer.isCompleted) completer.complete();
+            },
+          ));
+          await completer.future;
+        }
+      }
+
       // 加载并启动 MaiBot
       loadMaiBot();
 
       // 在终端创建完成后初始化固定标签页
-      // 等待terminal创建完成
       Future.delayed(const Duration(milliseconds: 500), () {
         terminalTabManager.initializeFixedTabs(terminal, napcatShowTerminal);
       });

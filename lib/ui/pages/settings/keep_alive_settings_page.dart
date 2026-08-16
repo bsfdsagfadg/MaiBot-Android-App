@@ -9,6 +9,7 @@ import 'package:shizuku_api/shizuku_api.dart';
 import '../../../core/config/app_config.dart';
 import '../../controllers/home_controller.dart';
 
+/// 权限与后台保活设置页面
 class KeepAliveSettingsPage extends StatefulWidget {
   const KeepAliveSettingsPage({super.key});
 
@@ -16,12 +17,13 @@ class KeepAliveSettingsPage extends StatefulWidget {
   State<KeepAliveSettingsPage> createState() => _KeepAliveSettingsPageState();
 }
 
-class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
+class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with WidgetsBindingObserver {
+  bool _isNotificationGranted = false;
+  bool _isStorageGranted = false;
   bool _isBatteryOptimizationIgnored = false;
 
   final Setting _enableWifiLock = 'enable_wifi_lock'.setting;
 
-  // Shizuku Keep-Alive 状态
   bool _shizukuDozeWhitelist = false;
   bool _shizukuRunAnyInBackground = false;
   bool _shizukuPhantomProcessLimit = false;
@@ -32,10 +34,47 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
   @override
   void initState() {
     super.initState();
-    _checkBatteryOptimizationStatus();
-    _checkShizukuStatus();
+    WidgetsBinding.instance.addObserver(this);
+    _checkAllStatus();
     if (_enableWifiLock.get() == null) {
       _enableWifiLock.set(true);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAllStatus();
+    }
+  }
+
+  Future<void> _checkAllStatus() async {
+    await _checkSystemPermissionsStatus();
+    await _checkBatteryOptimizationStatus();
+    await _checkShizukuStatus();
+  }
+
+  Future<void> _checkSystemPermissionsStatus() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final notifStatus = await Permission.notification.status;
+      final manageStorageStatus = await Permission.manageExternalStorage.status;
+      final storageStatus = await Permission.storage.status;
+
+      if (mounted) {
+        setState(() {
+          _isNotificationGranted = notifStatus.isGranted;
+          _isStorageGranted = manageStorageStatus.isGranted || storageStatus.isGranted;
+        });
+      }
+    } catch (e) {
+      Log.e('检查系统权限状态失败: $e', tag: 'KeepAliveSettingsPage');
     }
   }
 
@@ -53,7 +92,6 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     }
   }
 
-  // 检测并查询当前设备上特定保活命令的实际生效状态
   Future<void> _checkShizukuStatus() async {
     if (!Platform.isAndroid) return;
     try {
@@ -77,23 +115,15 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
       }
 
       if (hasPermission) {
-        // 1. 查询 Doze 白名单
-        final dozeOut =
-            await _shizukuApi.runCommand('dumpsys deviceidle whitelist');
-        final isDozeWhitelisted =
-            dozeOut != null && dozeOut.contains(Config.packageName);
+        final dozeOut = await _shizukuApi.runCommand('dumpsys deviceidle whitelist');
+        final isDozeWhitelisted = dozeOut != null && dozeOut.contains(Config.packageName);
 
-        // 2. 查询 RUN_ANY_IN_BACKGROUND
         final appopsOut = await _shizukuApi.runCommand(
             'cmd appops get ${Config.packageName} RUN_ANY_IN_BACKGROUND');
-        final isRunAnyAllowed =
-            appopsOut != null && appopsOut.toLowerCase().contains('allow');
+        final isRunAnyAllowed = appopsOut != null && appopsOut.toLowerCase().contains('allow');
 
-        // 3. 查询 phantom process
-        final phantomOut =
-            await _shizukuApi.runCommand('dumpsys activity settings');
-        final isPhantomIncreased = phantomOut != null &&
-            phantomOut.contains('max_phantom_processes=64');
+        final phantomOut = await _shizukuApi.runCommand('dumpsys activity settings');
+        final isPhantomIncreased = phantomOut != null && phantomOut.contains('max_phantom_processes=64');
 
         if (mounted) {
           setState(() {
@@ -108,14 +138,16 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     }
   }
 
-  // 确保已授权 Shizuku 权限
   Future<bool> _ensureShizukuPermission() async {
     final isBinderRunning = await _shizukuApi.pingBinder() ?? false;
     if (!isBinderRunning) {
-      Get.snackbar('Shizuku 未运行', '请确认 Shizuku 应用程序已在后台启动并运行',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.orange,
-          colorText: Colors.white);
+      Get.snackbar(
+        '提示',
+        'Shizuku 服务未运行',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
       setState(() {
         _shizukuAvailable = false;
         _shizukuPermissionGranted = false;
@@ -127,10 +159,13 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     if (!hasPermission) {
       final requested = await _shizukuApi.requestPermission() ?? false;
       if (!requested) {
-        Get.snackbar('权限拒绝', '未授予 Shizuku 权限',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red,
-            colorText: Colors.white);
+        Get.snackbar(
+          '提示',
+          '未授予 Shizuku 权限',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
         setState(() {
           _shizukuPermissionGranted = false;
         });
@@ -145,58 +180,37 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     return hasPermission;
   }
 
-  // 2. 豁免电池优化 (Doze Whitelist) 状态切换
   Future<void> _toggleDozeWhitelist(bool value) async {
     if (!await _ensureShizukuPermission()) return;
     try {
       if (value) {
-        await _shizukuApi
-            .runCommand('dumpsys deviceidle whitelist +${Config.packageName}');
-        Get.snackbar('设置成功', '已通过 Shell 将本应用加入电池优化白名单',
-            snackPosition: SnackPosition.BOTTOM);
+        await _shizukuApi.runCommand('dumpsys deviceidle whitelist +${Config.packageName}');
+        Get.snackbar('设置成功', '已加入电池优化白名单', snackPosition: SnackPosition.BOTTOM);
       } else {
-        await _shizukuApi
-            .runCommand('dumpsys deviceidle whitelist -${Config.packageName}');
-        Get.snackbar('还原成功', '已将本应用移出电池优化白名单',
-            snackPosition: SnackPosition.BOTTOM);
+        await _shizukuApi.runCommand('dumpsys deviceidle whitelist -${Config.packageName}');
+        Get.snackbar('设置成功', '已移出电池优化白名单', snackPosition: SnackPosition.BOTTOM);
       }
       await _checkShizukuStatus();
     } catch (e) {
-      Get.snackbar('执行失败', e.toString(),
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white);
+      Get.snackbar('执行失败', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
-  // 3. 无限制后台运行 AppOps 状态切换
   Future<void> _togglePhantomProcess(bool value) async {
     if (!await _ensureShizukuPermission()) return;
     try {
       if (value) {
-        // 第一步：禁止系统自动同步重置设定
-        await _shizukuApi
-            .runCommand('device_config set_sync_disabled_for_tests persistent');
-        // 第二步：将限制提升到 64
-        await _shizukuApi.runCommand(
-            'device_config put activity_manager max_phantom_processes 64');
-        Get.snackbar('设置成功', '已提高幻影进程限制至64',
-            snackPosition: SnackPosition.BOTTOM);
+        await _shizukuApi.runCommand('device_config set_sync_disabled_for_tests persistent');
+        await _shizukuApi.runCommand('device_config put activity_manager max_phantom_processes 64');
+        Get.snackbar('设置成功', '已调整幻影进程上限为 64', snackPosition: SnackPosition.BOTTOM);
       } else {
-        // 恢复：启用同步并改回 32
-        await _shizukuApi
-            .runCommand('device_config set_sync_disabled_for_tests none');
-        await _shizukuApi.runCommand(
-            'device_config put activity_manager max_phantom_processes 32');
-        Get.snackbar('还原成功', '已恢复默认幻影进程限制',
-            snackPosition: SnackPosition.BOTTOM);
+        await _shizukuApi.runCommand('device_config set_sync_disabled_for_tests none');
+        await _shizukuApi.runCommand('device_config put activity_manager max_phantom_processes 32');
+        Get.snackbar('设置成功', '已恢复默认幻影进程上限', snackPosition: SnackPosition.BOTTOM);
       }
       await _checkShizukuStatus();
     } catch (e) {
-      Get.snackbar('执行失败', e.toString(),
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white);
+      Get.snackbar('执行失败', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
@@ -204,27 +218,37 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     if (!await _ensureShizukuPermission()) return;
     try {
       if (value) {
-        await _shizukuApi.runCommand(
-            'cmd appops set ${Config.packageName} RUN_ANY_IN_BACKGROUND allow');
-        await _shizukuApi.runCommand(
-            'cmd appops set ${Config.packageName} RUN_IN_BACKGROUND allow');
-        Get.snackbar('设置成功', '已允许后台无限制自由运行',
-            snackPosition: SnackPosition.BOTTOM);
+        await _shizukuApi.runCommand('cmd appops set ${Config.packageName} RUN_ANY_IN_BACKGROUND allow');
+        await _shizukuApi.runCommand('cmd appops set ${Config.packageName} RUN_IN_BACKGROUND allow');
+        Get.snackbar('设置成功', '已开启后台无限制运行', snackPosition: SnackPosition.BOTTOM);
       } else {
-        await _shizukuApi.runCommand(
-            'cmd appops set ${Config.packageName} RUN_ANY_IN_BACKGROUND default');
-        await _shizukuApi.runCommand(
-            'cmd appops set ${Config.packageName} RUN_IN_BACKGROUND default');
-        Get.snackbar('还原成功', 'AppOps 权限已恢复至系统默认托管',
-            snackPosition: SnackPosition.BOTTOM);
+        await _shizukuApi.runCommand('cmd appops set ${Config.packageName} RUN_ANY_IN_BACKGROUND default');
+        await _shizukuApi.runCommand('cmd appops set ${Config.packageName} RUN_IN_BACKGROUND default');
+        Get.snackbar('设置成功', '已恢复默认后台运行策略', snackPosition: SnackPosition.BOTTOM);
       }
       await _checkShizukuStatus();
     } catch (e) {
-      Get.snackbar('执行失败', e.toString(),
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white);
+      Get.snackbar('执行失败', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
     }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    final status = await Permission.notification.request();
+    if (status.isPermanentlyDenied) {
+      openAppSettings();
+    }
+    await _checkSystemPermissionsStatus();
+  }
+
+  Future<void> _requestStoragePermission() async {
+    var status = await Permission.manageExternalStorage.request();
+    if (!status.isGranted) {
+      status = await Permission.storage.request();
+      if (status.isPermanentlyDenied) {
+        openAppSettings();
+      }
+    }
+    await _checkSystemPermissionsStatus();
   }
 
   Future<void> _requestBatteryOptimization() async {
@@ -232,32 +256,17 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     try {
       final status = await Permission.ignoreBatteryOptimizations.status;
       if (status.isGranted) {
-        Get.snackbar('已授权', '已获得电池优化豁免权限',
-            snackPosition: SnackPosition.BOTTOM,
-            duration: const Duration(seconds: 2));
+        Get.snackbar('提示', '已获得电池优化豁免权限', snackPosition: SnackPosition.BOTTOM, duration: const Duration(seconds: 2));
         return;
       }
       final result = await Permission.ignoreBatteryOptimizations.request();
       await Future.delayed(const Duration(milliseconds: 500));
       await _checkBatteryOptimizationStatus();
       if (result.isGranted) {
-        Get.snackbar('授权成功', '已获得电池优化豁免权限',
-            snackPosition: SnackPosition.BOTTOM,
-            duration: const Duration(seconds: 2));
-      } else {
-        Get.snackbar('授权失败', '未获得电池优化豁免权限',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.orange,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 2));
+        Get.snackbar('设置成功', '已获得电池优化豁免权限', snackPosition: SnackPosition.BOTTOM, duration: const Duration(seconds: 2));
       }
     } catch (e) {
       Log.e('请求电池优化豁免失败: $e', tag: 'MaiBot');
-      Get.snackbar('请求失败', '请求电池优化豁免时发生错误: $e',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 3));
     }
   }
 
@@ -269,7 +278,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('后台保活设置', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text('权限与后台保活', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => Get.back(),
@@ -278,48 +287,67 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.25)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline_rounded, color: theme.colorScheme.primary, size: 22),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '为确保后台常驻运行不中断，建议完成下方系统权限设置，并在多任务界面为 MaiBot 加锁。',
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontSize: 13,
-                      height: 1.45,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildSectionTitle('基础保活选项', Icons.battery_charging_full_rounded),
+          _buildSectionTitle('系统运行权限', Icons.verified_user_rounded),
           _buildCard([
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.battery_saver_rounded, color: Colors.green, size: 22),
-              ),
-              title: Text('电池优化豁免', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              leading: const Icon(Icons.notifications_none_rounded, size: 22),
+              title: Text('通知权限', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
               subtitle: Text(
-                _isBatteryOptimizationIgnored ? '已获得豁免权限，允许后台运行' : '未授权：系统可能在息屏时休眠进程',
+                _isNotificationGranted ? '已授权，前台通知正常运行' : '未授权，前台服务可能被系统终止',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _isNotificationGranted ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.error,
+                ),
+              ),
+              trailing: _isNotificationGranted
+                  ? const Icon(Icons.check_circle_rounded, color: Colors.green, size: 22)
+                  : FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: _requestNotificationPermission,
+                      child: const Text('授权', style: TextStyle(fontSize: 12)),
+                    ),
+              onTap: _requestNotificationPermission,
+            ),
+            const Divider(height: 1, indent: 56),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: const Icon(Icons.folder_open_rounded, size: 22),
+              title: Text('存储权限', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                _isStorageGranted ? '已授权，支持环境解压及备份读写' : '未授权，无法管理容器及备份文件',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _isStorageGranted ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.error,
+                ),
+              ),
+              trailing: _isStorageGranted
+                  ? const Icon(Icons.check_circle_rounded, color: Colors.green, size: 22)
+                  : FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: _requestStoragePermission,
+                      child: const Text('授权', style: TextStyle(fontSize: 12)),
+                    ),
+              onTap: _requestStoragePermission,
+            ),
+          ]),
+          const SizedBox(height: 16),
+          _buildSectionTitle('基础保活设置', Icons.battery_charging_full_rounded),
+          _buildCard([
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: const Icon(Icons.battery_saver_rounded, size: 22),
+              title: Text('忽略电池优化', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                _isBatteryOptimizationIgnored ? '已授权，允许息屏时保持后台运行' : '未授权，系统可能在息屏时暂停网络和进程',
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               trailing: _isBatteryOptimizationIgnored
@@ -336,18 +364,31 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
               onTap: _requestBatteryOptimization,
             ),
             const Divider(height: 1, indent: 56),
-            SwitchListTile(
-              secondary: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.indigo.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.wifi_lock_rounded, color: Colors.indigo, size: 22),
-              ),
-              title: Text('保持 Wi-Fi 连接 (WLAN 锁)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: const Icon(Icons.power_settings_new_rounded, size: 22),
+              title: Text('系统省电策略', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
               subtitle: Text(
-                '息屏时避免系统 Wi-Fi 进入休眠，保障网络连接稳定',
+                '建议在系统设置中将应用省电策略设为无限制。此状态无法自动检测。',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
+              trailing: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => openAppSettings(),
+                child: const Text('去设置', style: TextStyle(fontSize: 12)),
+              ),
+              onTap: () => openAppSettings(),
+            ),
+            const Divider(height: 1, indent: 56),
+            SwitchListTile(
+              secondary: const Icon(Icons.wifi_lock_rounded, size: 22),
+              title: Text('保持 WLAN 连接', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                '息屏时保持 Wi-Fi 连接稳定',
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: _enableWifiLock.get() ?? true,
@@ -359,23 +400,44 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
             ),
           ]),
           const SizedBox(height: 16),
-          _buildSectionTitle('Shizuku 进阶配置', Icons.extension_rounded),
+          _buildSectionTitle('任务管理与后台锁定', Icons.task_alt_rounded),
           _buildCard([
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.link_rounded, color: Colors.purple, size: 22),
+              leading: const Icon(Icons.lock_outline_rounded, size: 22),
+              title: Text('多任务卡片加锁', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                '在多任务列表中长按或下拉卡片添加锁定，防止被一键清理。此状态无法自动检测。',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
-              title: Text('Shizuku 运行状态', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+            ),
+            const Divider(height: 1, indent: 56),
+            SwitchListTile(
+              secondary: const Icon(Icons.visibility_off_rounded, size: 22),
+              title: Text('从最近任务列表中隐藏', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                '开启后不在多任务列表中显示应用',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
+              value: Get.find<HomeController>().hideFromRecents.get() ?? false,
+              activeThumbColor: primaryColor,
+              onChanged: (bool value) {
+                Get.find<HomeController>().setHideFromRecents(value);
+                if (mounted) setState(() {});
+              },
+            ),
+          ]),
+          const SizedBox(height: 16),
+          _buildSectionTitle('Shizuku 高级配置', Icons.extension_rounded),
+          _buildCard([
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: const Icon(Icons.link_rounded, size: 22),
+              title: Text('Shizuku 服务状态', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
               subtitle: Text(
                 !_shizukuAvailable
-                    ? '未运行：请先启动 Shizuku 应用'
-                    : (_shizukuPermissionGranted ? '已连接并获得授权' : '已检测到服务，点击请求授权'),
+                    ? '未检测到运行中的 Shizuku 服务'
+                    : (_shizukuPermissionGranted ? '已连接并获得授权' : '已检测到服务，点击授权'),
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               trailing: Icon(
@@ -394,17 +456,10 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
             ),
             const Divider(height: 1, indent: 56),
             SwitchListTile(
-              secondary: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.teal.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.flash_on_rounded, color: Colors.teal, size: 22),
-              ),
-              title: Text('写入系统 Doze 白名单', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              secondary: const Icon(Icons.flash_on_rounded, size: 22),
+              title: Text('写入 Doze 白名单', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
               subtitle: Text(
-                '通过 Shell 命令直接将应用注册至系统低电耗白名单',
+                '通过 Shell 命令将应用添加至系统白名单',
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: _shizukuDozeWhitelist,
@@ -413,17 +468,10 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
             ),
             const Divider(height: 1, indent: 56),
             SwitchListTile(
-              secondary: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.deepOrange.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.tune_rounded, color: Colors.deepOrange, size: 22),
-              ),
-              title: Text('无限制后台运行 (AppOps)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              secondary: const Icon(Icons.tune_rounded, size: 22),
+              title: Text('后台无限制运行', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
               subtitle: Text(
-                '开启 RUN_ANY_IN_BACKGROUND 权限，允许应用在后台持续运行',
+                '配置 AppOps 允许后台持续运行',
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: _shizukuRunAnyInBackground,
@@ -432,64 +480,15 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
             ),
             const Divider(height: 1, indent: 56),
             SwitchListTile(
-              secondary: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blueGrey.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.memory_rounded, color: Colors.blueGrey, size: 22),
-              ),
-              title: Text('提高幻影进程限制 (Android 12+)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              secondary: const Icon(Icons.memory_rounded, size: 22),
+              title: Text('提高幻影进程限制', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
               subtitle: Text(
-                '将系统幻影进程上限提升至 64，避免 Linux 容器子进程被系统清理',
+                '将系统限制提高至 64，适用于 Android 12 及以上',
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: _shizukuPhantomProcessLimit,
               activeThumbColor: primaryColor,
               onChanged: (bool value) => _togglePhantomProcess(value),
-            ),
-          ]),
-          const SizedBox(height: 16),
-          _buildSectionTitle('任务管理与隐身', Icons.task_alt_rounded),
-          _buildCard([
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade700.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.lock_outline_rounded, color: Colors.amber.shade800, size: 22),
-              ),
-              title: Text('多任务锁定建议', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
-              subtitle: Text(
-                '在系统的最近任务列表中长按或下拉 MaiBot 卡片添加锁定图标，防止一键清理任务时被关闭。',
-                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ),
-            const Divider(height: 1, indent: 56),
-            SwitchListTile(
-              secondary: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.visibility_off_rounded, color: Colors.red, size: 22),
-              ),
-              title: Text('从最近任务列表中隐藏', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
-              subtitle: Text(
-                '隐藏后应用不在多任务列表显示。在系统内存紧张时可能降低保活优先级。',
-                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-              ),
-              value: Get.find<HomeController>().hideFromRecents.get() ?? false,
-              activeThumbColor: primaryColor,
-              onChanged: (bool value) {
-                Get.find<HomeController>().setHideFromRecents(value);
-                if (mounted) setState(() {});
-              },
             ),
           ]),
           const SizedBox(height: 24),
@@ -512,7 +511,6 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.onSurfaceVariant,
-              letterSpacing: 0.3,
             ),
           ),
         ],
@@ -528,7 +526,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> {
       elevation: 0,
       color: theme.cardTheme.color ?? theme.colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.35 : 0.45)),
       ),
       clipBehavior: Clip.antiAlias,

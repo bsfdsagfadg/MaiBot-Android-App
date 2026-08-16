@@ -276,10 +276,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 _buildSectionHeader('系统与网络', Icons.settings_suggest_rounded),
                 _buildCard([
                   _buildSettingTile(
-                    icon: Icons.battery_charging_full_rounded,
-                    iconColor: Colors.green,
-                    title: '后台保活设置',
-                    subtitle: '电池优化、WLAN 保持连接及后台运行配置',
+                    icon: Icons.shield_outlined,
+                    iconColor: Colors.blue,
+                    title: '权限与后台保活',
+                    subtitle: '系统运行权限、电池优化及后台常驻策略',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () {
                       Get.to(() => const KeepAliveSettingsPage());

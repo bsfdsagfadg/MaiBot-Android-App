@@ -43,6 +43,72 @@ class BackupService {
       return [];
     }
   }
+  /// 安全平滑停止后台进程与 Linux 容器：
+  /// 1. 先停用原生服务守护层（防止原生守护进程误判为异常崩溃而立即自动重启）
+  /// 2. 向 Python / Node / QQ 进程发送 SIGINT (Ctrl+C / 信号 2)，通知应用优雅保存状态并落盘 SQLite 数据
+  /// 3. 等待缓冲期，让数据库完成 WAL checkpoint 和文件关闭
+  /// 4. 发送 SIGKILL (信号 9) 彻底清理残留孤儿子进程
+  /// 5. 清理 X11 锁文件，确保后续启动不产生锁冲突
+  static Future<void> safelyTerminateProcessesForMaintenance() async {
+    Log.i('正在平滑停止后台容器与进程...', tag: 'BackupService');
+
+    // 第一步：通知原生守护服务停用，封锁自动重启定时器
+    try {
+      await ForegroundServiceManager.stopService();
+    } catch (e) {
+      Log.w('通知原生服务停止异常: $e', tag: 'BackupService');
+    }
+
+    // 第二步：向核心进程发送 SIGINT (Ctrl+C，信号 2)，允许 Python / Node / SQLite 优雅写盘退出
+    try {
+      await Process.run('${RuntimeEnvir.binPath}/busybox',
+          ['killall', '-2', 'python', 'python3', 'node', 'qq', 'bash', 'sh']);
+    } catch (_) {}
+
+    // 第三步：等待 1 秒缓冲期，确保 SQLite 数据与日志文件安全完成落盘
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    // 第四步：彻底清理所有可能残留的孤儿进程
+    try {
+      await Process.run('${RuntimeEnvir.binPath}/busybox',
+          ['killall', '-9', 'proot', 'python', 'python3', 'node', 'qq', 'bash', 'sh']);
+    } catch (_) {}
+
+    // 第五步：清理锁文件
+    try {
+      final x1Lock = File('${RuntimeEnvir.tmpPath}/.X1-lock');
+      if (x1Lock.existsSync()) x1Lock.deleteSync();
+      final x11Unix = Directory('${RuntimeEnvir.tmpPath}/.X11-unix');
+      if (x11Unix.existsSync()) x11Unix.deleteSync(recursive: true);
+    } catch (_) {}
+  }
+
+  /// 确保获取存储权限（支持 Android 11+ 所有文件权限与旧版存储权限），无法获取时降级使用内部目录
+  static Future<bool> ensureStoragePermission() async {
+    try {
+      var manageStatus = await Permission.manageExternalStorage.status;
+      if (manageStatus.isGranted) return true;
+
+      var storageStatus = await Permission.storage.status;
+      if (storageStatus.isGranted) return true;
+
+      manageStatus = await Permission.manageExternalStorage.request();
+      if (manageStatus.isGranted) return true;
+
+      storageStatus = await Permission.storage.request();
+      if (storageStatus.isGranted) return true;
+
+      // 若公共存储权限未授予，检查内部备份目录是否可用
+      final internalBackupDir = Directory('${RuntimeEnvir.homePath}/backups');
+      if (internalBackupDir.existsSync()) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      Log.w('请求存储权限异常: $e', tag: 'BackupService');
+      return true;
+    }
+  }
 
   /// 探测备份文件内部包含的具体模块
   static Future<Map<String, bool>> inspectBackupContents(File backupFile) async {
@@ -83,84 +149,84 @@ class BackupService {
     bool showLoadingDialog = false,
     bool restoreService = true,
   }) async {
+    // 1. 检查并请求存储权限
+    final hasPermission = await ensureStoragePermission();
+    if (!hasPermission) {
+      Get.snackbar(
+        '权限不足',
+        '需要存储权限才能备份数据到手机存储',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+      return false;
+    }
+
+    final dataPath = '${scripts.ubuntuPath}/root/MaiBot/data';
+    final dataDir = Directory(dataPath);
+    if (!await dataDir.exists()) {
+      Get.snackbar(
+        '备份失败',
+        'MaiBot 数据目录不存在',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+
+    final backupDir = getMaiBotBackupDirectory();
+    if (!await backupDir.exists()) {
+      await backupDir.create(recursive: true);
+    }
+
+    final now = DateTime.now();
+    final timestamp =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+
+    final backupFileName = 'MaiBot-backup-$timestamp.tar.gz';
+    final backupPath = '${backupDir.path}/$backupFileName';
+
     bool dialogShown = false;
-    void closeDialog() {
+    if (showLoadingDialog) {
+      Get.dialog(
+        const PopScope(
+          canPop: false,
+          child: Center(
+            child: Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+              child: Padding(
+                padding: EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('正在打包备份数据...', style: TextStyle(fontSize: 14)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+      dialogShown = true;
+    }
+
+    void dismissDialog() {
       if (dialogShown) {
-        Get.back();
+        if (Get.isDialogOpen == true) {
+          Get.back();
+        }
         dialogShown = false;
       }
     }
 
     try {
-      // 检查并请求存储权限
-      var status = await Permission.manageExternalStorage.status;
-      if (!status.isGranted) {
-        status = await Permission.manageExternalStorage.request();
-        if (!status.isGranted) {
-          var storageStatus = await Permission.storage.status;
-          if (!storageStatus.isGranted) {
-            storageStatus = await Permission.storage.request();
-            if (!storageStatus.isGranted) {
-              Get.snackbar(
-                '权限不足',
-                '需要存储权限才能备份数据',
-                snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: Colors.orange,
-                colorText: Colors.white,
-                duration: const Duration(seconds: 3),
-              );
-              return false;
-            }
-          }
-        }
-      }
-
-      final dataPath = '${scripts.ubuntuPath}/root/MaiBot/data';
-      final dataDir = Directory(dataPath);
-      if (!await dataDir.exists()) {
-        Get.snackbar(
-          '备份失败',
-          'MaiBot 数据目录不存在',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return false;
-      }
-
-      final backupDir = getMaiBotBackupDirectory();
-      if (!await backupDir.exists()) {
-        await backupDir.create(recursive: true);
-      }
-
-      final now = DateTime.now();
-      final timestamp =
-          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
-
-      final backupFileName = 'MaiBot-backup-$timestamp.tar.gz';
-      final backupPath = '${backupDir.path}/$backupFileName';
-
-      Log.i('备份前暂停前台服务，确保数据一致性', tag: 'BackupService');
-      await ForegroundServiceManager.stopService();
-      try {
-        await Process.run('${RuntimeEnvir.binPath}/busybox',
-            ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
-        
-        final x1Lock = File('${RuntimeEnvir.tmpPath}/.X1-lock');
-        if (x1Lock.existsSync()) x1Lock.deleteSync();
-        final x11Unix = Directory('${RuntimeEnvir.tmpPath}/.X11-unix');
-        if (x11Unix.existsSync()) x11Unix.deleteSync(recursive: true);
-      } catch (e) {
-        Log.w('清理残留进程与锁文件失败: $e', tag: 'BackupService');
-      }
-
-      if (showLoadingDialog) {
-        Get.dialog(
-          const Center(child: CircularProgressIndicator()),
-          barrierDismissible: false,
-        );
-        dialogShown = true;
-      }
+      // 平滑发送 SIGINT 退出并终止进程，杜绝数据损坏与自动重启冲突
+      await safelyTerminateProcessesForMaintenance();
 
       final List<String> pathsToCreate = [
         '${scripts.ubuntuPath}/root/MaiBot/config',
@@ -187,9 +253,10 @@ class BackupService {
         'napcat/config',
       ]);
 
-      if (result.exitCode == 0) {
-        closeDialog();
+      // 先关闭加载框，再展示 Snackbar 提示
+      dismissDialog();
 
+      if (result.exitCode == 0) {
         final backupFile = File(backupPath);
         final fileSize = await backupFile.length();
         final fileSizeMB = (fileSize / 1024 / 1024).toStringAsFixed(2);
@@ -203,7 +270,6 @@ class BackupService {
         Log.i('备份成功: $backupPath (${fileSizeMB}MB)', tag: 'BackupService');
         return true;
       } else {
-        closeDialog();
         Get.snackbar(
           '备份失败',
           '错误: ${result.stderr}',
@@ -215,7 +281,7 @@ class BackupService {
         return false;
       }
     } catch (e) {
-      closeDialog();
+      dismissDialog();
       Get.snackbar(
         '备份失败',
         e.toString(),
@@ -226,7 +292,7 @@ class BackupService {
       Log.e('备份异常: $e', tag: 'BackupService');
       return false;
     } finally {
-      closeDialog();
+      dismissDialog();
       if (restoreService) {
         await ForegroundServiceManager.restartContainer();
       }
@@ -241,24 +307,22 @@ class BackupService {
     bool restorePlugins = true,
     bool restoreNapcat = true,
     bool restartService = true,
+    bool showSnackbar = true,
   }) async {
+    // 确保权限
+    await ensureStoragePermission();
+
     if (!backupFile.existsSync()) {
-      Get.snackbar('恢复失败', '备份文件不存在', snackPosition: SnackPosition.BOTTOM);
+      if (showSnackbar) {
+        Get.snackbar('恢复失败', '备份文件不存在', snackPosition: SnackPosition.BOTTOM);
+      }
       return false;
     }
 
     try {
       Log.i('开始执行选择性备份恢复: ${backupFile.path}', tag: 'BackupService');
-      await ForegroundServiceManager.stopService();
-
-      try {
-        await Process.run('${RuntimeEnvir.binPath}/busybox',
-            ['killall', '-9', 'node', 'python', 'python3', 'bash', 'sh']);
-        final x1Lock = File('${RuntimeEnvir.tmpPath}/.X1-lock');
-        if (x1Lock.existsSync()) x1Lock.deleteSync();
-        final x11Unix = Directory('${RuntimeEnvir.tmpPath}/.X11-unix');
-        if (x11Unix.existsSync()) x11Unix.deleteSync(recursive: true);
-      } catch (_) {}
+      // 平滑发送 SIGINT 退出并终止进程，杜绝数据损坏与自动重启冲突
+      await safelyTerminateProcessesForMaintenance();
 
       final extractTargets = <String>[];
       if (restoreData) extractTargets.add('MaiBot/data');
@@ -267,7 +331,9 @@ class BackupService {
       if (restoreNapcat) extractTargets.add('napcat/config');
 
       if (extractTargets.isEmpty) {
-        Get.snackbar('提示', '未选择任何要恢复的模块', snackPosition: SnackPosition.BOTTOM);
+        if (showSnackbar) {
+          Get.snackbar('提示', '未选择任何要恢复的模块', snackPosition: SnackPosition.BOTTOM);
+        }
         return true;
       }
 
@@ -287,21 +353,27 @@ class BackupService {
       final res = await Process.run('${RuntimeEnvir.binPath}/busybox', args);
       if (res.exitCode == 0) {
         Log.i('选择性恢复成功: $extractTargets', tag: 'BackupService');
-        Get.snackbar(
-          '恢复成功',
-          '已成功还原选定的数据与配置模块',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(seconds: 3),
-        );
+        if (showSnackbar) {
+          Get.snackbar(
+            '恢复成功',
+            '已成功还原选定的数据与配置模块',
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(seconds: 3),
+          );
+        }
         return true;
       } else {
         Log.e('恢复失败: ${res.stderr}', tag: 'BackupService');
-        Get.snackbar('恢复失败', '解压文件失败: ${res.stderr}', snackPosition: SnackPosition.BOTTOM);
+        if (showSnackbar) {
+          Get.snackbar('恢复失败', '解压文件失败: ${res.stderr}', snackPosition: SnackPosition.BOTTOM);
+        }
         return false;
       }
     } catch (e) {
       Log.e('恢复过程异常: $e', tag: 'BackupService');
-      Get.snackbar('恢复异常', e.toString(), snackPosition: SnackPosition.BOTTOM);
+      if (showSnackbar) {
+        Get.snackbar('恢复异常', e.toString(), snackPosition: SnackPosition.BOTTOM);
+      }
       return false;
     } finally {
       if (restartService) {
@@ -315,10 +387,20 @@ class BackupService {
     bool isInitialInstall = false,
     VoidCallback? onCompleted,
   }) async {
+    // 确保请求存储权限，避免无权限时直接返回空列表导致提示无备份
+    if (!isInitialInstall) {
+      await ensureStoragePermission();
+    }
+
     final backups = getAvailableBackups();
     if (backups.isEmpty) {
       if (!isInitialInstall) {
-        Get.snackbar('提示', '未在手机下载目录中找到任何备份存档', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar(
+          '未找到备份',
+          '未在手机存储或应用备份目录中找到备份存档',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
       }
       onCompleted?.call();
       return;
@@ -556,15 +638,35 @@ class BackupService {
                       label: const Text('开始恢复'),
                       onPressed: () async {
                         setState(() => isRestoring = true);
-                        await performSelectiveRestore(
+                        final success = await performSelectiveRestore(
                           backupFile: currentFile,
                           restoreData: restoreData,
                           restoreConfig: restoreConfig,
                           restorePlugins: restorePlugins,
                           restoreNapcat: restoreNapcat,
                           restartService: !isInitialInstall,
+                          showSnackbar: false,
                         );
-                        Get.back();
+                        if (Get.isDialogOpen == true) {
+                          Get.back();
+                        }
+                        if (success) {
+                          Get.snackbar(
+                            '恢复成功',
+                            '已成功还原选定的数据与配置模块',
+                            snackPosition: SnackPosition.BOTTOM,
+                            duration: const Duration(seconds: 3),
+                          );
+                        } else {
+                          Get.snackbar(
+                            '恢复失败',
+                            '数据还原过程中发生错误',
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white,
+                            duration: const Duration(seconds: 3),
+                          );
+                        }
                         onCompleted?.call();
                       },
                     ),
