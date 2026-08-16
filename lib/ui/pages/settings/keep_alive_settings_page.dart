@@ -273,8 +273,6 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -392,7 +390,6 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: _enableWifiLock.get() ?? true,
-              activeThumbColor: primaryColor,
               onChanged: (bool value) {
                 _enableWifiLock.set(value);
                 if (mounted) setState(() {});
@@ -420,7 +417,6 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: Get.find<HomeController>().hideFromRecents.get() ?? false,
-              activeThumbColor: primaryColor,
               onChanged: (bool value) {
                 Get.find<HomeController>().setHideFromRecents(value);
                 if (mounted) setState(() {});
@@ -463,7 +459,6 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: _shizukuDozeWhitelist,
-              activeThumbColor: primaryColor,
               onChanged: (bool value) => _toggleDozeWhitelist(value),
             ),
             const Divider(height: 1, indent: 56),
@@ -475,7 +470,6 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: _shizukuRunAnyInBackground,
-              activeThumbColor: primaryColor,
               onChanged: (bool value) => _toggleRunAnyInBackground(value),
             ),
             const Divider(height: 1, indent: 56),
@@ -487,7 +481,6 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: _shizukuPhantomProcessLimit,
-              activeThumbColor: primaryColor,
               onChanged: (bool value) => _togglePhantomProcess(value),
             ),
           ]),

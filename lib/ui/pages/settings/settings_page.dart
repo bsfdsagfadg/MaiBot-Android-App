@@ -15,9 +15,9 @@ import 'dialogs/update_dialogs.dart';
 import 'dialogs/webview_crud_dialogs.dart';
 import 'dialogs/quick_login_dialog.dart';
 import 'dialogs/git_clone_dialog.dart';
+import 'dialogs/git_dialogs.dart';
 import 'keep_alive_settings_page.dart';
 import 'maintenance_actions.dart';
-
 import '../../controllers/theme_controller.dart';
 class SettingsPage extends StatefulWidget {
   final WebViewController maiBotController;
@@ -237,7 +237,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                       ),
                       value: enabled,
-                      activeThumbColor: primaryColor,
                       onChanged: (bool value) {
                         homeController.napcatController.setNapCatWebUiEnabled(value);
                         Get.snackbar(
@@ -284,6 +283,33 @@ class _SettingsPageState extends State<SettingsPage> {
                     onTap: () {
                       Get.to(() => const KeepAliveSettingsPage());
                     },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.cloud_sync_rounded,
+                    iconColor: Colors.teal,
+                    title: '更新 MaiBot',
+                    subtitle: '执行 git pull 拉取当前分支最新代码并同步依赖',
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                    onTap: () => showUpdateMaiBotDialog(),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.alt_route_rounded,
+                    iconColor: Colors.teal.shade700,
+                    title: '切换 MaiBot 分支',
+                    subtitle: '动态获取并切换分支（兼容自定义 Fork 仓库）',
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                    onTap: () => showSwitchBranchDialog(),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingTile(
+                    icon: Icons.sell_rounded,
+                    iconColor: Colors.purple,
+                    title: '切换 Release 版本',
+                    subtitle: '按 Release Tag 检出版本（与分支切换互斥）',
+                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                    onTap: () => showSwitchReleaseTagDialog(),
                   ),
                   const Divider(height: 1, indent: 56),
                   _buildSettingTile(
@@ -376,15 +402,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     subtitle: '重新拉取并安装 MaiBot 代码',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: MaintenanceActions.reinstallMaiBot,
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _buildSettingTile(
-                    icon: Icons.delete_forever_rounded,
-                    iconColor: Colors.red,
-                    title: '清除 MaiBot 数据',
-                    subtitle: '清除本地数据与配置，恢复初始状态',
-                    trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: MaintenanceActions.clearMaiBotData,
                   ),
                 ], backgroundColor: Colors.red.withValues(alpha: 0.03), borderColor: Colors.red.withValues(alpha: 0.2)),
                 const SizedBox(height: 16),
@@ -792,7 +809,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
                 ),
                 value: controller.isAmoledDark.value,
-                activeThumbColor: colorScheme.primary,
                 onChanged: (bool value) => controller.setAmoledDark(value),
               ),
             ],

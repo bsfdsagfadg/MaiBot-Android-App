@@ -15,14 +15,15 @@ class ThemeController extends GetxController {
   static const List<AppThemeColor> presetColors = [
     AppThemeColor('系统动态 (Monet)', null, isDynamic: true),
     AppThemeColor('麦麦橙 (Mai Orange)', Color(0xFFFF8C00)),
-    AppThemeColor('落日橙 (Sunset)', Color(0xFFF57C00)),
+    AppThemeColor('落日红 (Sunset)', Color(0xFFFF5722)),
+    AppThemeColor('暖阳金 (Amber)', Color(0xFFFFB300)),
     AppThemeColor('经典蓝 (Classic)', Color(0xFF1976D2)),
     AppThemeColor('深靛蓝 (Indigo)', Color(0xFF3F51B5)),
     AppThemeColor('松石青 (Teal)', Color(0xFF00897B)),
     AppThemeColor('麦苗绿 (Mint)', Color(0xFF00A86B)),
+    AppThemeColor('极客绿 (Forest)', Color(0xFF2E7D32)),
     AppThemeColor('樱花粉 (Pink)', Color(0xFFE91E63)),
     AppThemeColor('优雅紫 (Purple)', Color(0xFF7B1FA2)),
-    AppThemeColor('极客绿 (Forest)', Color(0xFF2E7D32)),
     AppThemeColor('岩石灰 (Slate)', Color(0xFF455A64)),
   ];
 
@@ -330,6 +331,12 @@ class ThemeController extends GetxController {
             return colorScheme.primary;
           }
           return colorScheme.surfaceContainerHighest;
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return Colors.transparent;
+          }
+          return colorScheme.outline;
         }),
       ),
     );

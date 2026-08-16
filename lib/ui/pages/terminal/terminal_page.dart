@@ -357,7 +357,7 @@ class _TerminalPageState extends State<TerminalPage> {
                                 ),
                                 if (controller.napcatClient.isConnected) ...[
                                   const SizedBox(width: 12),
-                                  OutlinedButton.icon(
+                                  FilledButton.tonalIcon(
                                     onPressed: () {
                                       setState(() {
                                         _displayMode = 2;
@@ -365,7 +365,7 @@ class _TerminalPageState extends State<TerminalPage> {
                                     },
                                     icon: const Icon(Icons.pets_rounded, size: 18),
                                     label: const Text('NapCat 日志'),
-                                    style: OutlinedButton.styleFrom(
+                                    style: FilledButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(14),

@@ -68,21 +68,30 @@ class BackupService {
     // 第三步：等待 1 秒缓冲期，确保 SQLite 数据与日志文件安全完成落盘
     await Future.delayed(const Duration(milliseconds: 1000));
 
-    // 第四步：彻底清理所有可能残留的孤儿进程
+    // 第四步：彻底清理所有可能残留的容器进程
     try {
       await Process.run('${RuntimeEnvir.binPath}/busybox',
-          ['killall', '-9', 'proot', 'python', 'python3', 'node', 'qq', 'bash', 'sh']);
+          ['killall', '-9', 'proot', 'python', 'python3', 'node', 'qq', 'bash', 'sh', 'crashpad_handler']);
     } catch (_) {}
 
-    // 第五步：清理锁文件
+    // 第五步：清理锁文件与孤立 Socket
     try {
       final x1Lock = File('${RuntimeEnvir.tmpPath}/.X1-lock');
       if (x1Lock.existsSync()) x1Lock.deleteSync();
       final x11Unix = Directory('${RuntimeEnvir.tmpPath}/.X11-unix');
       if (x11Unix.existsSync()) x11Unix.deleteSync(recursive: true);
+      await Process.run('${RuntimeEnvir.binPath}/busybox', [
+        'rm',
+        '-rf',
+        '${RuntimeEnvir.tmpPath}/SingletonLock',
+        '${RuntimeEnvir.tmpPath}/SingletonSocket',
+        '${RuntimeEnvir.tmpPath}/SingletonCookie',
+        '${scripts.ubuntuPath}/root/.config/QQ/SingletonLock',
+        '${scripts.ubuntuPath}/root/.config/QQ/SingletonSocket',
+        '${scripts.ubuntuPath}/root/.config/QQ/SingletonCookie',
+      ]);
     } catch (_) {}
   }
-
   /// 确保获取存储权限（支持 Android 11+ 所有文件权限与旧版存储权限），无法获取时降级使用内部目录
   static Future<bool> ensureStoragePermission() async {
     try {

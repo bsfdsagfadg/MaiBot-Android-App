@@ -66,8 +66,13 @@ public class ProotService extends Service {
                 String bin = intent.getStringExtra("binPath");
                 if (bin != null) {
                     try {
-                        Runtime.getRuntime().exec(new String[]{bin + "/busybox", "killall", "-9", "proot", "qq", "python", "python3", "node", "bash", "sh"}).waitFor();
+                        Runtime.getRuntime().exec(new String[]{bin + "/busybox", "killall", "-9", "proot", "qq", "python", "python3", "node", "bash", "sh", "crashpad_handler"}).waitFor();
                     } catch (Exception e) {}
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE);
+                } else {
+                    stopForeground(true);
                 }
                 stopSelf();
                 return START_NOT_STICKY;
@@ -79,82 +84,80 @@ public class ProotService extends Service {
             String ubuntuPath = intent.getStringExtra("ubuntuPath");
             
             if (binPath != null && homePath != null) {
-                // 检测是否已经存在存活的容器进程，如果是 DartVM 退出/重启后重连，则直接放行，不杀进程
+                // 检测是否已经存在存活的容器进程，如果是 DartVM 退出/重启后重连，则直接放行，保护底层运行中的容器
                 if (maibotProcess != null && maibotProcess.isAlive() && 
                     napcatProcess != null && napcatProcess.isAlive()) {
                     Log.i(TAG, "Native Backend 依然存活，拦截重复的启动请求，保护底层 PRoot 容器免受重置。");
                     return START_REDELIVER_INTENT;
                 }
                 
-                Log.i(TAG, "执行容器环境清理与全新启动...");
-                
-                // 清理之前的锁
-                File x1Lock = new File(tmpPath, ".X1-lock");
-                if (x1Lock.exists()) x1Lock.delete();
-                File x11Unix = new File(tmpPath, ".X11-unix");
-                if (x11Unix.exists()) deleteRecursively(x11Unix);
-
-                // Strict cleanup according to memory
-                try {
-                    Runtime.getRuntime().exec(new String[]{binPath + "/busybox", "killall", "-9", "proot", "qq", "python", "python3", "node", "bash", "sh"}).waitFor();
-                } catch (Exception e) {
-                    Log.e(TAG, "killall processes failed", e);
+                // 仅启动尚未启动或已退出的进程，保障已有存活进程不受干扰
+                if (maibotProcess == null || !maibotProcess.isAlive()) {
+                    Log.i(TAG, "启动 MaiBot 服务进程...");
+                    String maibotCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" +
+                            "export TERM=xterm-256color\n" +
+                            "export COLORTERM=truecolor\n" +
+                            "export FORCE_COLOR=1\n" +
+                            "export CLICOLOR_FORCE=1\n" +
+                            "export CLICOLOR=1\n" +
+                            "export PYTHONUNBUFFERED=1\n" +
+                            "export PYTHONIOENCODING=utf-8\n" +
+                            "export PYTHON_COLORS=1\n" +
+                            "export RICH_FORCE_COLOR=1\n" +
+                            "export LOGURU_COLORIZE=true\n" +
+                            "export UV_COLOR=always\n" +
+                            "export UV_PROGRESS_MODE=visual\n" +
+                            "export UV_NO_PROGRESS=0\n" +
+                            "export UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple\n" +
+                            "export PIP_NO_COLOR=0\n" +
+                            "export COLUMNS=100\n" +
+                            "export LINES=30\n" +
+                            "export LANG=C.UTF-8\n" +
+                            "export LC_ALL=C.UTF-8\n" +
+                            "export UV_LINK_MODE=copy\n" +
+                            "export TMPDIR=/tmp\n" +
+                            "export TEMP=/tmp\n" +
+                            "export TMP=/tmp\n" +
+                            "mkdir -p /tmp /var/tmp\n" +
+                            "cd /root/MaiBot\n" +
+                            "if [ -f EULA.md ]; then export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}'); fi\n" +
+                            "if [ -f PRIVACY.md ]; then export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}'); fi\n" +
+                            "if command -v script >/dev/null 2>&1; then\n" +
+                            "    exec script -q -e -c \"stty cols 45 rows 24 2>/dev/null; /root/.local/bin/uv run --color always bot.py\" /dev/null\n" +
+                            "else\n" +
+                            "    exec /root/.local/bin/uv run --color always bot.py\n" +
+                            "fi\n";
+                    maibotProcess = new ProotProcess("MaiBot", 20001, binPath, homePath, tmpPath, ubuntuPath, maibotCmd);
+                    maibotProcess.start();
                 }
-
-                String maibotCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" +
-                        "export TERM=xterm-256color\n" +
-                        "export COLORTERM=truecolor\n" +
-                        "export FORCE_COLOR=1\n" +
-                        "export CLICOLOR_FORCE=1\n" +
-                        "export CLICOLOR=1\n" +
-                        "export PYTHONUNBUFFERED=1\n" +
-                        "export PYTHONIOENCODING=utf-8\n" +
-                        "export PYTHON_COLORS=1\n" +
-                        "export RICH_FORCE_COLOR=1\n" +
-                        "export LOGURU_COLORIZE=true\n" +
-                        "export UV_COLOR=always\n" +
-                        "export UV_PROGRESS_MODE=visual\n" +
-                        "export UV_NO_PROGRESS=0\n" +
-                        "export UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple\n" +
-                        "export PIP_NO_COLOR=0\n" +
-                        "export COLUMNS=100\n" +
-                        "export LINES=30\n" +
-                        "export LANG=C.UTF-8\n" +
-                        "export LC_ALL=C.UTF-8\n" +
-                        "export UV_LINK_MODE=copy\n" +
-                        "export TMPDIR=/tmp\n" +
-                        "export TEMP=/tmp\n" +
-                        "export TMP=/tmp\n" +
-                        "mkdir -p /tmp /var/tmp\n" +
-                        "cd /root/MaiBot\n" +
-                        "if [ -f EULA.md ]; then export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}'); fi\n" +
-                        "if [ -f PRIVACY.md ]; then export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}'); fi\n" +
-                        "if command -v script >/dev/null 2>&1; then\n" +
-                        "    exec script -q -e -c \"stty cols 45 rows 24 2>/dev/null; /root/.local/bin/uv run --color always bot.py\" /dev/null\n" +
-                        "else\n" +
-                        "    exec /root/.local/bin/uv run --color always bot.py\n" +
-                        "fi\n";
-                maibotProcess = new ProotProcess("MaiBot", 20001, binPath, homePath, tmpPath, ubuntuPath, maibotCmd);
-                maibotProcess.start();
                 
-                String napcatCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" +
-                        "export TERM=xterm-256color\n" +
-                        "export COLORTERM=truecolor\n" +
-                        "export FORCE_COLOR=1\n" +
-                        "export CLICOLOR_FORCE=1\n" +
-                        "export CLICOLOR=1\n" +
-                        "export COLUMNS=100\n" +
-                        "export LINES=30\n" +
-                        "export LANG=C.UTF-8\n" +
-                        "export LC_ALL=C.UTF-8\n" +
-                        "export TMPDIR=/tmp\n" +
-                        "export TEMP=/tmp\n" +
-                        "export TMP=/tmp\n" +
-                        "mkdir -p /tmp /var/tmp\n" +
-                        "cd /root\n" +
-                        "bash /root/launcher.sh\n";
-                napcatProcess = new ProotProcess("NapCat", 20002, binPath, homePath, tmpPath, ubuntuPath, napcatCmd);
-                napcatProcess.start();
+                if (napcatProcess == null || !napcatProcess.isAlive()) {
+                    Log.i(TAG, "启动 NapCat 服务进程...");
+                    String napcatCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" +
+                            "export TERM=xterm-256color\n" +
+                            "export COLORTERM=truecolor\n" +
+                            "export FORCE_COLOR=1\n" +
+                            "export CLICOLOR_FORCE=1\n" +
+                            "export CLICOLOR=1\n" +
+                            "export COLUMNS=100\n" +
+                            "export LINES=30\n" +
+                            "export LANG=C.UTF-8\n" +
+                            "export LC_ALL=C.UTF-8\n" +
+                            "export TMPDIR=/tmp\n" +
+                            "export TEMP=/tmp\n" +
+                            "export TMP=/tmp\n" +
+                            "mkdir -p /tmp /var/tmp /root/.config/QQ\n" +
+                            "chmod 777 /tmp /var/tmp 2>/dev/null || true\n" +
+                            "rm -rf /tmp/Singleton* /tmp/.org.chromium.* /tmp/QQ* /root/.config/QQ/Singleton* /root/.config/QQ/Crashpad* /root/.config/QQ/QQ* /root/.config/QQ/*lock* 2>/dev/null || true\n" +
+                            "cd /root\n" +
+                            "if [ -f /root/launcher.sh ]; then\n" +
+                            "    bash /root/launcher.sh\n" +
+                            "elif [ -d /root/napcat ]; then\n" +
+                            "    cd /root/napcat && LD_PRELOAD=./libnapcat_launcher.so qq --no-sandbox\n" +
+                            "fi\n";
+                    napcatProcess = new ProotProcess("NapCat", 20002, binPath, homePath, tmpPath, ubuntuPath, napcatCmd);
+                    napcatProcess.start();
+                }
             }
         }
         return START_REDELIVER_INTENT;
