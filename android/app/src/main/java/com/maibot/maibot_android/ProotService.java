@@ -47,11 +47,23 @@ public class ProotService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
+
+        Intent exitIntent = new Intent(this, ExitReceiver.class);
+        exitIntent.setAction(ExitReceiver.ACTION_EXIT);
+        PendingIntent exitPendingIntent = PendingIntent.getBroadcast(
+            this,
+            0,
+            exitIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
+        );
+
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("MaiBot 后台服务")
                 .setContentText("容器与服务正在后台运行")
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentIntent(pendingIntent)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "退出应用", exitPendingIntent)
+                .setOngoing(true)
                 .build();
         try {
             startForeground(1002, notification);

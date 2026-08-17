@@ -78,10 +78,9 @@ class ThemeController extends GetxController {
   String get currentSeedName => presetColors[selectedColorIndex.value].name;
 
   void setColorIndex(int index) {
-    if (index >= 0 && index < presetColors.length) {
+    if (index >= 0 && index < presetColors.length && selectedColorIndex.value != index) {
       selectedColorIndex.value = index;
       _colorIndexSetting.set(index);
-      Get.forceAppUpdate();
     }
   }
 
@@ -98,9 +97,10 @@ class ThemeController extends GetxController {
   }
 
   void setAmoledDark(bool value) {
-    isAmoledDark.value = value;
-    _amoledSetting.set(value);
-    Get.forceAppUpdate();
+    if (isAmoledDark.value != value) {
+      isAmoledDark.value = value;
+      _amoledSetting.set(value);
+    }
   }
 
   /// 构建正统 Material 3 浅色主题

@@ -22,14 +22,16 @@ import io.flutter.embedding.engine.FlutterEngineCache;
 import io.flutter.embedding.engine.dart.DartExecutor;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugins.GeneratedPluginRegistrant;
+import android.provider.Settings;
+import android.text.TextUtils;
 
 @SuppressWarnings("deprecation")
 public class MainActivity extends FragmentActivity {
+    public static MainActivity instance;
     FlutterFragment flutterFragment;
     private static final String TAG_FLUTTER_FRAGMENT = "flutter_fragment";
     Context mContext;
     FragmentManager fragmentManager = getSupportFragmentManager();
-
     // 文件选择器相关
     private static final int FILE_CHOOSER_REQUEST_CODE = 1;
     private ValueCallback<Uri[]> filePathCallback;
@@ -41,9 +43,9 @@ public class MainActivity extends FragmentActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        instance = this;
         mContext = this;
         setContentView(com.maibot.maibot_android.R.layout.my_activity_layout);
-
         flutterFragment = (FlutterFragment) fragmentManager.findFragmentByTag(TAG_FLUTTER_FRAGMENT);
         FlutterEngine flutterEngine = FlutterEngineCache.getInstance().get("my_engine_id");
         if (flutterEngine == null) {
@@ -99,6 +101,17 @@ public class MainActivity extends FragmentActivity {
                 intent.putExtra("binPath", stopBinPath);
                 mContext.startService(intent);
                 result.success(true);
+            } else if ("is_accessibility_enabled".equals(call.method)) {
+                result.success(isAccessibilityServiceEnabled());
+            } else if ("open_accessibility_settings".equals(call.method)) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    mContext.startActivity(intent);
+                    result.success(true);
+                } catch (Exception e) {
+                    result.error("OPEN_FAILED", e.getMessage(), null);
+                }
             } else {
                 result.notImplemented();
             }
@@ -205,8 +218,56 @@ public class MainActivity extends FragmentActivity {
         flutterFragment.onTrimMemory(level);
     }
 
+    private boolean isAccessibilityServiceEnabled() {
+        if (KeepAliveAccessibilityService.isRunning()) {
+            return true;
+        }
+        int accessibilityEnabled = 0;
+        final String expectedServiceName = getPackageName() + "/" + KeepAliveAccessibilityService.class.getCanonicalName();
+        try {
+            accessibilityEnabled = Settings.Secure.getInt(
+                    mContext.getContentResolver(),
+                    Settings.Secure.ACCESSIBILITY_ENABLED);
+        } catch (Settings.SettingNotFoundException ignored) {}
+
+        if (accessibilityEnabled == 1) {
+            String settingValue = Settings.Secure.getString(
+                    mContext.getContentResolver(),
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (settingValue != null) {
+                TextUtils.SimpleStringSplitter splitter = new TextUtils.SimpleStringSplitter(':');
+                splitter.setString(settingValue);
+                while (splitter.hasNext()) {
+                    String accessService = splitter.next();
+                    if (accessService.equalsIgnoreCase(expectedServiceName) ||
+                        accessService.contains(getPackageName() + "/.KeepAliveAccessibilityService") ||
+                        accessService.contains(getPackageName() + "/com.maibot.maibot_android.KeepAliveAccessibilityService")) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    public void triggerExitFromFlutter() {
+        runOnUiThread(() -> {
+            FlutterEngine flutterEngine = FlutterEngineCache.getInstance().get("my_engine_id");
+            if (flutterEngine != null) {
+                new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "maibot_channel")
+                        .invokeMethod("exit_app", null);
+            } else {
+                finishAffinity();
+                System.exit(0);
+            }
+        });
+    }
+
     @Override
     protected void onDestroy() {
+        if (instance == this) {
+            instance = null;
+        }
         FlutterEngine flutterEngine = FlutterEngineCache.getInstance().get("my_engine_id");
         if (flutterEngine != null) {
             new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "maibot_channel").setMethodCallHandler(null);

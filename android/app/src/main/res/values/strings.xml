@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MaiBot</string>
+    <string name="accessibility_service_label">MaiBot 无障碍保活服务</string>
+    <string name="accessibility_service_description">用于保持应用后台稳定运行，防止从最近任务列表清除时终止服务。</string>
+</resources>

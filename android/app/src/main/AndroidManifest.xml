@@ -76,6 +76,28 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Run local Linux PRoot environment and MaiBot backend service" />
         </service>
+        <!-- 无障碍保活服务：提升进程优先级，防止用户划掉多任务卡片导致进程被杀 -->
+        <service
+            android:name=".KeepAliveAccessibilityService"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- 前台通知栏退出广播接收器 -->
+        <receiver
+            android:name=".ExitReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.maibot.maibot_android.ACTION_EXIT" />
+            </intent-filter>
+        </receiver>
         <!-- Ubuntu Documents Provider -->
         <provider
             android:name=".UbuntuDocumentsProvider"

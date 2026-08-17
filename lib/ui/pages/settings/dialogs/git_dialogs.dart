@@ -16,13 +16,11 @@ Future<bool> _runGitTaskWithProgressDialog({
 
   void appendLog(String text) {
     logs.add(text);
-    if (scrollController.hasClients) {
-      scrollController.animateTo(
-        scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients) {
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   // 启动后台任务

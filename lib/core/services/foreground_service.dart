@@ -4,6 +4,7 @@ import 'package:global_repository/global_repository.dart';
 import '../constants/scripts.dart' as scripts;
 import '../config/app_config.dart';
 import 'config_service.dart';
+import '../../ui/pages/settings/maintenance_actions.dart';
 
 /// 前台服务管理类 (全面拥抱 Native Backend，已剔除 flutter_foreground_task)
 class ForegroundServiceManager {
@@ -12,7 +13,12 @@ class ForegroundServiceManager {
   static const _channel = MethodChannel(Config.methodChannel);
 
   static void init() {
-    // 初始化不再需要配置复杂的 Flutter Foreground Task
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'exit_app') {
+        Log.i('收到通知栏退出指令，正在退出应用...', tag: 'ForegroundService');
+        await MaintenanceActions.performExit(showConfirmation: false);
+      }
+    });
   }
 
   static Future<void> startService() async {

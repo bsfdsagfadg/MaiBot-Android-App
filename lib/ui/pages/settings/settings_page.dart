@@ -36,23 +36,29 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  String _appVersion = '';
+  static String _cachedAppVersion = '';
+  static String? _cachedPrivacyContent;
+  String _appVersion = _cachedAppVersion;
   final HomeController homeController = Get.find<HomeController>();
   final UpdateChecker _updateChecker = UpdateChecker();
 
   @override
   void initState() {
     super.initState();
-    _loadAppVersion();
+    if (_appVersion.isEmpty) {
+      _loadAppVersion();
+    }
   }
 
   Future<void> _loadAppVersion() async {
     final version = await getAppVersion();
-    setState(() {
-      _appVersion = version;
-    });
+    _cachedAppVersion = version;
+    if (mounted) {
+      setState(() {
+        _appVersion = version;
+      });
+    }
   }
-
   // 打开文件管理器并导航到 MaiBot Ubuntu 文件系统位置
   Future<void> _openFileManager() async {
     try {
@@ -431,7 +437,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () async {
                       try {
-                        final privacyContent =
+                        _cachedPrivacyContent ??=
                             await rootBundle.loadString('assets/privacy_policy.md');
                         if (context.mounted) {
                           Get.dialog(
@@ -464,7 +470,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                     child: SingleChildScrollView(
                                       padding: const EdgeInsets.all(16.0),
                                       child: MarkdownBody(
-                                        data: privacyContent,
+                                        data: _cachedPrivacyContent!,
                                       ),
                                     ),
                                   ),
@@ -687,17 +693,20 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 14),
             // 色彩选择器横向列表
-            SizedBox(
-              height: 48,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: ThemeController.presetColors.length,
-                itemBuilder: (context, index) {
-                  final item = ThemeController.presetColors[index];
-                  return Obx(() {
-                    final isSelected = controller.selectedColorIndex.value == index;
+            // 色彩选择器横向列表（统一单 Obx 响应，消除多 Obx 订阅开销）
+            Obx(() {
+              final selectedIndex = controller.selectedColorIndex.value;
+              final isDynamicSel = controller.isDynamicSelected;
+              return SizedBox(
+                height: 48,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: ThemeController.presetColors.length,
+                  itemBuilder: (context, index) {
+                    final item = ThemeController.presetColors[index];
+                    final isSelected = selectedIndex == index;
                     final displayColor = item.isDynamic
-                        ? (controller.isDynamicSelected ? colorScheme.primary : const Color(0xFF6750A4))
+                        ? (isDynamicSel ? colorScheme.primary : const Color(0xFF6750A4))
                         : item.color!;
 
                     return GestureDetector(
@@ -734,10 +743,10 @@ class _SettingsPageState extends State<SettingsPage> {
                                 : null),
                       ),
                     );
-                  });
-                },
-              ),
-            ),
+                  },
+                ),
+              );
+            }),
           ],
         ),
       ),

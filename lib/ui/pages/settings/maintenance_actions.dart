@@ -263,59 +263,66 @@ class MaintenanceActions {
     }
   }
 
-  /// 退出应用
-  static Future<void> exitApp() async {
-    // 显示确认对话框
-    final confirm = await Get.dialog<bool>(
-      AlertDialog(
-        icon: const Icon(Icons.power_settings_new_rounded, size: 28, color: Colors.redAccent),
-        title: const Text('确认退出应用'),
-        content: const Text('退出应用将终止后台常驻服务与 Linux 容器环境，确定要退出吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () => Get.back(result: true),
-            child: const Text('退出应用'),
-          ),
-        ],
-      ),
-    );
+  /// 统一退出应用流程（复用核心终止逻辑，支持从设置页二次确认或从通知栏直接触发）
+  static Future<void> performExit({bool showConfirmation = true}) async {
+    if (showConfirmation) {
+      // 显示确认对话框
+      final confirm = await Get.dialog<bool>(
+        AlertDialog(
+          icon: const Icon(Icons.power_settings_new_rounded, size: 28, color: Colors.redAccent),
+          title: const Text('确认退出应用'),
+          content: const Text('退出应用将终止后台常驻服务与 Linux 容器环境，确定要退出吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () => Get.back(result: true),
+              child: const Text('退出应用'),
+            ),
+          ],
+        ),
+      );
 
-    if (confirm == true) {
-      Get.dialog(
-        const PopScope(
-          canPop: false,
-          child: Center(
-            child: Card(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('正在安全终止后台容器与进程...', style: TextStyle(fontSize: 14)),
-                  ],
-                ),
+      if (confirm != true) return;
+    }
+
+    Get.dialog(
+      const PopScope(
+        canPop: false,
+        child: Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('正在退出应用并停止服务...', style: TextStyle(fontSize: 14)),
+                ],
               ),
             ),
           ),
         ),
-        barrierDismissible: false,
-      );
+      ),
+      barrierDismissible: false,
+    );
 
-      try {
-        await BackupService.safelyTerminateProcessesForMaintenance();
-      } catch (e) {
-        Log.e('退出应用终止进程异常: $e', tag: 'MaiBot');
-      }
-
-      await SystemNavigator.pop();
-      exit(0);
+    try {
+      await BackupService.safelyTerminateProcessesForMaintenance();
+    } catch (e) {
+      Log.e('退出应用终止进程异常: $e', tag: 'MaiBot');
     }
+
+    await SystemNavigator.pop();
+    exit(0);
+  }
+
+  /// 退出应用（设置页入口，带确认弹窗）
+  static Future<void> exitApp() async {
+    await performExit(showConfirmation: true);
   }
 }

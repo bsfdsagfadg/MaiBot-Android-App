@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
@@ -21,6 +22,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
   bool _isNotificationGranted = false;
   bool _isStorageGranted = false;
   bool _isBatteryOptimizationIgnored = false;
+  bool _isAccessibilityEnabled = false;
 
   final Setting _enableWifiLock = 'enable_wifi_lock'.setting;
 
@@ -35,10 +37,15 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _checkAllStatus();
     if (_enableWifiLock.get() == null) {
       _enableWifiLock.set(true);
     }
+    // 避免在页面推入路由转场动画期间执行密集 IPC/Channel 阻塞导致卡顿
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _checkAllStatus();
+      }
+    });
   }
 
   @override
@@ -49,15 +56,19 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && mounted) {
       _checkAllStatus();
     }
   }
 
   Future<void> _checkAllStatus() async {
-    await _checkSystemPermissionsStatus();
-    await _checkBatteryOptimizationStatus();
-    await _checkShizukuStatus();
+    if (!Platform.isAndroid) return;
+    await Future.wait([
+      _checkSystemPermissionsStatus(),
+      _checkBatteryOptimizationStatus(),
+      _checkAccessibilityStatus(),
+      _checkShizukuStatus(),
+    ]);
   }
 
   Future<void> _checkSystemPermissionsStatus() async {
@@ -92,6 +103,31 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
     }
   }
 
+  Future<void> _checkAccessibilityStatus() async {
+    if (!Platform.isAndroid) return;
+    try {
+      const channel = MethodChannel(Config.methodChannel);
+      final bool? enabled = await channel.invokeMethod<bool>('is_accessibility_enabled');
+      if (mounted) {
+        setState(() {
+          _isAccessibilityEnabled = enabled ?? false;
+        });
+      }
+    } catch (e) {
+      Log.e('检查无障碍保活状态失败: $e', tag: 'KeepAliveSettingsPage');
+    }
+  }
+
+  Future<void> _openAccessibilitySettings() async {
+    if (!Platform.isAndroid) return;
+    try {
+      const channel = MethodChannel(Config.methodChannel);
+      await channel.invokeMethod('open_accessibility_settings');
+    } catch (e) {
+      Log.e('打开无障碍设置失败: $e', tag: 'KeepAliveSettingsPage');
+      openAppSettings();
+    }
+  }
   Future<void> _checkShizukuStatus() async {
     if (!Platform.isAndroid) return;
     try {
@@ -107,31 +143,40 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
       }
 
       final hasPermission = await _shizukuApi.checkPermission() ?? false;
-      if (mounted) {
-        setState(() {
-          _shizukuAvailable = isBinderRunning;
-          _shizukuPermissionGranted = hasPermission;
-        });
-      }
-
-      if (hasPermission) {
-        final dozeOut = await _shizukuApi.runCommand('dumpsys deviceidle whitelist');
-        final isDozeWhitelisted = dozeOut != null && dozeOut.contains(Config.packageName);
-
-        final appopsOut = await _shizukuApi.runCommand(
-            'cmd appops get ${Config.packageName} RUN_ANY_IN_BACKGROUND');
-        final isRunAnyAllowed = appopsOut != null && appopsOut.toLowerCase().contains('allow');
-
-        final phantomOut = await _shizukuApi.runCommand('dumpsys activity settings');
-        final isPhantomIncreased = phantomOut != null && phantomOut.contains('max_phantom_processes=64');
-
+      if (!hasPermission) {
         if (mounted) {
           setState(() {
-            _shizukuDozeWhitelist = isDozeWhitelisted;
-            _shizukuRunAnyInBackground = isRunAnyAllowed;
-            _shizukuPhantomProcessLimit = isPhantomIncreased;
+            _shizukuAvailable = true;
+            _shizukuPermissionGranted = false;
           });
         }
+        return;
+      }
+
+      // 并行执行 Shizuku Shell 命令，大幅缩短等待时间避免 UI 掉帧
+      final results = await Future.wait([
+        _shizukuApi.runCommand('dumpsys deviceidle whitelist'),
+        _shizukuApi.runCommand('cmd appops get ${Config.packageName} RUN_ANY_IN_BACKGROUND'),
+        _shizukuApi.runCommand('dumpsys activity settings'),
+      ]);
+
+      final dozeOut = results[0];
+      final isDozeWhitelisted = dozeOut != null && dozeOut.contains(Config.packageName);
+
+      final appopsOut = results[1];
+      final isRunAnyAllowed = appopsOut != null && appopsOut.toLowerCase().contains('allow');
+
+      final phantomOut = results[2];
+      final isPhantomIncreased = phantomOut != null && phantomOut.contains('max_phantom_processes=64');
+
+      if (mounted) {
+        setState(() {
+          _shizukuAvailable = true;
+          _shizukuPermissionGranted = true;
+          _shizukuDozeWhitelist = isDozeWhitelisted;
+          _shizukuRunAnyInBackground = isRunAnyAllowed;
+          _shizukuPhantomProcessLimit = isPhantomIncreased;
+        });
       }
     } catch (e) {
       Log.e('检查 Shizuku 状态失败: $e', tag: 'KeepAliveSettingsPage');
@@ -399,6 +444,33 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
           const SizedBox(height: 16),
           _buildSectionTitle('任务管理与后台锁定', Icons.task_alt_rounded),
           _buildCard([
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: const Icon(Icons.accessibility_new_rounded, size: 22),
+              title: Text('无障碍保活服务', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                _isAccessibilityEnabled
+                    ? '已开启，防止从最近任务列表清除时终止后台服务'
+                    : '未开启，开启后可防止划掉任务卡片时误杀后台服务',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _isAccessibilityEnabled ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.error,
+                ),
+              ),
+              trailing: _isAccessibilityEnabled
+                  ? const Icon(Icons.check_circle_rounded, color: Colors.green, size: 22)
+                  : FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: _openAccessibilitySettings,
+                      child: const Text('去开启', style: TextStyle(fontSize: 12)),
+                    ),
+              onTap: _openAccessibilitySettings,
+            ),
+            const Divider(height: 1, indent: 56),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
               leading: const Icon(Icons.lock_outline_rounded, size: 22),
