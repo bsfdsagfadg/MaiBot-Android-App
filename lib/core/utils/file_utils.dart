@@ -50,10 +50,29 @@ Directory getMaiBotBackupDirectory() {
   return fallback;
 }
 
-
 extension TerminalExt on Terminal {
   void writeProgress(String data) {
     write('\x1b[31m- $data\x1b[0m\n\r');
   }
+
+  /// 提取终端当前缓冲区的纯文本内容
+  String getPlainText() {
+    final buf = buffer;
+    final lines = <String>[];
+    for (int i = 0; i < buf.lines.length; i++) {
+      lines.add(buf.lines[i].toString().trimRight());
+    }
+    while (lines.isNotEmpty && lines.last.isEmpty) {
+      lines.removeLast();
+    }
+    return lines.join('\n');
+  }
 }
 
+extension TerminalStringExt on String {
+  /// 将字符串中的独立 \n 统一转换为 xterm 终端换行所需的 \r\n（保留已有的 \r\n）
+  String toTerminalCrlf() {
+    if (isEmpty) return this;
+    return replaceAllMapped(RegExp(r'(?<!\r)\n'), (m) => '\r\n');
+  }
+}

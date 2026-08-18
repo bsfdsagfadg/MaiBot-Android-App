@@ -9,7 +9,7 @@ import 'dart:async';
 
 import 'core/config/app_config.dart';
 import 'core/services/env_bootstrapper.dart';
-import 'core/services/foreground_service.dart';
+import 'core/services/backend_process_manager.dart';
 import 'ui/routes/app_routes.dart';
 import 'ui/controllers/home_controller.dart';
 import 'ui/controllers/theme_controller.dart';
@@ -32,8 +32,8 @@ Future<void> main() async {
   // 初始化运行环境（释放原生二进制链接，防止由于拉起服务过快导致无 proot 可执行）
   await EnvBootstrapper.initEnvir();
 
-  // 初始化前台服务
-  ForegroundServiceManager.init();
+  // 初始化后台进程管理
+  BackendProcessManager.init();
 
 
   runApp(

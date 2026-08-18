@@ -5,6 +5,7 @@ import 'package:global_repository/global_repository.dart';
 import '../config/app_config.dart';
 import '../constants/scripts.dart' as scripts;
 import 'config_service.dart';
+import '../../ui/pages/settings/maintenance_actions.dart';
 
 enum ProcessState {
   stopped,
@@ -54,6 +55,12 @@ class BackendProcessManager {
 
   /// 初始化状态与事件监听
   static void init() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'exit_app') {
+        Log.i('收到通知栏退出指令，正在退出应用...', tag: 'BackendProcessManager');
+        await MaintenanceActions.performExit(showConfirmation: false);
+      }
+    });
     Log.d('BackendProcessManager initialized', tag: 'BackendProcessManager');
   }
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../core/services/foreground_service.dart';
+import '../../../../core/services/backend_process_manager.dart';
 import '../../../../core/services/git_service.dart';
 
 /// 统一执行 Git 操作并展示流式日志的弹窗
@@ -31,7 +31,7 @@ Future<bool> _runGitTaskWithProgressDialog({
       if (res.success) {
         appendLog('\n操作已完成，正在重启 MaiBot 服务...\n');
         try {
-          await ForegroundServiceManager.restartMaiBot();
+          await BackendProcessManager.restartService(target: ServiceTarget.maibot);
           appendLog('MaiBot 服务已重启生效。\n');
         } catch (e) {
           appendLog('重启服务提示: $e\n');

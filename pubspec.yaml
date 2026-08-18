@@ -40,10 +40,6 @@ dependencies:
 dependency_overrides:
   xterm:
     path: ./packages/xterm.dart
-  global_repository:
-    path: ./packages/global_repository
-  settings:
-    path: ./packages/settings
 
 dev_dependencies:
   flutter_test:

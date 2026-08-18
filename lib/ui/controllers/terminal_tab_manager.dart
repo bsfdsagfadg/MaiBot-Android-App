@@ -5,7 +5,8 @@ import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 import 'package:xterm/xterm.dart';
 
-import '../../../core/constants/scripts.dart' as scripts;
+import '../../../core/services/proot_runner.dart';
+import '../../../core/utils/file_utils.dart';
 
 /// 终端标签页类型
 enum TerminalTabType {
@@ -128,66 +129,8 @@ class TerminalTabManager extends GetxController {
     final newTitle = '终端 ${tabs.length + 1}';
     final newTerminal = Terminal(maxLines: 5000);
     final prootPath = '${RuntimeEnvir.binPath}/proot';
-    Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
-    final fakeProcs = [
-      ['.loadavg', '/proc/loadavg'],
-      ['.stat', '/proc/stat'],
-      ['.uptime', '/proc/uptime'],
-      ['.version', '/proc/version'],
-      ['.vmstat', '/proc/vmstat'],
-      ['.sysctl_entry_cap_last_cap', '/proc/sys/kernel/cap_last_cap'],
-      ['.sysctl_inotify_max_user_watches', '/proc/sys/fs/inotify/max_user_watches'],
-    ];
-
-    final procBinds = <String>[];
-    for (final pair in fakeProcs) {
-      final fakeFile = File('${scripts.ubuntuPath}/proc/${pair.first}');
-      if (fakeFile.existsSync()) {
-        procBinds.addAll(['-b', '${fakeFile.path}:${pair[1]}']);
-      }
-    }
-
-    final args = [
-      '-0', '-r', scripts.ubuntuPath,
-      '--link2symlink',
-      '-b', '/dev', '-b', '/proc', '-b', '/sys',
-      '-b', '${RuntimeEnvir.tmpPath}:/tmp',
-      '-b', '${RuntimeEnvir.tmpPath}:/dev/shm',
-      ...procBinds,
-      '-w', '/root',
-      '/bin/sh', '-c',
-      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; '
-      'export TERM=xterm-256color; '
-      'export COLORTERM=truecolor; '
-      'export FORCE_COLOR=1; '
-      'export CLICOLOR_FORCE=1; '
-      'export CLICOLOR=1; '
-      'export PYTHONUNBUFFERED=1; '
-      'export PYTHONIOENCODING=utf-8; '
-      'export LANG=C.UTF-8; '
-      'export LC_ALL=C.UTF-8; '
-      'export HOME=/root; '
-      'export PS1="\\u@maibot:\\w# "; '
-      'cd /root; '
-      'if command -v script >/dev/null 2>&1; then '
-      '    exec script -q -e -c "/bin/bash -i" /dev/null; '
-      'elif [ -x /bin/bash ]; then '
-      '    exec /bin/bash -i; '
-      'else '
-      '    exec /bin/sh -i; '
-      'fi'
-    ];
-    final env = {
-      'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
-      'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
-      'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
-      'TERM': 'xterm-256color',
-      'LANG': 'C.UTF-8',
-      'LC_ALL': 'C.UTF-8',
-      'TMPDIR': '/tmp',
-      'TEMP': '/tmp',
-      'TMP': '/tmp',
-    };
+    final args = ProotRunner.buildProotArgs(isInteractive: true);
+    final env = ProotRunner.getProotEnv();
     try {
       newTerminal.write('正在启动系统交互终端 (Ubuntu PRoot 环境)...\r\n\r\n');
       final process = await Process.start(prootPath, args, environment: env);
@@ -199,12 +142,12 @@ class TerminalTabManager extends GetxController {
       final sub = process.stdout
           .transform(const Utf8Decoder(allowMalformed: true))
           .listen((data) {
-        newTerminal.write(data.replaceAllMapped(RegExp(r'(?<!\r)\n'), (m) => '\r\n'));
+        newTerminal.write(data.toTerminalCrlf());
       });
       process.stderr
           .transform(const Utf8Decoder(allowMalformed: true))
           .listen((data) {
-        newTerminal.write(data.replaceAllMapped(RegExp(r'(?<!\r)\n'), (m) => '\r\n'));
+        newTerminal.write(data.toTerminalCrlf());
       });
 
       process.exitCode.then((code) {

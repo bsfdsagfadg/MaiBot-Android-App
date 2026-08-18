@@ -127,7 +127,7 @@ class _TerminalTabViewState extends State<TerminalTabView> {
               unawaited(() async {
                 final activeTab = manager.activeTab;
                 if (activeTab != null) {
-                  final text = _getTerminalText(activeTab.terminal);
+                  final text = activeTab.terminal.getPlainText();
                   if (text.isNotEmpty) {
                     await Clipboard.setData(ClipboardData(text: text));
                     Get.snackbar(
@@ -157,7 +157,7 @@ class _TerminalTabViewState extends State<TerminalTabView> {
               unawaited(() async {
                 final activeTab = manager.activeTab;
                 if (activeTab != null) {
-                  final text = _getTerminalText(activeTab.terminal);
+                  final text = activeTab.terminal.getPlainText();
                   try {
                     final dir = getMaiBotBackupDirectory();
                     final now = DateTime.now();
@@ -203,17 +203,6 @@ class _TerminalTabViewState extends State<TerminalTabView> {
     );
   }
 
-  String _getTerminalText(Terminal terminal) {
-    final buffer = terminal.buffer;
-    final lines = <String>[];
-    for (int i = 0; i < buffer.lines.length; i++) {
-      lines.add(buffer.lines[i].toString().trimRight());
-    }
-    while (lines.isNotEmpty && lines.last.isEmpty) {
-      lines.removeLast();
-    }
-    return lines.join('\n');
-  }
 
   /// 构建单个标签页项
   Widget _buildTabItem({

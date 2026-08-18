@@ -6,6 +6,7 @@ import 'package:settings/settings.dart';
 
 import '../config/app_config.dart';
 import '../constants/scripts.dart' as scripts;
+import 'proot_runner.dart';
 class InstallerService {
   /// 记录当前流水线是否为首次/全新安装
   static bool lastInstallWasFresh = false;
@@ -568,139 +569,12 @@ class InstallerService {
   }
 
   static Future<bool> _runInProot(String command, {Function(String)? onLog, Duration timeout = const Duration(minutes: 10)}) async {
-    final prootPath = '${RuntimeEnvir.binPath}/proot';
-    Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
-    
-    // 继承宿主机的代理配置（支持 VPN / 代理工具环境穿透）
-    final envKeys = [
-      'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
-      'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
-    ];
-    final proxyExports = StringBuffer();
-    for (final key in envKeys) {
-      final val = Platform.environment[key];
-      if (val != null && val.isNotEmpty) {
-        proxyExports.write('export $key="$val"; ');
-      }
-    }
-
-    final args = [
-      '-0', '-r', scripts.ubuntuPath,
-      '--link2symlink',
-      '-b', '/dev', '-b', '/proc', '-b', '/sys',
-      '-b', '${RuntimeEnvir.tmpPath}:/tmp',
-      '-b', '${RuntimeEnvir.tmpPath}:/dev/shm',
-      '-w', '/root',
-      '/bin/sh', '-c',
-      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; '
-      'export TERM=xterm-256color; '
-      'export COLORTERM=truecolor; '
-      'export FORCE_COLOR=1; '
-      'export CLICOLOR_FORCE=1; '
-      'export CLICOLOR=1; '
-      'export PYTHONUNBUFFERED=1; '
-      'export PYTHONIOENCODING=utf-8; '
-      'export PYTHON_COLORS=1; '
-      'export RICH_FORCE_COLOR=1; '
-      'export LOGURU_COLORIZE=true; '
-      'export UV_COLOR=always; '
-      'export UV_PROGRESS_MODE=visual; '
-      'export UV_NO_PROGRESS=0; '
-      'export UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple; '
-      'export PIP_NO_COLOR=0; '
-      'export COLUMNS=50; '
-      'export LINES=24; '
-      'export LANG=C.UTF-8; '
-      'export LC_ALL=C.UTF-8; '
-      'export DEBIAN_FRONTEND=noninteractive; '
-      'export GIT_TERMINAL_PROMPT=0; '
-      'export UV_LINK_MODE=copy; '
-      'export TMPDIR=/tmp; '
-      'export TEMP=/tmp; '
-      'export TMP=/tmp; '
-      '${proxyExports.toString()}'
-      'mkdir -p /tmp /var/tmp; '
-      '$command'
-    ];
-    final env = {
-      'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
-      'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
-      'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
-      'TERM': 'xterm-256color',
-      'COLORTERM': 'truecolor',
-      'FORCE_COLOR': '1',
-      'CLICOLOR_FORCE': '1',
-      'CLICOLOR': '1',
-      'PYTHONUNBUFFERED': '1',
-      'PYTHONIOENCODING': 'utf-8',
-      'PYTHON_COLORS': '1',
-      'RICH_FORCE_COLOR': '1',
-      'LOGURU_COLORIZE': 'true',
-      'UV_COLOR': 'always',
-      'UV_PROGRESS_MODE': 'visual',
-      'UV_NO_PROGRESS': '0',
-      'UV_INDEX_URL': 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple',
-      'PIP_NO_COLOR': '0',
-      'COLUMNS': '50',
-      'LINES': '24',
-      'LANG': 'C.UTF-8',
-      'LC_ALL': 'C.UTF-8',
-      'TMPDIR': '/tmp',
-      'TEMP': '/tmp',
-      'TMP': '/tmp',
-    };
-    if (onLog != null) {
-      final process = await Process.start(prootPath, args, environment: env);
-      
-      bool lastCharWasCr = false;
-      String normalizeChunk(String chunk) {
-        if (chunk.isEmpty) return chunk;
-        final buf = StringBuffer();
-        for (int i = 0; i < chunk.length; i++) {
-          final char = chunk[i];
-          if (char == '\n') {
-            if (!lastCharWasCr && (i == 0 || chunk[i - 1] != '\r')) {
-              buf.write('\r\n');
-            } else {
-              buf.write('\n');
-            }
-          } else {
-            buf.write(char);
-          }
-          lastCharWasCr = (char == '\r');
-        }
-        return buf.toString();
-      }
-
-      process.stdout.transform(const Utf8Decoder(allowMalformed: true)).listen(
-        (data) => onLog(normalizeChunk(data)),
-        onError: (e) => Log.w('stdout read error: $e', tag: 'InstallerService'),
-      );
-      process.stderr.transform(const Utf8Decoder(allowMalformed: true)).listen(
-        (data) => onLog(normalizeChunk(data)),
-        onError: (e) => Log.w('stderr read error: $e', tag: 'InstallerService'),
-      );
-      
-      try {
-        final exitCode = await process.exitCode.timeout(timeout, onTimeout: () {
-          process.kill(ProcessSignal.sigkill);
-          return -1;
-        });
-        return exitCode == 0;
-      } catch (e) {
-        process.kill(ProcessSignal.sigkill);
-        return false;
-      }
-    } else {
-      try {
-        final res = await Process.run(prootPath, args, environment: env).timeout(timeout, onTimeout: () {
-          return ProcessResult(-1, -1, '', 'Timed out');
-        });
-        return res.exitCode == 0;
-      } catch (e) {
-        return false;
-      }
-    }
+    final result = await ProotRunner.runCommand(
+      command,
+      onLog: onLog,
+      timeout: timeout,
+    );
+    return result.success;
   }
 
   /// 恢复一次性暂存的 NapCat 配置并在完成后清理临时备份文件

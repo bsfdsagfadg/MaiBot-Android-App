@@ -1,26 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:global_repository/global_repository.dart';
-
 import '../constants/scripts.dart' as scripts;
+import 'proot_runner.dart';
 
-class ProotExecResult {
-  final bool success;
-  final int exitCode;
-  final String stdout;
-  final String stderr;
-  final String output;
-
-  ProotExecResult({
-    required this.success,
-    required this.exitCode,
-    required this.stdout,
-    required this.stderr,
-    required this.output,
-  });
-}
-
+export 'proot_runner.dart' show ProotExecResult;
 class GitService {
   static const String maiBotPath = '/root/MaiBot';
 
@@ -36,112 +19,12 @@ class GitService {
     Function(String)? onLog,
     Duration timeout = const Duration(minutes: 5),
   }) async {
-    final prootPath = '${RuntimeEnvir.binPath}/proot';
-    Directory(RuntimeEnvir.tmpPath).createSync(recursive: true);
-
-    // 继承宿主机的代理配置（支持 VPN / 代理工具环境穿透）
-    final envKeys = [
-      'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
-      'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
-    ];
-    final proxyExports = StringBuffer();
-    for (final key in envKeys) {
-      final val = Platform.environment[key];
-      if (val != null && val.isNotEmpty) {
-        proxyExports.write('export $key="$val"; ');
-      }
-    }
-
-    final args = [
-      '-0',
-      '-r',
-      scripts.ubuntuPath,
-      '--link2symlink',
-      '-b',
-      '/dev',
-      '-b',
-      '/proc',
-      '-b',
-      '/sys',
-      '-b',
-      '${RuntimeEnvir.tmpPath}:/tmp',
-      '-b',
-      '${RuntimeEnvir.tmpPath}:/dev/shm',
-      '-w',
-      '/root',
-      '/bin/sh',
-      '-c',
-      'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; '
-          'export TERM=xterm-256color; '
-          'export COLORTERM=truecolor; '
-          'export FORCE_COLOR=1; '
-          'export CLICOLOR_FORCE=1; '
-          'export CLICOLOR=1; '
-          'export PYTHONUNBUFFERED=1; '
-          'export PYTHONIOENCODING=utf-8; '
-          'export UV_COLOR=always; '
-          'export UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple; '
-          'export LANG=C.UTF-8; '
-          'export LC_ALL=C.UTF-8; '
-          'export DEBIAN_FRONTEND=noninteractive; '
-          'export GIT_TERMINAL_PROMPT=0; '
-          'export TMPDIR=/tmp; '
-          'export TEMP=/tmp; '
-          'export TMP=/tmp; '
-          '${proxyExports.toString()}'
-          'mkdir -p /tmp /var/tmp; '
-          '$command'
-    ];
-    final env = {
-      'PROOT_TMP_DIR': RuntimeEnvir.tmpPath,
-      'LD_LIBRARY_PATH': RuntimeEnvir.binPath,
-      'PROOT_LOADER': '${RuntimeEnvir.binPath}/loader',
-      'TERM': 'xterm-256color',
-      'LANG': 'C.UTF-8',
-      'LC_ALL': 'C.UTF-8',
-      'TMPDIR': '/tmp',
-    };
-
-    final stdoutBuffer = StringBuffer();
-    final stderrBuffer = StringBuffer();
-    final allOutputBuffer = StringBuffer();
-
-    try {
-      final process = await Process.start(prootPath, args, environment: env);
-
-      process.stdout.transform(const Utf8Decoder(allowMalformed: true)).listen((data) {
-        stdoutBuffer.write(data);
-        allOutputBuffer.write(data);
-        onLog?.call(data);
-      });
-
-      process.stderr.transform(const Utf8Decoder(allowMalformed: true)).listen((data) {
-        stderrBuffer.write(data);
-        allOutputBuffer.write(data);
-        onLog?.call(data);
-      });
-
-      final exitCode = await process.exitCode.timeout(timeout, onTimeout: () {
-        process.kill(ProcessSignal.sigkill);
-        return -1;
-      });
-
-      return ProotExecResult(
-        success: exitCode == 0,
-        exitCode: exitCode,
-        stdout: stdoutBuffer.toString().trim(),
-        stderr: stderrBuffer.toString().trim(),
-        output: allOutputBuffer.toString().trim(),
-      );
-    } catch (e) {
-      return ProotExecResult(
-        success: false,
-        exitCode: -1,
-        stdout: '',
-        stderr: e.toString(),
-        output: '执行失败: $e',
-      );
-    }
+    return await ProotRunner.runCommand(
+      command,
+      onLog: onLog,
+      timeout: timeout,
+      workingDir: maiBotPath,
+    );
   }
 
   /// 获取当前检出的分支名或 Tag 标识

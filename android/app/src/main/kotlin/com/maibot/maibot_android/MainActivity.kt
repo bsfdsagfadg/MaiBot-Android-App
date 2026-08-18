@@ -94,33 +94,6 @@ class MainActivity : FragmentActivity() {
                         result.error("ERROR", "Task not found", null)
                     }
                 }
-                "start_native_backend" -> {
-                    val binPath = call.argument<String>("binPath")
-                    val homePath = call.argument<String>("homePath")
-                    val tmpPath = call.argument<String>("tmpPath")
-                    val ubuntuPath = call.argument<String>("ubuntuPath")
-                    val intent = Intent(mContext, ProotService::class.java).apply {
-                        putExtra("binPath", binPath)
-                        putExtra("homePath", homePath)
-                        putExtra("tmpPath", tmpPath)
-                        putExtra("ubuntuPath", ubuntuPath)
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        mContext.startForegroundService(intent)
-                    } else {
-                        mContext.startService(intent)
-                    }
-                    result.success(true)
-                }
-                "stop_native_backend" -> {
-                    val stopBinPath = call.argument<String>("binPath")
-                    val intent = Intent(mContext, ProotService::class.java).apply {
-                        action = "STOP"
-                        putExtra("binPath", stopBinPath)
-                    }
-                    mContext.startService(intent)
-                    result.success(true)
-                }
                 "control_backend_service" -> {
                     val target = call.argument<String>("target") ?: "all"
                     val action = call.argument<String>("action") ?: "start"

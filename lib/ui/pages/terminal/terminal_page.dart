@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:xterm/xterm.dart';
+import '../../../core/utils/file_utils.dart';
 
 import '../../controllers/home_controller.dart';
 import 'terminal_theme.dart';
@@ -150,7 +151,7 @@ class _TerminalPageState extends State<TerminalPage> {
                                     final activeTerminal = _displayMode == 2
                                         ? controller.napcatShowTerminal
                                         : controller.terminal;
-                                    final text = _getTerminalText(activeTerminal);
+                                    final text = activeTerminal.getPlainText();
                                     if (text.isNotEmpty) {
                                       await Clipboard.setData(ClipboardData(text: text));
                                       Get.snackbar(
@@ -406,15 +407,4 @@ class _TerminalPageState extends State<TerminalPage> {
     );
   }
 
-  String _getTerminalText(Terminal terminal) {
-    final buffer = terminal.buffer;
-    final lines = <String>[];
-    for (int i = 0; i < buffer.lines.length; i++) {
-      lines.add(buffer.lines[i].toString().trimRight());
-    }
-    while (lines.isNotEmpty && lines.last.isEmpty) {
-      lines.removeLast();
-    }
-    return lines.join('\n');
-  }
 }

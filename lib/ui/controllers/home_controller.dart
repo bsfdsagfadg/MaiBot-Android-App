@@ -12,7 +12,6 @@ import 'package:xterm/xterm.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/services/backup_service.dart';
-import '../../core/services/foreground_service.dart';
 import '../../core/services/installer_service.dart';
 import '../../core/services/progress_tracker.dart';
 import '../../core/services/socket_stream_client.dart';
@@ -80,7 +79,6 @@ class HomeController extends GetxController with WidgetsBindingObserver {
 
   void _handleMaibotLine(String line) {
     napcatController.handleMaibotOutput(line);
-    napcatController.handleNapcatOutput(line);
     final cleanLine = NapcatLogParser.stripAnsi(line);
     if (cleanLine.contains('访问地址:')) {
       _isLocalhostDetected = true;
@@ -144,8 +142,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   Future<void> _startBackendServices() async {
     progressTracker.setProgress('正在启动后台运行环境...');
 
-    // 启动原生后台守护服务（内部已具备幂等存活保护）
-    await ForegroundServiceManager.startService();
+    await BackendProcessManager.startService();
 
     // 前端连接到后端 Socket
     maibotClient.connect();
