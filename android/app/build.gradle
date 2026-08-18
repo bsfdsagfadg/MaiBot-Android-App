@@ -1,7 +1,5 @@
-
 plugins {
     id 'com.android.application'
-    id 'kotlin-android'
     id 'dev.flutter.flutter-gradle-plugin'
 }
 def keystorePropertiesFile = rootProject.file('key.properties')
@@ -22,9 +20,6 @@ android {
         targetCompatibility = 17
     }
 
-    kotlinOptions {
-        jvmTarget = 17
-    }
     signingConfigs {
         if (hasKeystoreFile) {
             release {
@@ -90,6 +85,12 @@ android {
         main {
             jniLibs.srcDirs = ['src/main/jniLibs']
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 
