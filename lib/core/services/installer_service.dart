@@ -9,6 +9,8 @@ import '../constants/scripts.dart' as scripts;
 class InstallerService {
   /// 记录当前流水线是否为首次/全新安装
   static bool lastInstallWasFresh = false;
+  /// NapCat 重装时的一次性临时备份文件路径
+  static String get napcatTempBackupPath => '${RuntimeEnvir.homePath}/.napcat_reinstall_backup.tar.gz';
 
   static Future<bool> runInstallPipeline({
     required Function(String) onProgress,
@@ -156,6 +158,26 @@ class InstallerService {
     final launcherSh = File('${scripts.ubuntuPath}/root/launcher.sh');
     final napcatEntry = File('${napcatDir.path}/napcat.mjs');
     if (!napcatDir.existsSync() || !qqBinary.existsSync() || !launcherSh.existsSync() || !napcatEntry.existsSync()) {
+      // 若 napcat 目录依然存在（安装器会因文件夹已存在而拒绝安装），且存在未暂存的配置，自动备份配置后清理目录
+      final tempBackup = File(napcatTempBackupPath);
+      final configDir = Directory('${scripts.ubuntuPath}/root/napcat/config');
+      if (napcatDir.existsSync()) {
+        if (!tempBackup.existsSync() && configDir.existsSync()) {
+          onLog?.call('\x1b[33m[NapCat]\x1b[0m 检测到未暂存的 NapCat 配置，正在暂存数据...\r\n');
+          await Process.run('${RuntimeEnvir.binPath}/busybox', [
+            'tar',
+            '-czf',
+            napcatTempBackupPath,
+            '-C',
+            '${scripts.ubuntuPath}/root',
+            'napcat/config',
+          ]);
+        }
+        // 清理 /root/napcat 目录避免安装器冲突拒绝安装
+        onLog?.call('\x1b[33m[NapCat]\x1b[0m 清理旧版 NapCat 目录以供全新安装...\r\n');
+        await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', napcatDir.path]);
+      }
+
       onProgress('正在清理依赖并下载 NapCatQQ 组件...');
       await _runInProot('echo "[APT] 检查并修复破损的系统包..." && dpkg --configure -a || true && apt-get --fix-broken install -y', onLog: onLog);
       onProgress('正在下载 NapCatQQ 组件...');
@@ -175,6 +197,9 @@ class InstallerService {
         onLog: onLog
       );
       if (!success) return false;
+
+      // 安装完成后，恢复一次性暂存备份并清理
+      await _restoreAndCleanNapcatTempBackup(onProgress, onLog);
     }
     onProgress('初始化完成，正在准备启动...');
     return true;
@@ -677,5 +702,127 @@ class InstallerService {
         return false;
       }
     }
+  }
+
+  /// 恢复一次性暂存的 NapCat 配置并在完成后清理临时备份文件
+  static Future<void> _restoreAndCleanNapcatTempBackup(Function(String) onProgress, Function(String)? onLog) async {
+    final tempBackupFile = File(napcatTempBackupPath);
+    if (!tempBackupFile.existsSync()) return;
+
+    try {
+      onProgress('正在恢复 NapCat 数据与配置...');
+      onLog?.call('\x1b[32m[NapCat]\x1b[0m 发现一次性暂存备份，正在恢复配置...\r\n');
+      
+      Directory('${scripts.ubuntuPath}/root/napcat').createSync(recursive: true);
+      final res = await Process.run('${RuntimeEnvir.binPath}/busybox', [
+        'tar',
+        '-xzf',
+        napcatTempBackupPath,
+        '-C',
+        '${scripts.ubuntuPath}/root',
+      ]);
+
+      if (res.exitCode == 0) {
+        onLog?.call('\x1b[32m[NapCat]\x1b[0m NapCat 配置数据恢复成功！\r\n');
+        Log.i('NapCat 临时数据已成功恢复', tag: 'InstallerService');
+      } else {
+        onLog?.call('\x1b[31m[NapCat]\x1b[0m 恢复 NapCat 配置数据失败: ${res.stderr}\r\n');
+        Log.e('恢复 NapCat 配置数据失败: ${res.stderr}', tag: 'InstallerService');
+      }
+    } catch (e) {
+      Log.e('恢复 NapCat 临时备份异常: $e', tag: 'InstallerService');
+    } finally {
+      // 备份是一次性的，记得清理
+      try {
+        if (tempBackupFile.existsSync()) {
+          tempBackupFile.deleteSync();
+          onLog?.call('\x1b[32m[NapCat]\x1b[0m 一次性暂存备份已清理。\r\n');
+          Log.i('已清理 NapCat 一次性临时备份: $napcatTempBackupPath', tag: 'InstallerService');
+        }
+      } catch (e) {
+        Log.e('清理 NapCat 一次性临时备份失败: $e', tag: 'InstallerService');
+      }
+    }
+  }
+
+  /// 准备重新安装 NapCat：
+  /// 1. 将现有的 NapCat 配置数据备份到一次性临时文件（避免安装器因文件夹已存在而拒绝安装）
+  /// 2. 卸载 QQ（使用 dpkg 强制移除 QQ 单包，保留系统库依赖，避免重复耗时下载）
+  /// 3. 清理 NapCat 安装目录与相关启动脚本
+  static Future<bool> prepareNapcatReinstall() async {
+    try {
+      final configDir = Directory('${scripts.ubuntuPath}/root/napcat/config');
+      final tempBackupFile = File(napcatTempBackupPath);
+
+      // 1. 如果存在 NapCat 配置目录，则打包暂存
+      if (configDir.existsSync()) {
+        if (tempBackupFile.existsSync()) {
+          try {
+            tempBackupFile.deleteSync();
+          } catch (_) {}
+        }
+        final tarRes = await Process.run('${RuntimeEnvir.binPath}/busybox', [
+          'tar',
+          '-czf',
+          napcatTempBackupPath,
+          '-C',
+          '${scripts.ubuntuPath}/root',
+          'napcat/config',
+        ]);
+        if (tarRes.exitCode == 0) {
+          Log.i('NapCat 配置已暂存至: $napcatTempBackupPath', tag: 'InstallerService');
+        } else {
+          Log.w('NapCat 配置暂存失败: ${tarRes.stderr}', tag: 'InstallerService');
+        }
+      }
+
+      // 2. 卸载 QQ（保留依赖）
+      Log.i('正在卸载 LinuxQQ（保留系统依赖）...', tag: 'InstallerService');
+      await _runInProot(
+        'dpkg -P --force-depends linuxqq 2>/dev/null || dpkg -r --force-depends linuxqq 2>/dev/null || true',
+        timeout: const Duration(seconds: 30),
+      );
+
+      // 清理残留的 QQ 目录
+      final qqDir = Directory('${scripts.ubuntuPath}/opt/QQ');
+      if (qqDir.existsSync()) {
+        await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', qqDir.path]);
+      }
+
+      // 3. 卸载 NapCat（删除 napcat 目录、启动脚本及锁文件）
+      Log.i('正在清理 NapCat 目录与启动脚本...', tag: 'InstallerService');
+      final napcatDir = Directory('${scripts.ubuntuPath}/root/napcat');
+      if (napcatDir.existsSync()) {
+        await Process.run('${RuntimeEnvir.binPath}/busybox', ['rm', '-rf', napcatDir.path]);
+      }
+
+      final launcherFile = File('${scripts.ubuntuPath}/root/launcher.sh');
+      if (launcherFile.existsSync()) {
+        launcherFile.deleteSync();
+      }
+
+      final installerScript = File('${scripts.ubuntuPath}/root/napcat.sh');
+      if (installerScript.existsSync()) {
+        installerScript.deleteSync();
+      }
+
+      // 清理 QQ 运行时单例锁文件
+      await Process.run('${RuntimeEnvir.binPath}/busybox', [
+        'rm',
+        '-rf',
+        '${RuntimeEnvir.tmpPath}/SingletonLock',
+        '${RuntimeEnvir.tmpPath}/SingletonSocket',
+        '${RuntimeEnvir.tmpPath}/SingletonCookie',
+        '${scripts.ubuntuPath}/root/.config/QQ/SingletonLock',
+        '${scripts.ubuntuPath}/root/.config/QQ/SingletonSocket',
+        '${scripts.ubuntuPath}/root/.config/QQ/SingletonCookie',
+      ]);
+
+      Log.i('NapCat 与 LinuxQQ 卸载完成，配置已暂存', tag: 'InstallerService');
+      return true;
+    } catch (e) {
+      Log.e('准备重新安装 NapCat 异常: $e', tag: 'InstallerService');
+      return false;
+     }
   }
 }

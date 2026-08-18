@@ -8,6 +8,7 @@ import 'package:global_repository/global_repository.dart';
 import '../../../core/constants/scripts.dart' as scripts;
 import '../../../core/services/backup_service.dart';
 import '../../../core/services/foreground_service.dart';
+import '../../../core/services/installer_service.dart';
 /// 设置页中的破坏性维护操作（重装/清除/退出）。
 /// 均为独立于页面状态的静态流程，统一在此收敛。
 class MaintenanceActions {
@@ -139,14 +140,17 @@ class MaintenanceActions {
     }
   }
 
-  /// 更新或重装 NapcatQQ：删除安装判断文件后退出应用
+  /// 更新或重装 NapcatQQ：卸载 QQ（保留依赖）和 NapCat，暂存配置并在重启后自动重装与恢复
   static Future<void> reinstallNapcat() async {
     // 显示确认对话框
     final confirm = await Get.dialog<bool>(
       AlertDialog(
         icon: const Icon(Icons.refresh_rounded, size: 28, color: Colors.orange),
         title: const Text('确认重新安装 NapCat'),
-        content: const Text('此操作将删除 NapcatQQ 安装文件（保留配置文件）并在启动时重新安装，确定继续吗？'),
+        content: const Text(
+          '此操作将卸载 QQ（保留系统依赖）与 NapCat 并暂存当前配置数据。\n\n'
+          '应用退出并重新打开后，将自动重新安装 NapCat 组件并恢复配置数据，确定继续吗？',
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
@@ -161,29 +165,62 @@ class MaintenanceActions {
     );
 
     if (confirm == true) {
+      Get.dialog(
+        const PopScope(
+          canPop: false,
+          child: Center(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('正在暂存配置并卸载 NapCat / QQ...', style: TextStyle(fontSize: 14)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+
       try {
         await BackupService.safelyTerminateProcessesForMaintenance();
-        // 删除 launcher.sh 文件，这是安装判断的依据
-        final launcherPath = '${scripts.ubuntuPath}/root/launcher.sh';
-        final launcherFile = File(launcherPath);
-        if (await launcherFile.exists()) {
-          await launcherFile.delete();
-          Log.i('已删除 launcher.sh: $launcherPath', tag: 'MaiBot');
+        final success = await InstallerService.prepareNapcatReinstall();
+
+        if (Get.isDialogOpen == true) {
+          Get.back();
         }
 
-        Get.snackbar(
-          '重装成功',
-          '应用将自动退出，请重新启动',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(seconds: 2),
-        );
+        if (success) {
+          Get.snackbar(
+            '重置完成',
+            'NapCat 与 QQ 已卸载（配置已暂存），应用即将退出，请重新打开以完成重装',
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(seconds: 3),
+          );
 
-        // 2秒后自动退出应用
-        Future.delayed(const Duration(seconds: 2), () async {
-          await SystemNavigator.pop();
-          exit(0);
-        });
+          // 2秒后自动退出应用
+          Future.delayed(const Duration(seconds: 2), () async {
+            await SystemNavigator.pop();
+            exit(0);
+          });
+        } else {
+          Get.snackbar(
+            '卸载失败',
+            '准备重新安装失败，请查看日志',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
       } catch (e) {
+        if (Get.isDialogOpen == true) {
+          Get.back();
+        }
         Log.e('重新安装 NapcatQQ 失败: $e', tag: 'MaiBot');
         Get.snackbar(
           '重新安装失败',
