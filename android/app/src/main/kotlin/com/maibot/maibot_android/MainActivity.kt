@@ -81,7 +81,7 @@ class MainActivity : FragmentActivity() {
                     var targetTask: ActivityManager.AppTask? = null
                     if (am != null) {
                         for (task in am.appTasks) {
-                            if (task.taskInfo.id == taskId) {
+                            if (task.taskInfo?.id == taskId) {
                                 targetTask = task
                                 break
                             }

@@ -138,11 +138,10 @@ class ProotService : Service() {
                 return START_NOT_STICKY
             }
 
-            val curBin = binPath
-            val curHome = homePath
+            val curBin = binPath ?: applicationInfo.nativeLibraryDir
+            val curHome = homePath ?: "${filesDir.absolutePath}/usr"
             val curTmp = tmpPath ?: cacheDir.absolutePath
-            val curUbuntu = ubuntuPath
-
+            val curUbuntu = ubuntuPath ?: "${filesDir.absolutePath}/usr/var/lib/proot-distro/installed-rootfs/ubuntu"
             // 检测是否已经存在存活的容器进程，如果是 DartVM 退出/重启后重连，则直接放行，保护底层运行中的容器
             if (maibotProcess?.isAlive() == true && napcatProcess?.isAlive() == true) {
                 Log.i(TAG, "Native Backend 依然存活，拦截重复的启动请求，保护底层 PRoot 容器免受重置。")
@@ -352,8 +351,9 @@ class ProotService : Service() {
 
                                 val input: InputStream = client.getInputStream()
                                 val inBuffer = ByteArray(1024)
-                                var inRead: Int
-                                while (!isStopped && input.read(inBuffer).also { inRead = it } != -1) {
+                                while (!isStopped) {
+                                    val inRead = input.read(inBuffer)
+                                    if (inRead == -1) break
                                     val p = process
                                     if (p != null) {
                                         val pStdin = p.outputStream
