@@ -49,8 +49,31 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
             info.flags |= AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE;
         }
         setServiceInfo(info);
+
+        // 无障碍服务连接就绪时，执行自启动检查与后台原生服务拉起
+        checkAndAutoStartBackend(this);
     }
 
+    public static void checkAndAutoStartBackend(android.content.Context context) {
+        try {
+            android.content.SharedPreferences sp = context.getSharedPreferences("maibot_backend_prefs", android.content.Context.MODE_PRIVATE);
+            boolean autoStart = sp.getBoolean("auto_start_enabled", true);
+            if (!autoStart) {
+                Log.i(TAG, "自启动已被用户关闭，跳过后台原生服务拉起");
+                return;
+            }
+
+            android.content.Intent serviceIntent = new android.content.Intent(context, ProotService.class);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent);
+            } else {
+                context.startService(serviceIntent);
+            }
+            Log.i(TAG, "已成功触发 ProotService 后台自启动");
+        } catch (Exception e) {
+            Log.e(TAG, "自启动 ProotService 失败: ", e);
+        }
+    }
     @Override
     public void onTaskRemoved(android.content.Intent rootIntent) {
         Log.i(TAG, "onTaskRemoved: 用户划掉多任务卡片，无障碍服务继续锚定 :backend 进程");

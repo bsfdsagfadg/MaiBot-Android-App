@@ -89,11 +89,44 @@ public class ProotService extends Service {
                 stopSelf();
                 return START_NOT_STICKY;
             }
-            
+            android.content.SharedPreferences sp = getSharedPreferences("maibot_backend_prefs", Context.MODE_PRIVATE);
             String binPath = intent.getStringExtra("binPath");
             String homePath = intent.getStringExtra("homePath");
             String tmpPath = intent.getStringExtra("tmpPath");
             String ubuntuPath = intent.getStringExtra("ubuntuPath");
+            
+            if (binPath != null && homePath != null) {
+                // 保存路径供无障碍/开机自启动时读取
+                sp.edit()
+                    .putString("binPath", binPath)
+                    .putString("homePath", homePath)
+                    .putString("tmpPath", tmpPath)
+                    .putString("ubuntuPath", ubuntuPath)
+                    .apply();
+            } else {
+                // 自启动场景（空 Intent 或缺少显式路径）
+                boolean autoStart = sp.getBoolean("auto_start_enabled", true);
+                if (!autoStart) {
+                    Log.i(TAG, "自启动已被用户关闭，ProotService 保持待命状态");
+                    return START_NOT_STICKY;
+                }
+                binPath = sp.getString("binPath", null);
+                homePath = sp.getString("homePath", null);
+                tmpPath = sp.getString("tmpPath", null);
+                ubuntuPath = sp.getString("ubuntuPath", null);
+
+                if (binPath == null) binPath = getApplicationInfo().nativeLibraryDir;
+                if (homePath == null) homePath = getFilesDir().getAbsolutePath() + "/usr";
+                if (tmpPath == null) tmpPath = getCacheDir().getAbsolutePath();
+                if (ubuntuPath == null) ubuntuPath = getFilesDir().getAbsolutePath() + "/usr/var/lib/proot-distro/installed-rootfs/ubuntu";
+            }
+            
+            // 检查 RootFS 是否已就绪，避免在未安装解压时拉起损坏的容器进程
+            File rootfsCheck = new File(ubuntuPath, "bin/bash");
+            if (!rootfsCheck.exists()) {
+                Log.w(TAG, "Ubuntu RootFS 未就绪 (" + rootfsCheck.getAbsolutePath() + " 不存在)，暂缓启动容器进程");
+                return START_NOT_STICKY;
+            }
             
             if (binPath != null && homePath != null) {
                 // 检测是否已经存在存活的容器进程，如果是 DartVM 退出/重启后重连，则直接放行，保护底层运行中的容器

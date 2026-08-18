@@ -23,6 +23,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
   bool _isStorageGranted = false;
   bool _isBatteryOptimizationIgnored = false;
   bool _isAccessibilityEnabled = false;
+  bool _isAutoStartEnabled = true;
 
   final Setting _enableWifiLock = 'enable_wifi_lock'.setting;
 
@@ -67,6 +68,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
       _checkSystemPermissionsStatus(),
       _checkBatteryOptimizationStatus(),
       _checkAccessibilityStatus(),
+      _checkAutoStartStatus(),
       _checkShizukuStatus(),
     ]);
   }
@@ -126,6 +128,35 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
     } catch (e) {
       Log.e('打开无障碍设置失败: $e', tag: 'KeepAliveSettingsPage');
       openAppSettings();
+    }
+  }
+  Future<void> _checkAutoStartStatus() async {
+    if (!Platform.isAndroid) return;
+    try {
+      const channel = MethodChannel(Config.methodChannel);
+      final bool? enabled = await channel.invokeMethod<bool>('is_auto_start_enabled');
+      if (mounted) {
+        setState(() {
+          _isAutoStartEnabled = enabled ?? true;
+        });
+      }
+    } catch (e) {
+      Log.e('检查自启动状态失败: $e', tag: 'KeepAliveSettingsPage');
+    }
+  }
+
+  Future<void> _toggleAutoStart(bool value) async {
+    if (!Platform.isAndroid) return;
+    try {
+      const channel = MethodChannel(Config.methodChannel);
+      await channel.invokeMethod('set_auto_start_enabled', {'enabled': value});
+      if (mounted) {
+        setState(() {
+          _isAutoStartEnabled = value;
+        });
+      }
+    } catch (e) {
+      Log.e('设置自启动状态失败: $e', tag: 'KeepAliveSettingsPage');
     }
   }
   Future<void> _checkShizukuStatus() async {
@@ -493,6 +524,17 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                 Get.find<HomeController>().setHideFromRecents(value);
                 if (mounted) setState(() {});
               },
+            ),
+            const Divider(height: 1, indent: 56),
+            SwitchListTile(
+              secondary: const Icon(Icons.rocket_launch_rounded, size: 22),
+              title: Text('开机与无障碍自启动', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
+              subtitle: Text(
+                '开机或连接无障碍服务时，自动在后台拉起 PRoot 容器与 MaiBot（无需打开界面）',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
+              value: _isAutoStartEnabled,
+              onChanged: _toggleAutoStart,
             ),
           ]),
           const SizedBox(height: 16),

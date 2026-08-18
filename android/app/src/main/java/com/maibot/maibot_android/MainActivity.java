@@ -131,6 +131,14 @@ public class MainActivity extends FragmentActivity {
                 } catch (Exception e) {
                     result.error("OPEN_FAILED", e.getMessage(), null);
                 }
+            } else if ("is_auto_start_enabled".equals(call.method)) {
+                android.content.SharedPreferences sp = mContext.getSharedPreferences("maibot_backend_prefs", Context.MODE_PRIVATE);
+                result.success(sp.getBoolean("auto_start_enabled", true));
+            } else if ("set_auto_start_enabled".equals(call.method)) {
+                boolean enabled = Boolean.TRUE.equals(call.argument("enabled"));
+                android.content.SharedPreferences sp = mContext.getSharedPreferences("maibot_backend_prefs", Context.MODE_PRIVATE);
+                sp.edit().putBoolean("auto_start_enabled", enabled).apply();
+                result.success(true);
             } else {
                 result.notImplemented();
             }

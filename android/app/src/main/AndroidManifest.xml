@@ -18,7 +18,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- url_launcher需要声明可以打开浏览器 -->
     <queries>
         <intent>
@@ -99,6 +99,20 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.maibot.maibot_android.ACTION_EXIT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 开机与应用更新自启动广播接收器：置于 :backend 进程直接拉起后台容器 -->
+        <receiver
+            android:name=".BootReceiver"
+            android:process=":backend"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
         <!-- Ubuntu Documents Provider -->
