@@ -184,6 +184,12 @@ public class ProotService extends Service {
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        Log.i(TAG, "onTaskRemoved: 用户划掉多任务卡片，ProotService 保持后台持续运行");
+        super.onTaskRemoved(rootIntent);
+    }
+
+    @Override
     public IBinder onBind(Intent intent) { return null; }
 
     private void createNotificationChannel() {

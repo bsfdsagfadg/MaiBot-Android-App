@@ -70,15 +70,18 @@
         <service
             android:name=".ProotService"
             android:process=":backend"
+            android:stopWithTask="false"
             android:foregroundServiceType="dataSync|specialUse"
             android:exported="false">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Run local Linux PRoot environment and MaiBot backend service" />
         </service>
-        <!-- 无障碍保活服务：提升进程优先级，防止用户划掉多任务卡片导致进程被杀 -->
+        <!-- 无障碍保活服务：置于 :backend 进程，直接为 PRoot 后端进程提供系统级 BIND 保活保护 -->
         <service
             android:name=".KeepAliveAccessibilityService"
+            android:process=":backend"
+            android:stopWithTask="false"
             android:label="@string/accessibility_service_label"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">

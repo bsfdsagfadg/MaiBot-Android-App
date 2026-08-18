@@ -31,12 +31,30 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
     protected void onServiceConnected() {
         super.onServiceConnected();
         isServiceRunning = true;
-        Log.i(TAG, "KeepAliveAccessibilityService onServiceConnected: 无障碍保活服务已启动");
-        AccessibilityServiceInfo info = new AccessibilityServiceInfo();
+        Log.i(TAG, "KeepAliveAccessibilityService onServiceConnected: 无障碍保活服务已启动并在 :backend 进程生效");
+        
+        AccessibilityServiceInfo info = getServiceInfo();
+        if (info == null) {
+            info = new AccessibilityServiceInfo();
+        }
         info.eventTypes = AccessibilityEvent.TYPES_ALL_MASK;
-        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
-        info.flags = AccessibilityServiceInfo.DEFAULT;
+        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_ALL_MASK;
+        info.flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+                | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+                | AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+                | AccessibilityServiceInfo.FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY
+                | AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS;
+        info.notificationTimeout = 0;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            info.flags |= AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE;
+        }
         setServiceInfo(info);
+    }
+
+    @Override
+    public void onTaskRemoved(android.content.Intent rootIntent) {
+        Log.i(TAG, "onTaskRemoved: 用户划掉多任务卡片，无障碍服务继续锚定 :backend 进程");
+        super.onTaskRemoved(rootIntent);
     }
 
     @Override
