@@ -11,8 +11,8 @@ Future<String> getAppVersion() async {
 int compareVersions(String v1, String v2) {
   String clean(String v) {
     v = v.replaceFirst('v', '').trim();
-    if (v.contains('-')) v = v.split('-')[0];
-    if (v.contains('+')) v = v.split('+')[0];
+    if (v.contains('-')) v = v.split('-').first;
+    if (v.contains('+')) v = v.split('+').first;
     return v;
   }
 

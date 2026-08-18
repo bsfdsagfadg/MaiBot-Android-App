@@ -7,9 +7,10 @@ TerminalTheme getAppTerminalTheme(BuildContext context) {
   final isDark = theme.brightness == Brightness.dark;
 
   // 终端统一使用深黑/纯黑画布背景，防止浅色主题下终端背景变为亮白刺眼
-  final Color terminalBg = isDark
-      ? (theme.colorScheme.surface == Colors.black ? Colors.black : const Color(0xFF121214))
-      : const Color(0xFF161618);
+  final Color darkBg = theme.colorScheme.surface == Colors.black
+      ? Colors.black
+      : const Color(0xFF121214);
+  final Color terminalBg = isDark ? darkBg : const Color(0xFF161618);
 
   return TerminalTheme(
     cursor: theme.colorScheme.primary,

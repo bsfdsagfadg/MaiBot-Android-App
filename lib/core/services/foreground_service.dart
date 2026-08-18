@@ -27,7 +27,7 @@ class ForegroundServiceManager {
 
     try {
       // 同步配置
-      await ConfigService.ensureConfigsSynced();
+      ConfigService.ensureConfigsSynced();
 
       await _channel.invokeMethod('start_native_backend', {
         'binPath': RuntimeEnvir.binPath,
@@ -94,10 +94,11 @@ class ForegroundServiceManager {
     return _isRunning;
   }
 
-  static Future<void> updateNotification({
+  static void updateNotification({
     String? title,
     String? text,
-  }) async {
-    // Native Backend 服务已在 Java 层固定了通知内容，若需动态更新可在此通过 MethodChannel 调用
+  }) {
+    // Native Backend 服务已在 Java 层固定通知内容；保留此接口以便后续扩展
+    Log.d('updateNotification called with title: $title, text: $text', tag: 'ForegroundService');
   }
 }

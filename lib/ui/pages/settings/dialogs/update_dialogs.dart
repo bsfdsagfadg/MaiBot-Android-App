@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -286,22 +287,24 @@ class UpdateChecker {
                             style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
                           )
                         : null,
-                    onTap: () async {
-                      final url = source['url'] as String;
-                      final uri = Uri.parse(url);
+                    onTap: () {
+                      unawaited(() async {
+                        final url = source['url'] as String;
+                        final uri = Uri.parse(url);
 
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                        Get.back();
-                      } else {
-                        Get.snackbar(
-                          '打开失败',
-                          '无法打开浏览器',
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: Colors.red,
-                          colorText: Colors.white,
-                        );
-                      }
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          Get.back();
+                        } else {
+                          Get.snackbar(
+                            '打开失败',
+                            '无法打开浏览器',
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white,
+                          );
+                        }
+                      }());
                     },
                   );
                 }),

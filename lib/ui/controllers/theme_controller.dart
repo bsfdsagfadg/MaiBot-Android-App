@@ -52,11 +52,10 @@ class ThemeController extends GetxController {
 
   void _loadThemeSettings() {
     final colorIdx = _colorIndexSetting.get();
-    if (colorIdx is int && colorIdx >= 0 && colorIdx < presetColors.length) {
-      selectedColorIndex.value = colorIdx;
-    } else {
-      selectedColorIndex.value = 0; // 默认使用系统动态 Monet
-    }
+    selectedColorIndex.value =
+        (colorIdx is int && colorIdx >= 0 && colorIdx < presetColors.length)
+            ? colorIdx
+            : 0; // 默认使用系统动态 Monet
 
     final modeVal = _themeModeSetting.get();
     if (modeVal == 'light') {
@@ -105,30 +104,26 @@ class ThemeController extends GetxController {
 
   /// 构建正统 Material 3 浅色主题
   ThemeData getLightTheme({ColorScheme? dynamicLightScheme}) {
-    ColorScheme colorScheme;
-    if (isDynamicSelected && (dynamicLightScheme ?? _systemLightScheme) != null) {
-      colorScheme = (dynamicLightScheme ?? _systemLightScheme)!;
-    } else {
-      colorScheme = ColorScheme.fromSeed(
-        seedColor: currentSeedColor,
-        brightness: Brightness.light,
-      );
-    }
+    final ColorScheme colorScheme =
+        (isDynamicSelected && (dynamicLightScheme ?? _systemLightScheme) != null)
+            ? (dynamicLightScheme ?? _systemLightScheme)!
+            : ColorScheme.fromSeed(
+                seedColor: currentSeedColor,
+                brightness: Brightness.light,
+              );
 
     return _buildThemeData(colorScheme: colorScheme, isDark: false);
   }
 
   /// 构建正统 Material 3 深色主题
   ThemeData getDarkTheme({ColorScheme? dynamicDarkScheme}) {
-    ColorScheme colorScheme;
-    if (isDynamicSelected && (dynamicDarkScheme ?? _systemDarkScheme) != null) {
-      colorScheme = (dynamicDarkScheme ?? _systemDarkScheme)!;
-    } else {
-      colorScheme = ColorScheme.fromSeed(
-        seedColor: currentSeedColor,
-        brightness: Brightness.dark,
-      );
-    }
+    ColorScheme colorScheme =
+        (isDynamicSelected && (dynamicDarkScheme ?? _systemDarkScheme) != null)
+            ? (dynamicDarkScheme ?? _systemDarkScheme)!
+            : ColorScheme.fromSeed(
+                seedColor: currentSeedColor,
+                brightness: Brightness.dark,
+              );
 
     final isAmoled = isAmoledDark.value;
     if (isAmoled) {

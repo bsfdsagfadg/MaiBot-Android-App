@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -35,11 +36,7 @@ class _TerminalPageState extends State<TerminalPage> {
       if (_displayMode == 0) {
         _displayMode = 1;
       } else if (_displayMode == 1) {
-        if (controller.napcatClient.isConnected) {
-          _displayMode = 2;
-        } else {
-          _displayMode = 0;
-        }
+        _displayMode = controller.napcatClient.isConnected ? 2 : 0;
       } else {
         _displayMode = 0;
       }
@@ -148,21 +145,23 @@ class _TerminalPageState extends State<TerminalPage> {
                                 padding: const EdgeInsets.all(6),
                                 icon: Icon(Icons.copy_all_rounded, size: 18, color: colorScheme.onSurfaceVariant),
                                 tooltip: '复制日志',
-                                onPressed: () async {
-                                  final activeTerminal = _displayMode == 2
-                                      ? controller.napcatShowTerminal
-                                      : controller.terminal;
-                                  final text = _getTerminalText(activeTerminal);
-                                  if (text.isNotEmpty) {
-                                    await Clipboard.setData(ClipboardData(text: text));
-                                    Get.snackbar(
-                                      '已复制',
-                                      '${_displayMode == 2 ? 'NapCat' : 'MaiBot'} 终端内容已复制到剪贴板',
-                                      snackPosition: SnackPosition.BOTTOM,
-                                      duration: const Duration(seconds: 2),
-                                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    );
-                                  }
+                                onPressed: () {
+                                  unawaited(() async {
+                                    final activeTerminal = _displayMode == 2
+                                        ? controller.napcatShowTerminal
+                                        : controller.terminal;
+                                    final text = _getTerminalText(activeTerminal);
+                                    if (text.isNotEmpty) {
+                                      await Clipboard.setData(ClipboardData(text: text));
+                                      Get.snackbar(
+                                        '已复制',
+                                        '${_displayMode == 2 ? 'NapCat' : 'MaiBot'} 终端内容已复制到剪贴板',
+                                        snackPosition: SnackPosition.BOTTOM,
+                                        duration: const Duration(seconds: 2),
+                                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      );
+                                    }
+                                  }());
                                 },
                               ),
                               IconButton(

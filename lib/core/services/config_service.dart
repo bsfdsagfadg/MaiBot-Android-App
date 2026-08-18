@@ -7,7 +7,7 @@ import 'package:toml/toml.dart';
 import '../constants/scripts.dart' as scripts;
 
 class ConfigService {
-  static Future<void> ensureConfigsSynced() async {
+  static void ensureConfigsSynced() {
     try {
       final String napcatConfigDir = '${scripts.ubuntuPath}/root/napcat/config';
       final String onebotPath = '$napcatConfigDir/onebot11.json';

@@ -1,7 +1,5 @@
 import 'package:xterm/xterm.dart';
 import '../utils/file_utils.dart';
-import '../../generated/l10n.dart';
-
 /// 安装进度跟踪器 (纯内存状态驱动，已剔除废弃的基于文件系统监控与轮询逻辑)
 class ProgressTracker {
   ProgressTracker({
@@ -26,14 +24,14 @@ class ProgressTracker {
   Terminal? terminal;
 
   /// 进度 +1（纯内存操作）
-  Future<void> bump() async {
+  void bump() {
     _currentStepCount++;
     progress = _currentStepCount / step;
     onChanged();
   }
 
   /// 重置状态（兼容旧的 startWatching 接口名）
-  Future<void> startWatching() async {
+  void startWatching() {
     _currentStepCount = 0;
     progress = 0.0;
     currentProgress = '';
@@ -45,7 +43,7 @@ class ProgressTracker {
     currentProgress = description;
     terminal?.writeProgress(currentProgress);
     
-    if (description.contains('Napcat ${S.current.installed}')) {
+    if (description.contains('Napcat 已安装') || description.contains('Napcat Installed')) {
       bump();
       onNapcatInstalled?.call();
     }

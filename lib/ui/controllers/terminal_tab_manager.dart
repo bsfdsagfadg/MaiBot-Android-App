@@ -141,7 +141,7 @@ class TerminalTabManager extends GetxController {
 
     final procBinds = <String>[];
     for (final pair in fakeProcs) {
-      final fakeFile = File('${scripts.ubuntuPath}/proc/${pair[0]}');
+      final fakeFile = File('${scripts.ubuntuPath}/proc/${pair.first}');
       if (fakeFile.existsSync()) {
         procBinds.addAll(['-b', '${fakeFile.path}:${pair[1]}']);
       }
@@ -207,8 +207,8 @@ class TerminalTabManager extends GetxController {
         newTerminal.write(data.replaceAllMapped(RegExp(r'(?<!\r)\n'), (m) => '\r\n'));
       });
 
-      process.exitCode.then((_) {
-        // 自动提示
+      process.exitCode.then((code) {
+        Log.d('System tab process exited with code $code', tag: 'TerminalTabManager');
       });
 
       final newTab = TerminalTab(

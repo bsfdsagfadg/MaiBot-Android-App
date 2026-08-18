@@ -7,7 +7,6 @@ import 'package:global_repository/global_repository.dart';
 import 'package:settings/settings.dart';
 import 'dart:async';
 
-import 'generated/l10n.dart';
 import 'core/config/app_config.dart';
 import 'core/services/env_bootstrapper.dart';
 import 'core/services/foreground_service.dart';
@@ -102,12 +101,14 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
             darkTheme: themeController.getDarkTheme(dynamicDarkScheme: darkDynamic),
             themeMode: themeController.currentThemeMode.value,
             localizationsDelegates: const [
-              S.delegate,
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            supportedLocales: S.delegate.supportedLocales,
+            supportedLocales: const [
+              Locale('zh', 'CN'),
+              Locale('en', 'US'),
+            ],
             initialRoute: AppRoutes.terminal,
             getPages: AppRoutes.routes,
           );

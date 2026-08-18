@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -25,6 +26,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
   bool _isAccessibilityEnabled = false;
   bool _isAutoStartEnabled = true;
 
+  int _stateUpdateCounter = 0;
   final Setting _enableWifiLock = 'enable_wifi_lock'.setting;
 
   bool _shizukuDozeWhitelist = false;
@@ -191,7 +193,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
         _shizukuApi.runCommand('dumpsys activity settings'),
       ]);
 
-      final dozeOut = results[0];
+      final dozeOut = results.first;
       final isDozeWhitelisted = dozeOut != null && dozeOut.contains(Config.packageName);
 
       final appopsOut = results[1];
@@ -382,10 +384,10 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      onPressed: _requestNotificationPermission,
+                      onPressed: () => unawaited(_requestNotificationPermission()),
                       child: const Text('授权', style: TextStyle(fontSize: 12)),
                     ),
-              onTap: _requestNotificationPermission,
+              onTap: () => unawaited(_requestNotificationPermission()),
             ),
             const Divider(height: 1, indent: 56),
             ListTile(
@@ -407,10 +409,10 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      onPressed: _requestStoragePermission,
+                      onPressed: () => unawaited(_requestStoragePermission()),
                       child: const Text('授权', style: TextStyle(fontSize: 12)),
                     ),
-              onTap: _requestStoragePermission,
+              onTap: () => unawaited(_requestStoragePermission()),
             ),
           ]),
           const SizedBox(height: 16),
@@ -432,10 +434,10 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      onPressed: _requestBatteryOptimization,
+                      onPressed: () => unawaited(_requestBatteryOptimization()),
                       child: const Text('授权', style: TextStyle(fontSize: 12)),
                     ),
-              onTap: _requestBatteryOptimization,
+              onTap: () => unawaited(_requestBatteryOptimization()),
             ),
             const Divider(height: 1, indent: 56),
             ListTile(
@@ -468,7 +470,9 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
               value: _enableWifiLock.get() ?? true,
               onChanged: (bool value) {
                 _enableWifiLock.set(value);
-                if (mounted) setState(() {});
+                if (mounted) {
+                  setState(() => _stateUpdateCounter++);
+                }
               },
             ),
           ]),
@@ -496,10 +500,10 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      onPressed: _openAccessibilitySettings,
+                      onPressed: () => unawaited(_openAccessibilitySettings()),
                       child: const Text('去开启', style: TextStyle(fontSize: 12)),
                     ),
-              onTap: _openAccessibilitySettings,
+              onTap: () => unawaited(_openAccessibilitySettings()),
             ),
             const Divider(height: 1, indent: 56),
             ListTile(
@@ -522,7 +526,9 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
               value: Get.find<HomeController>().hideFromRecents.get() ?? false,
               onChanged: (bool value) {
                 Get.find<HomeController>().setHideFromRecents(value);
-                if (mounted) setState(() {});
+                if (mounted) {
+                  setState(() => _stateUpdateCounter++);
+                }
               },
             ),
             const Divider(height: 1, indent: 56),
@@ -534,7 +540,7 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               value: _isAutoStartEnabled,
-              onChanged: _toggleAutoStart,
+              onChanged: (val) => unawaited(_toggleAutoStart(val)),
             ),
           ]),
           const SizedBox(height: 16),
@@ -545,23 +551,19 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
               leading: const Icon(Icons.link_rounded, size: 22),
               title: Text('Shizuku 服务状态', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: theme.colorScheme.onSurface)),
               subtitle: Text(
-                !_shizukuAvailable
-                    ? '未检测到运行中的 Shizuku 服务'
-                    : (_shizukuPermissionGranted ? '已连接并获得授权' : '已检测到服务，点击授权'),
+                _getShizukuSubtitle(),
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
               trailing: Icon(
-                !_shizukuAvailable
-                    ? Icons.cancel_rounded
-                    : (_shizukuPermissionGranted ? Icons.check_circle_rounded : Icons.info_rounded),
-                color: !_shizukuAvailable
-                    ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
-                    : (_shizukuPermissionGranted ? Colors.green : Colors.orange),
+                _getShizukuIcon(),
+                color: _getShizukuIconColor(theme),
                 size: 22,
               ),
-              onTap: () async {
-                await _ensureShizukuPermission();
-                await _checkShizukuStatus();
+              onTap: () {
+                unawaited(() async {
+                  await _ensureShizukuPermission();
+                  await _checkShizukuStatus();
+                }());
               },
             ),
             const Divider(height: 1, indent: 56),
@@ -642,5 +644,21 @@ class _KeepAliveSettingsPageState extends State<KeepAliveSettingsPage> with Widg
         children: children,
       ),
     );
+  }
+  String _getShizukuSubtitle() {
+    if (!_shizukuAvailable) return '未检测到运行中的 Shizuku 服务';
+    return _shizukuPermissionGranted ? '已连接并获得授权' : '已检测到服务，点击授权';
+  }
+
+  IconData _getShizukuIcon() {
+    if (!_shizukuAvailable) return Icons.cancel_rounded;
+    return _shizukuPermissionGranted ? Icons.check_circle_rounded : Icons.info_rounded;
+  }
+
+  Color _getShizukuIconColor(ThemeData theme) {
+    if (!_shizukuAvailable) {
+      return theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5);
+    }
+    return _shizukuPermissionGranted ? Colors.green : Colors.orange;
   }
 }

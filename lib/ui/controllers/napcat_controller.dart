@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -234,7 +235,7 @@ class NapcatController extends GetxController {
     _qrcodeDialog = null;
   }
 
-  void handleMaibotOutput(String event) async {
+  void handleMaibotOutput(String event) {
     // 剥离ANSI颜色代码
     final cleanEvent = NapcatLogParser.stripAnsi(event);
 
@@ -297,14 +298,16 @@ class NapcatController extends GetxController {
                 child: const Text('取消'),
               ),
               FilledButton(
-                onPressed: () async {
-                  webuiConfig['autoLoginAccount'] = loggedInQQ;
-                  await webuiFile.writeAsString(
-                    const JsonEncoder.withIndent('    ').convert(webuiConfig),
-                  );
-                  Get.back();
-                  Get.snackbar('保存成功', '已将 $loggedInQQ 设置为快速登录账号',
-                      snackPosition: SnackPosition.BOTTOM);
+                onPressed: () {
+                  unawaited(() async {
+                    webuiConfig['autoLoginAccount'] = loggedInQQ;
+                    await webuiFile.writeAsString(
+                      const JsonEncoder.withIndent('    ').convert(webuiConfig),
+                    );
+                    Get.back();
+                    Get.snackbar('保存成功', '已将 $loggedInQQ 设置为快速登录账号',
+                        snackPosition: SnackPosition.BOTTOM);
+                  }());
                 },
                 child: const Text('保存'),
               ),

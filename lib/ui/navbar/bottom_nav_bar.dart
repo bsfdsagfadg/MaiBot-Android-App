@@ -55,9 +55,7 @@ class WebViewBottomNavBar extends StatelessWidget {
           label: '设置',
         ),
       ];
-      final int selectedIndex = currentIndex >= destinations.length
-          ? destinations.length - 1
-          : (currentIndex < 0 ? 0 : currentIndex);
+      final int selectedIndex = currentIndex.clamp(0, destinations.length - 1);
 
       final theme = Theme.of(context);
 

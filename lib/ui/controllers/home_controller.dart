@@ -39,7 +39,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       maibotClient.socket?.add(utf8.encode(data));
     },
     onResize: (width, height, pixelWidth, pixelHeight) {
-      // FlutterForegroundTask.sendDataToTask('resize_maibot:$width,$height');
+      Log.d('maibot terminal resize: $width x $height', tag: 'HomeController');
     },
   );
 
@@ -49,7 +49,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       napcatClient.socket?.add(utf8.encode(data));
     },
     onResize: (width, height, pixelWidth, pixelHeight) {
-      // FlutterForegroundTask.sendDataToTask('resize_napcat:$width,$height');
+      Log.d('napcat terminal resize: $width x $height', tag: 'HomeController');
     },
   );
 
@@ -77,7 +77,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  void _handleMaibotLine(String line) async {
+  void _handleMaibotLine(String line) {
     napcatController.handleMaibotOutput(line);
     napcatController.handleNapcatOutput(line);
     final cleanLine = NapcatLogParser.stripAnsi(line);
@@ -85,7 +85,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       _isLocalhostDetected = true;
       // 仅在非历史回放（实时流数据）时增加进度计数，防止重连重放触发
       if (!maibotClient.isReplaying) {
-        await progressTracker.bump();
+        progressTracker.bump();
       }
       _checkAndNavigateToWebview();
       Future.delayed(const Duration(milliseconds: 2000), () => update());
@@ -118,9 +118,6 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       onLog: (log) {
         terminal.write(log);
       },
-      onNapcatLog: (log) {
-        napcatShowTerminal.write(log);
-      },
     );
 
     if (!success) {
@@ -133,9 +130,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       if (backups.isNotEmpty) {
         await BackupService.showRestoreDialog(
           isInitialInstall: true,
-          onCompleted: () async {
-            await _startBackendServices();
-          },
+          onCompleted: () => unawaited(_startBackendServices()),
         );
         return;
       }
@@ -236,24 +231,26 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     // [Fix 4.2 / 5.1] 定时主动探测本地 8001 端口并检查跳转条件，解开多重 AND 条件跳转死锁并兜底日志丢失
     _localhostProbeTimer?.cancel();
     _localhostProbeTimer =
-        Timer.periodic(const Duration(seconds: 2), (timer) async {
-      if (webviewController.webviewHasOpen) {
-        timer.cancel();
-        return;
-      }
-      if (!_isLocalhostDetected) {
-        for (final port in Ports.localhostProbePorts) {
-          try {
-            final socket = await Socket.connect('127.0.0.1', port,
-                timeout: const Duration(milliseconds: 800));
-            await socket.close();
-            _isLocalhostDetected = true;
-            Log.i('主动探测 127.0.0.1:$port 成功，设置 _isLocalhostDetected = true', tag: 'MaiBot');
-            break;
-          } catch (_) {}
+        Timer.periodic(const Duration(seconds: 2), (timer) {
+      unawaited(() async {
+        if (webviewController.webviewHasOpen) {
+          timer.cancel();
+          return;
         }
-      }
-      _checkAndNavigateToWebview();
+        if (!_isLocalhostDetected) {
+          for (final port in Ports.localhostProbePorts) {
+            try {
+              final socket = await Socket.connect('127.0.0.1', port,
+                  timeout: const Duration(milliseconds: 800));
+              await socket.close();
+              _isLocalhostDetected = true;
+              Log.i('主动探测 127.0.0.1:$port 成功，设置 _isLocalhostDetected = true', tag: 'MaiBot');
+              break;
+            } catch (_) {}
+          }
+        }
+        _checkAndNavigateToWebview();
+      }());
     });
     // 监听应用生命周期状态变化
     WidgetsBinding.instance.addObserver(this);

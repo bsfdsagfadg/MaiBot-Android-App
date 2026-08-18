@@ -16,7 +16,7 @@ class WebviewController extends GetxController {
 
   // 加载自定义 WebView 列表
   void _loadCustomWebViews() {
-    final stored = box?.get('custom_webviews', defaultValue: <dynamic>[]);
+    final stored = box?.get('custom_webviews', defaultValue: const []);
     if (stored is List) {
       customWebViews.value = stored.map((e) {
         if (e is Map) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -645,51 +646,53 @@ class BackupService {
                     FilledButton.icon(
                       icon: const Icon(Icons.check_rounded, size: 18),
                       label: const Text('开始恢复'),
-                      onPressed: () async {
-                        setState(() => isRestoring = true);
-                        final success = await performSelectiveRestore(
-                          backupFile: currentFile,
-                          restoreData: restoreData,
-                          restoreConfig: restoreConfig,
-                          restorePlugins: restorePlugins,
-                          restoreNapcat: restoreNapcat,
-                          restartService: isInitialInstall,
-                          showSnackbar: false,
-                        );
-                        if (Get.isDialogOpen == true) {
-                          Get.back();
-                        }
-                        if (success) {
-                          if (!isInitialInstall) {
-                            Get.snackbar(
-                              '恢复成功',
-                              '已成功还原数据与配置，应用即将退出，请重新打开',
-                              snackPosition: SnackPosition.BOTTOM,
-                              duration: const Duration(seconds: 3),
-                            );
-                            Future.delayed(const Duration(seconds: 2), () {
-                              SystemNavigator.pop();
-                              exit(0);
-                            });
+                      onPressed: () {
+                        unawaited(() async {
+                          setState(() => isRestoring = true);
+                          final success = await performSelectiveRestore(
+                            backupFile: currentFile,
+                            restoreData: restoreData,
+                            restoreConfig: restoreConfig,
+                            restorePlugins: restorePlugins,
+                            restoreNapcat: restoreNapcat,
+                            restartService: isInitialInstall,
+                            showSnackbar: false,
+                          );
+                          if (Get.isDialogOpen == true) {
+                            Get.back();
+                          }
+                          if (success) {
+                            if (!isInitialInstall) {
+                              Get.snackbar(
+                                '恢复成功',
+                                '已成功还原数据与配置，应用即将退出，请重新打开',
+                                snackPosition: SnackPosition.BOTTOM,
+                                duration: const Duration(seconds: 3),
+                              );
+                              Future.delayed(const Duration(seconds: 2), () {
+                                SystemNavigator.pop();
+                                exit(0);
+                              });
+                            } else {
+                              Get.snackbar(
+                                '恢复成功',
+                                '已成功还原选定的数据与配置模块',
+                                snackPosition: SnackPosition.BOTTOM,
+                                duration: const Duration(seconds: 3),
+                              );
+                            }
                           } else {
                             Get.snackbar(
-                              '恢复成功',
-                              '已成功还原选定的数据与配置模块',
+                              '恢复失败',
+                              '数据还原过程中发生错误',
                               snackPosition: SnackPosition.BOTTOM,
+                              backgroundColor: Colors.red,
+                              colorText: Colors.white,
                               duration: const Duration(seconds: 3),
                             );
                           }
-                        } else {
-                          Get.snackbar(
-                            '恢复失败',
-                            '数据还原过程中发生错误',
-                            snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: Colors.red,
-                            colorText: Colors.white,
-                            duration: const Duration(seconds: 3),
-                          );
-                        }
-                        onCompleted?.call();
+                          onCompleted?.call();
+                        }());
                       },
                     ),
                   ],

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -122,64 +123,68 @@ class _TerminalTabViewState extends State<TerminalTabView> {
           IconButton(
             icon: Icon(Icons.copy_all_rounded, size: 19, color: colorScheme.onSurfaceVariant),
             tooltip: '复制终端内容',
-            onPressed: () async {
-              final activeTab = manager.activeTab;
-              if (activeTab != null) {
-                final text = _getTerminalText(activeTab.terminal);
-                if (text.isNotEmpty) {
-                  await Clipboard.setData(ClipboardData(text: text));
-                  Get.snackbar(
-                    '已复制',
-                    '${activeTab.title} 终端内容已复制到剪贴板',
-                    snackPosition: SnackPosition.BOTTOM,
-                    duration: const Duration(seconds: 2),
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  );
-                } else {
-                  Get.snackbar(
-                    '提示',
-                    '当前终端无内容',
-                    snackPosition: SnackPosition.BOTTOM,
-                    duration: const Duration(seconds: 2),
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  );
+            onPressed: () {
+              unawaited(() async {
+                final activeTab = manager.activeTab;
+                if (activeTab != null) {
+                  final text = _getTerminalText(activeTab.terminal);
+                  if (text.isNotEmpty) {
+                    await Clipboard.setData(ClipboardData(text: text));
+                    Get.snackbar(
+                      '已复制',
+                      '${activeTab.title} 终端内容已复制到剪贴板',
+                      snackPosition: SnackPosition.BOTTOM,
+                      duration: const Duration(seconds: 2),
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    );
+                  } else {
+                    Get.snackbar(
+                      '提示',
+                      '当前终端无内容',
+                      snackPosition: SnackPosition.BOTTOM,
+                      duration: const Duration(seconds: 2),
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    );
+                  }
                 }
-              }
+              }());
             },
           ),
           IconButton(
             icon: Icon(Icons.save_alt_rounded, size: 19, color: colorScheme.onSurfaceVariant),
             tooltip: '保存日志文件',
-            onPressed: () async {
-              final activeTab = manager.activeTab;
-              if (activeTab != null) {
-                final text = _getTerminalText(activeTab.terminal);
-                try {
-                  final dir = getMaiBotBackupDirectory();
-                  final now = DateTime.now();
-                  final timestamp =
-                      '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
-                  final logFile = File('${dir.path}/terminal_${activeTab.id}_$timestamp.log');
-                  await logFile.writeAsString(text);
-                  Get.snackbar(
-                    '保存成功',
-                    '日志已导出至: ${logFile.path}',
-                    snackPosition: SnackPosition.BOTTOM,
-                    duration: const Duration(seconds: 3),
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  );
-                } catch (e) {
-                  Get.snackbar(
-                    '保存失败',
-                    '写入日志文件异常: $e',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.red,
-                    colorText: Colors.white,
-                    duration: const Duration(seconds: 3),
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  );
+            onPressed: () {
+              unawaited(() async {
+                final activeTab = manager.activeTab;
+                if (activeTab != null) {
+                  final text = _getTerminalText(activeTab.terminal);
+                  try {
+                    final dir = getMaiBotBackupDirectory();
+                    final now = DateTime.now();
+                    final timestamp =
+                        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+                    final logFile = File('${dir.path}/terminal_${activeTab.id}_$timestamp.log');
+                    await logFile.writeAsString(text);
+                    Get.snackbar(
+                      '保存成功',
+                      '日志已导出至: ${logFile.path}',
+                      snackPosition: SnackPosition.BOTTOM,
+                      duration: const Duration(seconds: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    );
+                  } catch (e) {
+                    Get.snackbar(
+                      '保存失败',
+                      '写入日志文件异常: $e',
+                      snackPosition: SnackPosition.BOTTOM,
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                      duration: const Duration(seconds: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    );
+                  }
                 }
-              }
+              }());
             },
           ),
           IconButton(

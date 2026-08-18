@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -194,7 +195,7 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> with Widg
                           description: '用于在状态栏显示常驻前台服务，防止后台进程被系统终止。',
                           isGranted: _notificationGranted,
                           isRequired: true,
-                          onRequest: _requestNotificationPermission,
+                          onRequest: () => unawaited(_requestNotificationPermission()),
                         ),
                         const SizedBox(height: 10),
                         _buildPermissionItem(
@@ -204,7 +205,7 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> with Widg
                           description: '用于解压 Linux 运行环境、保存数据及管理备份文件。',
                           isGranted: _storageGranted,
                           isRequired: true,
-                          onRequest: _requestStoragePermission,
+                          onRequest: () => unawaited(_requestStoragePermission()),
                         ),
                         const SizedBox(height: 20),
                         _buildSectionHeader(context, '可选保活设置'),
@@ -216,7 +217,7 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> with Widg
                           description: '允许应用在系统休眠时保持后台网络和进程运行。',
                           isGranted: _batteryOptimizationIgnored,
                           isRequired: false,
-                          onRequest: _requestBatteryOptimization,
+                          onRequest: () => unawaited(_requestBatteryOptimization()),
                         ),
                         const SizedBox(height: 10),
                         _buildNoticeItem(
@@ -319,9 +320,31 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> with Widg
               Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                child: Row(
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                    if (isRequired) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: colorScheme.errorContainer.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '必选',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               if (isGranted)

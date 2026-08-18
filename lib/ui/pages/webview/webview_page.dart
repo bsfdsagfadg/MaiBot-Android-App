@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -582,40 +583,42 @@ class _WebViewPageState extends State<WebViewPage> {
         ),
         child: PopScope(
           canPop: false,
-          onPopInvokedWithResult: (didPop, result) async {
-            if (didPop) return;
+          onPopInvokedWithResult: (didPop, result) {
+            unawaited(() async {
+              if (didPop) return;
 
-            // 1. 如果当前不是 MaiBot 主控制台标签页，按返回键优先返回主标签页
-            if (_currentIndex != 0) {
-              setState(() {
-                _currentIndex = 0;
-              });
-              return;
-            }
+              // 1. 如果当前不是 MaiBot 主控制台标签页，按返回键优先返回主标签页
+              if (_currentIndex != 0) {
+                setState(() {
+                  _currentIndex = 0;
+                });
+                return;
+              }
 
-            // 2. 如果 MaiBot WebView 内部有历史页面可回退，则回退上一页
-            if (await _maiBotController.canGoBack()) {
-              await _maiBotController.goBack();
-              return;
-            }
+              // 2. 如果 MaiBot WebView 内部有历史页面可回退，则回退上一页
+              if (await _maiBotController.canGoBack()) {
+                await _maiBotController.goBack();
+                return;
+              }
 
-            // 3. 在主页根路径时，双击返回键退出应用或移至后台
-            final now = DateTime.now();
-            if (_lastBackPressedTime == null ||
-                now.difference(_lastBackPressedTime!) > const Duration(seconds: 2)) {
-              _lastBackPressedTime = now;
-              Get.snackbar(
-                '提示',
-                '再次按返回键退出应用',
-                snackPosition: SnackPosition.BOTTOM,
-                duration: const Duration(seconds: 2),
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              );
-              return;
-            }
+              // 3. 在主页根路径时，双击返回键退出应用或移至后台
+              final now = DateTime.now();
+              if (_lastBackPressedTime == null ||
+                  now.difference(_lastBackPressedTime!) > const Duration(seconds: 2)) {
+                _lastBackPressedTime = now;
+                Get.snackbar(
+                  '提示',
+                  '再次按返回键退出应用',
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 2),
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                );
+                return;
+              }
 
-            // 执行安全退出
-            SystemNavigator.pop();
+              // 执行安全退出
+              SystemNavigator.pop();
+            }());
           },
           child: Scaffold(
             backgroundColor: theme.scaffoldBackgroundColor,

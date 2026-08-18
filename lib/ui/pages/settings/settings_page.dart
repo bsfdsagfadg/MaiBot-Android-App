@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -126,16 +127,18 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             actions: [
               TextButton(
-                onPressed: () async {
-                  await Clipboard.setData(
-                      ClipboardData(text: scripts.ubuntuPath));
-                  Get.back();
-                  Get.snackbar(
-                    '已复制',
-                    '路径已复制到剪贴板',
-                    snackPosition: SnackPosition.BOTTOM,
-                    duration: const Duration(seconds: 2),
-                  );
+                onPressed: () {
+                  unawaited(() async {
+                    await Clipboard.setData(
+                        ClipboardData(text: scripts.ubuntuPath));
+                    Get.back();
+                    Get.snackbar(
+                      '已复制',
+                      '路径已复制到剪贴板',
+                      snackPosition: SnackPosition.BOTTOM,
+                      duration: const Duration(seconds: 2),
+                    );
+                  }());
                 },
                 child: const Text('复制路径'),
               ),
@@ -333,28 +336,30 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: '清空 WebView 缓存',
                     subtitle: '清理内置网页与控制台的临时缓存',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: () async {
-                      try {
-                        await widget.maiBotController.clearCache();
-                        await widget.napCatController.clearCache();
-                        if (context.mounted) {
-                          Get.snackbar(
-                            '成功',
-                            'WebView 缓存已清理',
-                            snackPosition: SnackPosition.BOTTOM,
-                          );
+                    onTap: () {
+                      unawaited(() async {
+                        try {
+                          await widget.maiBotController.clearCache();
+                          await widget.napCatController.clearCache();
+                          if (context.mounted) {
+                            Get.snackbar(
+                              '成功',
+                              'WebView 缓存已清理',
+                              snackPosition: SnackPosition.BOTTOM,
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            Get.snackbar(
+                              '清理失败',
+                              e.toString(),
+                              snackPosition: SnackPosition.BOTTOM,
+                              backgroundColor: Colors.red,
+                              colorText: Colors.white,
+                            );
+                          }
                         }
-                      } catch (e) {
-                        if (context.mounted) {
-                          Get.snackbar(
-                            '清理失败',
-                            e.toString(),
-                            snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: Colors.red,
-                            colorText: Colors.white,
-                          );
-                        }
-                      }
+                      }());
                     },
                   ),
                 ]),
@@ -367,9 +372,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: '备份 MaiBot 数据',
                     subtitle: '打包本地配置、插件及数据至手机下载目录',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: () async {
-                      await BackupService.performBackup(showLoadingDialog: true);
-                    },
+                    onTap: () => unawaited(BackupService.performBackup(showLoadingDialog: true)),
                   ),
                   const Divider(height: 1, indent: 56),
                   _buildSettingTile(
@@ -378,9 +381,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: '从备份恢复数据',
                     subtitle: '选择本地备份存档，支持按模块细粒度还原',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: () async {
-                      await BackupService.showRestoreDialog();
-                    },
+                    onTap: () => unawaited(BackupService.showRestoreDialog()),
                   ),
                   const Divider(height: 1, indent: 56),
                   _buildSettingTile(
@@ -389,7 +390,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: '重置 Python 环境',
                     subtitle: '删除虚拟环境并在启动时重新构建依赖',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: MaintenanceActions.resetPythonEnv,
+                    onTap: () => unawaited(MaintenanceActions.resetPythonEnv()),
                   ),
                   const Divider(height: 1, indent: 56),
                   _buildSettingTile(
@@ -398,7 +399,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: '重新安装 NapCat 组件',
                     subtitle: '清除 NapCat 文件并触发重新安装',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: MaintenanceActions.reinstallNapcat,
+                    onTap: () => unawaited(MaintenanceActions.reinstallNapcat()),
                   ),
                   const Divider(height: 1, indent: 56),
                   _buildSettingTile(
@@ -407,7 +408,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: '重新安装 MaiBot',
                     subtitle: '重新拉取并安装 MaiBot 代码',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: MaintenanceActions.reinstallMaiBot,
+                    onTap: () => unawaited(MaintenanceActions.reinstallMaiBot()),
                   ),
                 ], backgroundColor: Colors.red.withValues(alpha: 0.03), borderColor: Colors.red.withValues(alpha: 0.2)),
                 const SizedBox(height: 16),
@@ -435,55 +436,57 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: '隐私政策',
                     subtitle: '查看应用隐私保护与开源协议条款',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: () async {
-                      try {
-                        _cachedPrivacyContent ??=
-                            await rootBundle.loadString('assets/privacy_policy.md');
-                        if (context.mounted) {
-                          Get.dialog(
-                            Dialog(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Row(
-                                      children: [
-                                        const Text(
-                                          '隐私政策',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        IconButton(
-                                          icon: const Icon(Icons.close),
-                                          onPressed: () => Get.back(),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const Divider(height: 1),
-                                  Flexible(
-                                    child: SingleChildScrollView(
+                    onTap: () {
+                      unawaited(() async {
+                        try {
+                          _cachedPrivacyContent ??=
+                              await rootBundle.loadString('assets/privacy_policy.md');
+                          if (context.mounted) {
+                            Get.dialog(
+                              Dialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Padding(
                                       padding: const EdgeInsets.all(16.0),
-                                      child: MarkdownBody(
-                                        data: _cachedPrivacyContent!,
+                                      child: Row(
+                                        children: [
+                                          const Text(
+                                            '隐私政策',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          IconButton(
+                                            icon: const Icon(Icons.close),
+                                            onPressed: () => Get.back(),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    const Divider(height: 1),
+                                    Flexible(
+                                      child: SingleChildScrollView(
+                                        padding: const EdgeInsets.all(16.0),
+                                        child: MarkdownBody(
+                                          data: _cachedPrivacyContent!,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            Get.snackbar('加载失败', '无法加载隐私政策: $e', snackPosition: SnackPosition.BOTTOM);
+                          }
                         }
-                      } catch (e) {
-                        if (context.mounted) {
-                          Get.snackbar('加载失败', '无法加载隐私政策: $e', snackPosition: SnackPosition.BOTTOM);
-                        }
-                      }
+                      }());
                     },
                   ),
                   const Divider(height: 1, indent: 56),
@@ -493,7 +496,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: '退出应用',
                     subtitle: '完全终止前台守护服务与容器进程',
                     trailing: Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: MaintenanceActions.exitApp,
+                    onTap: () => unawaited(MaintenanceActions.exitApp()),
                   ),
                 ]),
                 const SizedBox(height: 36),
@@ -597,9 +600,8 @@ class _SettingsPageState extends State<SettingsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final color = isDanger
-        ? (isDark ? const Color(0xFFFF8A80) : colorScheme.error)
-        : colorScheme.onSurfaceVariant;
+    final Color dangerColor = isDark ? const Color(0xFFFF8A80) : colorScheme.error;
+    final Color color = isDanger ? dangerColor : colorScheme.onSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
@@ -705,9 +707,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   itemBuilder: (context, index) {
                     final item = ThemeController.presetColors[index];
                     final isSelected = selectedIndex == index;
-                    final displayColor = item.isDynamic
-                        ? (isDynamicSel ? colorScheme.primary : const Color(0xFF6750A4))
-                        : item.color!;
+    final Color dynamicColor = isDynamicSel ? colorScheme.primary : const Color(0xFF6750A4);
+    final Color displayColor = item.isDynamic ? dynamicColor : item.color!;
 
                     return GestureDetector(
                       onTap: () => controller.setColorIndex(index),
@@ -732,15 +733,18 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ]
                               : null,
                         ),
-                        child: item.isDynamic
-                            ? Icon(
-                                isSelected ? Icons.check_rounded : Icons.auto_awesome_rounded,
-                                color: Colors.white,
-                                size: 18,
-                              )
-                            : (isSelected
-                                ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
-                                : null),
+                        child: () {
+                          if (item.isDynamic) {
+                            return Icon(
+                              isSelected ? Icons.check_rounded : Icons.auto_awesome_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            );
+                          } else if (isSelected) {
+                            return const Icon(Icons.check_rounded, color: Colors.white, size: 20);
+                          }
+                          return null;
+                        }(),
                       ),
                     );
                   },
@@ -897,14 +901,17 @@ class _SettingsPageState extends State<SettingsPage> {
           color: colorScheme.onSurface,
         ),
       ),
-      subtitle: Text(
-        hasToken ? (token.length > 20 ? '${token.substring(0, 16)}••••' : token) : '暂未捕获到 Token',
-        style: TextStyle(
-          fontSize: 12,
-          color: hasToken ? colorScheme.onSurface : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-          fontFamily: hasToken ? 'monospace' : null,
-        ),
-      ),
+      subtitle: () {
+        final String tokenDisplay = token.length > 20 ? '${token.substring(0, 16)}••••' : token;
+        return Text(
+          hasToken ? tokenDisplay : '暂未捕获到 Token',
+          style: TextStyle(
+            fontSize: 12,
+            color: hasToken ? colorScheme.onSurface : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            fontFamily: hasToken ? 'monospace' : null,
+          ),
+        );
+      }(),
       trailing: hasToken
           ? OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
@@ -915,7 +922,22 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               icon: const Icon(Icons.copy_rounded, size: 14),
               label: const Text('复制', style: TextStyle(fontSize: 12)),
-              onPressed: () async {
+              onPressed: () {
+                unawaited(() async {
+                  await Clipboard.setData(ClipboardData(text: token));
+                  Get.snackbar(
+                    '已复制',
+                    '$title 已复制到剪贴板',
+                    snackPosition: SnackPosition.BOTTOM,
+                    duration: const Duration(seconds: 2),
+                  );
+                }());
+              },
+            )
+          : null,
+      onTap: hasToken
+          ? () {
+              unawaited(() async {
                 await Clipboard.setData(ClipboardData(text: token));
                 Get.snackbar(
                   '已复制',
@@ -923,18 +945,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   snackPosition: SnackPosition.BOTTOM,
                   duration: const Duration(seconds: 2),
                 );
-              },
-            )
-          : null,
-      onTap: hasToken
-          ? () async {
-              await Clipboard.setData(ClipboardData(text: token));
-              Get.snackbar(
-                '已复制',
-                '$title 已复制到剪贴板',
-                snackPosition: SnackPosition.BOTTOM,
-                duration: const Duration(seconds: 2),
-              );
+              }());
             }
           : null,
     );

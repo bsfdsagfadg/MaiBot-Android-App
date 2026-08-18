@@ -15,7 +15,6 @@ class InstallerService {
   static Future<bool> runInstallPipeline({
     required Function(String) onProgress,
     Function(String)? onLog,
-    Function(String)? onNapcatLog,
   }) async {
     final ubuntuDir = Directory(scripts.ubuntuPath);
     
@@ -675,11 +674,11 @@ class InstallerService {
 
       process.stdout.transform(const Utf8Decoder(allowMalformed: true)).listen(
         (data) => onLog(normalizeChunk(data)),
-        onError: (_) {},
+        onError: (e) => Log.w('stdout read error: $e', tag: 'InstallerService'),
       );
       process.stderr.transform(const Utf8Decoder(allowMalformed: true)).listen(
         (data) => onLog(normalizeChunk(data)),
-        onError: (_) {},
+        onError: (e) => Log.w('stderr read error: $e', tag: 'InstallerService'),
       );
       
       try {
