@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
 import '../constants/scripts.dart' as scripts;
-import 'foreground_service.dart';
+import 'backend_process_manager.dart';
 import '../utils/file_utils.dart';
 
 /// 备份与恢复服务：支持 MaiBot / NapCat 全量备份与细粒度选择性模块恢复
@@ -51,47 +51,11 @@ class BackupService {
   /// 4. 发送 SIGKILL (信号 9) 彻底清理残留孤儿子进程
   /// 5. 清理 X11 锁文件，确保后续启动不产生锁冲突
   static Future<void> safelyTerminateProcessesForMaintenance() async {
-    Log.i('正在平滑停止后台容器与进程...', tag: 'BackupService');
-
-    // 第一步：通知原生守护服务停用，封锁自动重启定时器
-    try {
-      await ForegroundServiceManager.stopService();
-    } catch (e) {
-      Log.w('通知原生服务停止异常: $e', tag: 'BackupService');
-    }
-
-    // 第二步：向核心进程发送 SIGINT (Ctrl+C，信号 2)，允许 Python / Node / SQLite 优雅写盘退出
-    try {
-      await Process.run('${RuntimeEnvir.binPath}/busybox',
-          ['killall', '-2', 'python', 'python3', 'node', 'qq', 'bash', 'sh']);
-    } catch (_) {}
-
-    // 第三步：等待 1 秒缓冲期，确保 SQLite 数据与日志文件安全完成落盘
-    await Future.delayed(const Duration(milliseconds: 1000));
-
-    // 第四步：彻底清理所有可能残留的容器进程
-    try {
-      await Process.run('${RuntimeEnvir.binPath}/busybox',
-          ['killall', '-9', 'proot', 'python', 'python3', 'node', 'qq', 'bash', 'sh', 'crashpad_handler']);
-    } catch (_) {}
-
-    // 第五步：清理锁文件与孤立 Socket
-    try {
-      final x1Lock = File('${RuntimeEnvir.tmpPath}/.X1-lock');
-      if (x1Lock.existsSync()) x1Lock.deleteSync();
-      final x11Unix = Directory('${RuntimeEnvir.tmpPath}/.X11-unix');
-      if (x11Unix.existsSync()) x11Unix.deleteSync(recursive: true);
-      await Process.run('${RuntimeEnvir.binPath}/busybox', [
-        'rm',
-        '-rf',
-        '${RuntimeEnvir.tmpPath}/SingletonLock',
-        '${RuntimeEnvir.tmpPath}/SingletonSocket',
-        '${RuntimeEnvir.tmpPath}/SingletonCookie',
-        '${scripts.ubuntuPath}/root/.config/QQ/SingletonLock',
-        '${scripts.ubuntuPath}/root/.config/QQ/SingletonSocket',
-        '${scripts.ubuntuPath}/root/.config/QQ/SingletonCookie',
-      ]);
-    } catch (_) {}
+    Log.i('通过统一进程管理器平滑停止后台容器与进程...', tag: 'BackupService');
+    await BackendProcessManager.runMaintenanceTransaction(
+      action: () async => null,
+      autoRestart: false,
+    );
   }
   /// 确保获取存储权限（支持 Android 11+ 所有文件权限与旧版存储权限），无法获取时降级使用内部目录
   static Future<bool> ensureStoragePermission() async {
@@ -234,79 +198,77 @@ class BackupService {
       }
     }
 
-    try {
-      // 平滑发送 SIGINT 退出并终止进程，杜绝数据损坏与自动重启冲突
-      await safelyTerminateProcessesForMaintenance();
+    return await BackendProcessManager.runMaintenanceTransaction(
+      autoRestart: restoreService,
+      action: () async {
+        try {
+          final List<String> pathsToCreate = [
+            '${scripts.ubuntuPath}/root/MaiBot/config',
+            '${scripts.ubuntuPath}/root/MaiBot/plugins',
+            '${scripts.ubuntuPath}/root/napcat/config',
+          ];
+          for (final path in pathsToCreate) {
+            final dir = Directory(path);
+            if (!await dir.exists()) {
+              await dir.create(recursive: true);
+            }
+          }
 
-      final List<String> pathsToCreate = [
-        '${scripts.ubuntuPath}/root/MaiBot/config',
-        '${scripts.ubuntuPath}/root/MaiBot/plugins',
-        '${scripts.ubuntuPath}/root/napcat/config',
-      ];
-      for (final path in pathsToCreate) {
-        final dir = Directory(path);
-        if (!await dir.exists()) {
-          await dir.create(recursive: true);
+          final result = await Process.run('${RuntimeEnvir.binPath}/busybox', [
+            'tar',
+            '-czf',
+            backupPath,
+            '--exclude=MaiBot/plugins/hello_world_plugin',
+            '-C',
+            '${scripts.ubuntuPath}/root',
+            'MaiBot/data',
+            'MaiBot/config',
+            'MaiBot/plugins',
+            'napcat/config',
+          ]);
+
+          dismissDialog();
+
+          if (result.exitCode == 0) {
+            final backupFile = File(backupPath);
+            final fileSize = await backupFile.length();
+            final fileSizeMB = (fileSize / 1024 / 1024).toStringAsFixed(2);
+
+            Get.snackbar(
+              '备份成功',
+              '备份文件: $backupFileName\n大小: ${fileSizeMB}MB',
+              snackPosition: SnackPosition.BOTTOM,
+              duration: const Duration(seconds: 3),
+            );
+            Log.i('备份成功: $backupPath (${fileSizeMB}MB)', tag: 'BackupService');
+            return true;
+          } else {
+            Get.snackbar(
+              '备份失败',
+              '错误: ${result.stderr}',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+            );
+            Log.e('备份失败: ${result.stderr}', tag: 'BackupService');
+            return false;
+          }
+        } catch (e) {
+          dismissDialog();
+          Get.snackbar(
+            '备份失败',
+            e.toString(),
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+          Log.e('备份异常: $e', tag: 'BackupService');
+          return false;
+        } finally {
+          dismissDialog();
         }
-      }
-
-      final result = await Process.run('${RuntimeEnvir.binPath}/busybox', [
-        'tar',
-        '-czf',
-        backupPath,
-        '--exclude=MaiBot/plugins/hello_world_plugin',
-        '-C',
-        '${scripts.ubuntuPath}/root',
-        'MaiBot/data',
-        'MaiBot/config',
-        'MaiBot/plugins',
-        'napcat/config',
-      ]);
-
-      // 先关闭加载框，再展示 Snackbar 提示
-      dismissDialog();
-
-      if (result.exitCode == 0) {
-        final backupFile = File(backupPath);
-        final fileSize = await backupFile.length();
-        final fileSizeMB = (fileSize / 1024 / 1024).toStringAsFixed(2);
-
-        Get.snackbar(
-          '备份成功',
-          '备份文件: $backupFileName\n大小: ${fileSizeMB}MB',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(seconds: 3),
-        );
-        Log.i('备份成功: $backupPath (${fileSizeMB}MB)', tag: 'BackupService');
-        return true;
-      } else {
-        Get.snackbar(
-          '备份失败',
-          '错误: ${result.stderr}',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        Log.e('备份失败: ${result.stderr}', tag: 'BackupService');
-        return false;
-      }
-    } catch (e) {
-      dismissDialog();
-      Get.snackbar(
-        '备份失败',
-        e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      Log.e('备份异常: $e', tag: 'BackupService');
-      return false;
-    } finally {
-      dismissDialog();
-      if (restoreService) {
-        await ForegroundServiceManager.restartContainer();
-      }
-    }
+      },
+    );
   }
 
   /// 执行细粒度选择性备份恢复
@@ -329,67 +291,65 @@ class BackupService {
       return false;
     }
 
-    try {
-      Log.i('开始执行选择性备份恢复: ${backupFile.path}', tag: 'BackupService');
-      // 平滑发送 SIGINT 退出并终止进程，杜绝数据损坏与自动重启冲突
-      await safelyTerminateProcessesForMaintenance();
+    Log.i('开始执行选择性备份恢复: ${backupFile.path}', tag: 'BackupService');
+    return await BackendProcessManager.runMaintenanceTransaction(
+      autoRestart: restartService,
+      action: () async {
+        try {
+          final extractTargets = <String>[];
+          if (restoreData) extractTargets.add('MaiBot/data');
+          if (restoreConfig) extractTargets.add('MaiBot/config');
+          if (restorePlugins) extractTargets.add('MaiBot/plugins');
+          if (restoreNapcat) extractTargets.add('napcat/config');
 
-      final extractTargets = <String>[];
-      if (restoreData) extractTargets.add('MaiBot/data');
-      if (restoreConfig) extractTargets.add('MaiBot/config');
-      if (restorePlugins) extractTargets.add('MaiBot/plugins');
-      if (restoreNapcat) extractTargets.add('napcat/config');
+          if (extractTargets.isEmpty) {
+            if (showSnackbar) {
+              Get.snackbar('提示', '未选择任何要恢复的模块', snackPosition: SnackPosition.BOTTOM);
+            }
+            return true;
+          }
 
-      if (extractTargets.isEmpty) {
-        if (showSnackbar) {
-          Get.snackbar('提示', '未选择任何要恢复的模块', snackPosition: SnackPosition.BOTTOM);
+          // 确保目标父目录结构完整
+          Directory('${scripts.ubuntuPath}/root/MaiBot').createSync(recursive: true);
+          Directory('${scripts.ubuntuPath}/root/napcat').createSync(recursive: true);
+
+          final args = [
+            'tar',
+            '-xzf',
+            backupFile.path,
+            '-C',
+            '${scripts.ubuntuPath}/root',
+            ...extractTargets,
+          ];
+
+          final res = await Process.run('${RuntimeEnvir.binPath}/busybox', args);
+          if (res.exitCode == 0) {
+            Log.i('选择性恢复成功: $extractTargets', tag: 'BackupService');
+            if (showSnackbar) {
+              Get.snackbar(
+                '恢复成功',
+                '已成功还原选定的数据与配置模块',
+                snackPosition: SnackPosition.BOTTOM,
+                duration: const Duration(seconds: 3),
+              );
+            }
+            return true;
+          } else {
+            Log.e('恢复失败: ${res.stderr}', tag: 'BackupService');
+            if (showSnackbar) {
+              Get.snackbar('恢复失败', '解压文件失败: ${res.stderr}', snackPosition: SnackPosition.BOTTOM);
+            }
+            return false;
+          }
+        } catch (e) {
+          Log.e('恢复过程异常: $e', tag: 'BackupService');
+          if (showSnackbar) {
+            Get.snackbar('恢复异常', e.toString(), snackPosition: SnackPosition.BOTTOM);
+          }
+          return false;
         }
-        return true;
-      }
-
-      // 确保目标父目录结构完整
-      Directory('${scripts.ubuntuPath}/root/MaiBot').createSync(recursive: true);
-      Directory('${scripts.ubuntuPath}/root/napcat').createSync(recursive: true);
-
-      final args = [
-        'tar',
-        '-xzf',
-        backupFile.path,
-        '-C',
-        '${scripts.ubuntuPath}/root',
-        ...extractTargets,
-      ];
-
-      final res = await Process.run('${RuntimeEnvir.binPath}/busybox', args);
-      if (res.exitCode == 0) {
-        Log.i('选择性恢复成功: $extractTargets', tag: 'BackupService');
-        if (showSnackbar) {
-          Get.snackbar(
-            '恢复成功',
-            '已成功还原选定的数据与配置模块',
-            snackPosition: SnackPosition.BOTTOM,
-            duration: const Duration(seconds: 3),
-          );
-        }
-        return true;
-      } else {
-        Log.e('恢复失败: ${res.stderr}', tag: 'BackupService');
-        if (showSnackbar) {
-          Get.snackbar('恢复失败', '解压文件失败: ${res.stderr}', snackPosition: SnackPosition.BOTTOM);
-        }
-        return false;
-      }
-    } catch (e) {
-      Log.e('恢复过程异常: $e', tag: 'BackupService');
-      if (showSnackbar) {
-        Get.snackbar('恢复异常', e.toString(), snackPosition: SnackPosition.BOTTOM);
-      }
-      return false;
-    } finally {
-      if (restartService) {
-        await ForegroundServiceManager.restartContainer();
-      }
-    }
+      },
+    );
   }
 
   /// 显示 Material You 风格的备份恢复选择对话框
@@ -669,8 +629,11 @@ class BackupService {
                                 snackPosition: SnackPosition.BOTTOM,
                                 duration: const Duration(seconds: 3),
                               );
-                              Future.delayed(const Duration(seconds: 2), () {
-                                SystemNavigator.pop();
+                              Future.delayed(const Duration(seconds: 2), () async {
+                                try {
+                                  await BackendProcessManager.stopService();
+                                } catch (_) {}
+                                await SystemNavigator.pop();
                                 exit(0);
                               });
                             } else {

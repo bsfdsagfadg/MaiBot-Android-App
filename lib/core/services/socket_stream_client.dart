@@ -3,11 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../config/app_config.dart';
+import 'backend_process_manager.dart';
 
 /// 前台服务 PTY 转发 Socket 客户端。
 ///
 /// 负责连接前台服务监听的本地 Socket、按行缓冲输出、
-/// 剥离历史回放标记（__HIST_START__/__HIST_END__）并在断线后自动重连。
+/// 解析状态变更事件（__STATE_CHANGE__）、剥离历史回放标记（__HIST_START__/__HIST_END__）并在断线后自动重连。
 class SocketStreamClient {
   SocketStreamClient({
     required this.port,
@@ -72,7 +73,28 @@ class SocketStreamClient {
   void _onStringChunk(String event) {
     if (_disposed) return;
 
-    // [Fix 4.1] 处理历史缓冲区回放标记
+    // 解析并剥离原生状态控制帧
+    if (event.contains('\x02__STATE_CHANGE__:')) {
+      final matches = RegExp(r'\x02__STATE_CHANGE__:(.*?)\x03').allMatches(event);
+      for (final match in matches) {
+        final jsonStr = match.group(1);
+        if (jsonStr != null) {
+          try {
+            final Map<String, dynamic> data = jsonDecode(jsonStr);
+            final service = data['service']?.toString() ?? '';
+            final stateStr = data['state']?.toString() ?? '';
+            final retry = data['retry'] as int? ?? 0;
+            final pid = data['pid'] as int? ?? -1;
+            if (service.isNotEmpty && stateStr.isNotEmpty) {
+              BackendProcessManager.updateServiceState(service, stateStr, retry: retry, pid: pid);
+            }
+          } catch (_) {}
+        }
+      }
+      event = event.replaceAll(RegExp(r'\x02__STATE_CHANGE__:.*?\x03'), '');
+    }
+
+    // 处理历史缓冲区回放标记
     if (event.contains('\x02__HIST_START__\x03')) {
       _replaying = true;
       event = event.replaceAll('\x02__HIST_START__\x03', '');
@@ -81,6 +103,9 @@ class SocketStreamClient {
       event = event.replaceAll('\x02__HIST_END__\x03', '');
       _replaying = false;
     }
+
+    if (event.isEmpty) return;
+
     // 采用有状态换行规范化，防止 \r\n 跨包拆分时破坏动态进度条的单行 \r 原地重绘
     final normalizedEvent = _normalizeNewlines(event);
     onData?.call(normalizedEvent);

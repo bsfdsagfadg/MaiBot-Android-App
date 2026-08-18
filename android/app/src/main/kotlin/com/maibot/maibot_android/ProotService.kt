@@ -23,6 +23,15 @@ import java.util.LinkedList
 import java.util.Timer
 import java.util.TimerTask
 
+enum class ServiceState(val value: String) {
+    STOPPED("STOPPED"),
+    STARTING("STARTING"),
+    RUNNING("RUNNING"),
+    STOPPING("STOPPING"),
+    RESTARTING("RESTARTING"),
+    ERROR("ERROR")
+}
+
 class ProotService : Service() {
 
     companion object {
@@ -79,30 +88,6 @@ class ProotService : Service() {
 
         if (intent != null) {
             val action = intent.action
-            if ("STOP" == action) {
-                maibotProcess?.stop()
-                napcatProcess?.stop()
-                val bin = intent.getStringExtra("binPath")
-                if (bin != null) {
-                    try {
-                        Runtime.getRuntime().exec(
-                            arrayOf(
-                                "$bin/busybox", "killall", "-9",
-                                "proot", "qq", "python", "python3", "node", "bash", "sh", "crashpad_handler"
-                            )
-                        ).waitFor()
-                    } catch (_: Exception) {}
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
-                }
-                stopSelf()
-                return START_NOT_STICKY
-            }
-
             val sp = getSharedPreferences("maibot_backend_prefs", Context.MODE_PRIVATE)
             var binPath = intent.getStringExtra("binPath")
             var homePath = intent.getStringExtra("homePath")
@@ -110,7 +95,6 @@ class ProotService : Service() {
             var ubuntuPath = intent.getStringExtra("ubuntuPath")
 
             if (binPath != null && homePath != null) {
-                // 保存路径供无障碍/开机自启动时读取
                 sp.edit()
                     .putString("binPath", binPath)
                     .putString("homePath", homePath)
@@ -118,9 +102,8 @@ class ProotService : Service() {
                     .putString("ubuntuPath", ubuntuPath)
                     .apply()
             } else {
-                // 自启动场景（空 Intent 或缺少显式路径）
                 val autoStart = sp.getBoolean("auto_start_enabled", true)
-                if (!autoStart) {
+                if (!autoStart && action == null) {
                     Log.i(TAG, "自启动已被用户关闭，ProotService 保持待命状态")
                     return START_NOT_STICKY
                 }
@@ -131,105 +114,204 @@ class ProotService : Service() {
                     ?: "${filesDir.absolutePath}/usr/var/lib/proot-distro/installed-rootfs/ubuntu"
             }
 
+            val curBin = binPath ?: applicationInfo.nativeLibraryDir
+            val curHome = homePath ?: "${filesDir.absolutePath}/usr"
+            val curTmp = tmpPath ?: cacheDir.absolutePath
+            val curUbuntu = ubuntuPath ?: "${filesDir.absolutePath}/usr/var/lib/proot-distro/installed-rootfs/ubuntu"
+
+            if ("STOP" == action) {
+                safelyTerminateAllProcesses(curBin, curTmp, curUbuntu)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                stopSelf()
+                return START_NOT_STICKY
+            }
+
+            if ("CONTROL" == action) {
+                val ctrlAction = intent.getStringExtra("action")?.uppercase() ?: "START"
+                val ctrlTarget = intent.getStringExtra("target")?.uppercase() ?: "ALL"
+                Log.i(TAG, "收到控制指令: action=$ctrlAction, target=$ctrlTarget")
+
+                when (ctrlAction) {
+                    "START" -> {
+                        if (ctrlTarget == "ALL" || ctrlTarget == "MAIBOT") {
+                            startMaiBot(curBin, curHome, curTmp, curUbuntu)
+                        }
+                        if (ctrlTarget == "ALL" || ctrlTarget == "NAPCAT") {
+                            startNapCat(curBin, curHome, curTmp, curUbuntu)
+                        }
+                    }
+                    "STOP" -> {
+                        if (ctrlTarget == "MAIBOT") {
+                            maibotProcess?.stop()
+                        } else if (ctrlTarget == "NAPCAT") {
+                            napcatProcess?.stop()
+                        } else if (ctrlTarget == "ALL") {
+                            safelyTerminateAllProcesses(curBin, curTmp, curUbuntu)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                stopForeground(STOP_FOREGROUND_REMOVE)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                stopForeground(true)
+                            }
+                            stopSelf()
+                            return START_NOT_STICKY
+                        }
+                    }
+                    "RESTART" -> {
+                        if (ctrlTarget == "MAIBOT") {
+                            startMaiBot(curBin, curHome, curTmp, curUbuntu, forceRestart = true)
+                        } else if (ctrlTarget == "NAPCAT") {
+                            startNapCat(curBin, curHome, curTmp, curUbuntu, forceRestart = true)
+                        } else if (ctrlTarget == "ALL") {
+                            startMaiBot(curBin, curHome, curTmp, curUbuntu, forceRestart = true)
+                            startNapCat(curBin, curHome, curTmp, curUbuntu, forceRestart = true)
+                        }
+                    }
+                    "SAFE_TERMINATE" -> {
+                        safelyTerminateAllProcesses(curBin, curTmp, curUbuntu)
+                    }
+                }
+                return START_REDELIVER_INTENT
+            }
+
             // 检查 RootFS 是否已就绪，避免在未安装解压时拉起损坏的容器进程
-            val rootfsCheck = File(ubuntuPath, "bin/bash")
+            val rootfsCheck = File(curUbuntu, "bin/bash")
             if (!rootfsCheck.exists()) {
                 Log.w(TAG, "Ubuntu RootFS 未就绪 (${rootfsCheck.absolutePath} 不存在)，暂缓启动容器进程")
                 return START_NOT_STICKY
             }
 
-            val curBin = binPath ?: applicationInfo.nativeLibraryDir
-            val curHome = homePath ?: "${filesDir.absolutePath}/usr"
-            val curTmp = tmpPath ?: cacheDir.absolutePath
-            val curUbuntu = ubuntuPath ?: "${filesDir.absolutePath}/usr/var/lib/proot-distro/installed-rootfs/ubuntu"
             // 检测是否已经存在存活的容器进程，如果是 DartVM 退出/重启后重连，则直接放行，保护底层运行中的容器
             if (maibotProcess?.isAlive() == true && napcatProcess?.isAlive() == true) {
                 Log.i(TAG, "Native Backend 依然存活，拦截重复的启动请求，保护底层 PRoot 容器免受重置。")
                 return START_REDELIVER_INTENT
             }
 
-            // 仅启动尚未启动或已退出的进程，保障已有存活进程不受干扰
-            if (maibotProcess?.isAlive() != true) {
-                maibotProcess?.stop()
-                maibotProcess = null
-                Log.i(TAG, "启动 MaiBot 服务进程...")
-                val maibotCmd = """
-                    export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-                    export TERM=xterm-256color
-                    export COLORTERM=truecolor
-                    export FORCE_COLOR=1
-                    export CLICOLOR_FORCE=1
-                    export CLICOLOR=1
-                    export PYTHONUNBUFFERED=1
-                    export PYTHONIOENCODING=utf-8
-                    export PYTHON_COLORS=1
-                    export RICH_FORCE_COLOR=1
-                    export LOGURU_COLORIZE=true
-                    export UV_COLOR=always
-                    export UV_PROGRESS_MODE=visual
-                    export UV_NO_PROGRESS=0
-                    export UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-                    export PIP_NO_COLOR=0
-                    export COLUMNS=100
-                    export LINES=30
-                    export LANG=C.UTF-8
-                    export LC_ALL=C.UTF-8
-                    export UV_LINK_MODE=copy
-                    export TMPDIR=/tmp
-                    export TEMP=/tmp
-                    export TMP=/tmp
-                    mkdir -p /tmp /var/tmp
-                    cd /root/MaiBot
-                    if [ -f EULA.md ]; then export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}'); fi
-                    if [ -f PRIVACY.md ]; then export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}'); fi
-                    if command -v script >/dev/null 2>&1; then
-                        exec script -q -e -c "stty cols 45 rows 24 2>/dev/null; /root/.local/bin/uv run --color always bot.py" /dev/null
-                    else
-                        exec /root/.local/bin/uv run --color always bot.py
-                    fi
-                """.trimIndent() + "\n"
-
-                maibotProcess = ProotProcess("MaiBot", 20001, curBin, curHome, curTmp, curUbuntu, maibotCmd).apply {
-                    start()
-                }
-            }
-
-            if (napcatProcess?.isAlive() != true) {
-                napcatProcess?.stop()
-                napcatProcess = null
-                Log.i(TAG, "启动 NapCat 服务进程...")
-                cleanNapcatLocks(curTmp, curUbuntu)
-                val napcatCmd = """
-                    export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-                    export TERM=xterm-256color
-                    export COLORTERM=truecolor
-                    export FORCE_COLOR=1
-                    export CLICOLOR_FORCE=1
-                    export CLICOLOR=1
-                    export COLUMNS=100
-                    export LINES=30
-                    export LANG=C.UTF-8
-                    export LC_ALL=C.UTF-8
-                    export TMPDIR=/tmp
-                    export TEMP=/tmp
-                    export TMP=/tmp
-                    mkdir -p /tmp /var/tmp /root/.config/QQ
-                    chmod 777 /tmp /var/tmp 2>/dev/null || true
-                    rm -rf /tmp/Singleton* /tmp/.org.chromium.* /tmp/QQ* /root/.config/QQ/Singleton* /root/.config/QQ/Crashpad* /root/.config/QQ/QQ* /root/.config/QQ/*lock* 2>/dev/null || true
-                    cd /root
-                    if [ -f /root/launcher.sh ]; then
-                        bash /root/launcher.sh
-                    elif [ -d /root/napcat ]; then
-                        cd /root/napcat && LD_PRELOAD=./libnapcat_launcher.so qq --no-sandbox
-                    fi
-                """.trimIndent() + "\n"
-
-                napcatProcess = ProotProcess("NapCat", 20002, curBin, curHome, curTmp, curUbuntu, napcatCmd).apply {
-                    start()
-                }
-            }
+            startMaiBot(curBin, curHome, curTmp, curUbuntu)
+            startNapCat(curBin, curHome, curTmp, curUbuntu)
         }
         return START_REDELIVER_INTENT
+    }
+
+    private fun startMaiBot(binPath: String, homePath: String, tmpPath: String, ubuntuPath: String, forceRestart: Boolean = false) {
+        if (!forceRestart && maibotProcess?.isAlive() == true) {
+            Log.d(TAG, "MaiBot 进程已在运行，跳过启动")
+            return
+        }
+        maibotProcess?.stop()
+        maibotProcess = null
+
+        Log.i(TAG, "启动 MaiBot 服务进程...")
+        val maibotCmd = """
+            export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            export TERM=xterm-256color
+            export COLORTERM=truecolor
+            export FORCE_COLOR=1
+            export CLICOLOR_FORCE=1
+            export CLICOLOR=1
+            export PYTHONUNBUFFERED=1
+            export PYTHONIOENCODING=utf-8
+            export PYTHON_COLORS=1
+            export RICH_FORCE_COLOR=1
+            export LOGURU_COLORIZE=true
+            export UV_COLOR=always
+            export UV_PROGRESS_MODE=visual
+            export UV_NO_PROGRESS=0
+            export UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+            export PIP_NO_COLOR=0
+            export COLUMNS=100
+            export LINES=30
+            export LANG=C.UTF-8
+            export LC_ALL=C.UTF-8
+            export UV_LINK_MODE=copy
+            export TMPDIR=/tmp
+            export TEMP=/tmp
+            export TMP=/tmp
+            mkdir -p /tmp /var/tmp
+            cd /root/MaiBot
+            if [ -f EULA.md ]; then export EULA_AGREE=$(md5sum EULA.md | awk '{print $1}'); fi
+            if [ -f PRIVACY.md ]; then export PRIVACY_AGREE=$(md5sum PRIVACY.md | awk '{print $1}'); fi
+            if command -v script >/dev/null 2>&1; then
+                exec script -q -e -c "stty cols 45 rows 24 2>/dev/null; /root/.local/bin/uv run --color always bot.py" /dev/null
+            else
+                exec /root/.local/bin/uv run --color always bot.py
+            fi
+        """.trimIndent() + "\n"
+
+        maibotProcess = ProotProcess("MaiBot", 20001, binPath, homePath, tmpPath, ubuntuPath, maibotCmd).apply {
+            start()
+        }
+    }
+
+    private fun startNapCat(binPath: String, homePath: String, tmpPath: String, ubuntuPath: String, forceRestart: Boolean = false) {
+        if (!forceRestart && napcatProcess?.isAlive() == true) {
+            Log.d(TAG, "NapCat 进程已在运行，跳过启动")
+            return
+        }
+        napcatProcess?.stop()
+        napcatProcess = null
+
+        Log.i(TAG, "启动 NapCat 服务进程...")
+        cleanNapcatLocks(tmpPath, ubuntuPath)
+        val napcatCmd = """
+            export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            export TERM=xterm-256color
+            export COLORTERM=truecolor
+            export FORCE_COLOR=1
+            export CLICOLOR_FORCE=1
+            export CLICOLOR=1
+            export COLUMNS=100
+            export LINES=30
+            export LANG=C.UTF-8
+            export LC_ALL=C.UTF-8
+            export TMPDIR=/tmp
+            export TEMP=/tmp
+            export TMP=/tmp
+            mkdir -p /tmp /var/tmp /root/.config/QQ
+            chmod 777 /tmp /var/tmp 2>/dev/null || true
+            rm -rf /tmp/Singleton* /tmp/.org.chromium.* /tmp/QQ* /root/.config/QQ/Singleton* /root/.config/QQ/Crashpad* /root/.config/QQ/QQ* /root/.config/QQ/*lock* 2>/dev/null || true
+            cd /root
+            if [ -f /root/launcher.sh ]; then
+                bash /root/launcher.sh
+            elif [ -d /root/napcat ]; then
+                cd /root/napcat && LD_PRELOAD=./libnapcat_launcher.so qq --no-sandbox
+            fi
+        """.trimIndent() + "\n"
+
+        napcatProcess = ProotProcess("NapCat", 20002, binPath, homePath, tmpPath, ubuntuPath, napcatCmd).apply {
+            start()
+        }
+    }
+
+    private fun safelyTerminateAllProcesses(binPath: String?, tmpPath: String, ubuntuPath: String) {
+        maibotProcess?.stop()
+        napcatProcess?.stop()
+        if (binPath != null) {
+            try {
+                // 平滑发送 SIGINT 给子进程落盘
+                Runtime.getRuntime().exec(
+                    arrayOf("$binPath/busybox", "killall", "-2", "python", "python3", "node", "qq", "bash", "sh")
+                ).waitFor()
+            } catch (_: Exception) {}
+            try {
+                Thread.sleep(600)
+            } catch (_: Exception) {}
+            try {
+                // 强制释放所有容器残留进程
+                Runtime.getRuntime().exec(
+                    arrayOf(
+                        "$binPath/busybox", "killall", "-9",
+                        "proot", "qq", "python", "python3", "node", "bash", "sh", "crashpad_handler"
+                    )
+                ).waitFor()
+            } catch (_: Exception) {}
+        }
+        cleanNapcatLocks(tmpPath, ubuntuPath)
     }
 
     override fun onDestroy() {
@@ -300,6 +382,27 @@ class ProotService : Service() {
         @Volatile
         var isStopped = false
 
+        @Volatile
+        var currentState: ServiceState = ServiceState.STOPPED
+            private set
+
+        private fun notifyState(state: ServiceState, pid: Long = -1) {
+            currentState = state
+            val json = "{\"service\":\"${name.lowercase()}\",\"state\":\"${state.value}\",\"retry\":$restartCount,\"pid\":$pid}"
+            val frame = "\u0002__STATE_CHANGE__:$json\u0003".toByteArray()
+
+            val currentClients: List<Socket>
+            synchronized(clients) {
+                currentClients = ArrayList(clients)
+            }
+            for (client in currentClients) {
+                try {
+                    client.getOutputStream().write(frame)
+                    client.getOutputStream().flush()
+                } catch (_: IOException) {}
+            }
+        }
+
         private fun initServerSocket() {
             val existing = serverSocket
             if (existing != null && !existing.isClosed && existing.isBound) {
@@ -349,6 +452,11 @@ class ProotService : Service() {
                                 }
                                 out.write("\u0002__HIST_END__\u0003".toByteArray())
 
+                                // 发送当前状态快照给新连入的客户端
+                                val json = "{\"service\":\"${name.lowercase()}\",\"state\":\"${currentState.value}\",\"retry\":$restartCount,\"pid\":-1}"
+                                out.write("\u0002__STATE_CHANGE__:$json\u0003".toByteArray())
+                                out.flush()
+
                                 val input: InputStream = client.getInputStream()
                                 val inBuffer = ByteArray(1024)
                                 while (!isStopped) {
@@ -377,13 +485,17 @@ class ProotService : Service() {
 
         @Synchronized
         fun start() {
-            if (isStopped) return
+            if (isStopped) {
+                isStopped = false
+            }
             if (process != null && isAlive()) {
                 Log.d(TAG, "$name 进程依然存活，无需重复启动")
+                notifyState(ServiceState.RUNNING)
                 return
             }
             restartTimer?.cancel()
             restartTimer = null
+            notifyState(ServiceState.STARTING)
 
             try {
                 initServerSocket()
@@ -459,6 +571,8 @@ class ProotService : Service() {
                 stdin.write((command + "\n").toByteArray())
                 stdin.flush()
 
+                notifyState(ServiceState.RUNNING)
+
                 val processStartTime = System.currentTimeMillis()
                 val stdout = p.inputStream
                 Thread({
@@ -506,16 +620,21 @@ class ProotService : Service() {
 
             } catch (e: Exception) {
                 Log.e(TAG, "$name start error", e)
+                notifyState(ServiceState.ERROR)
                 scheduleRestart()
             }
         }
 
         @Synchronized
         private fun scheduleRestart() {
-            if (isStopped || restartCount >= 10) return
+            if (isStopped || restartCount >= 10) {
+                notifyState(ServiceState.STOPPED)
+                return
+            }
             restartTimer?.cancel()
             restartTimer = null
 
+            notifyState(ServiceState.RESTARTING)
             val delay = minOf(3 * (1 shl restartCount), 60)
             restartCount++
             Log.i(TAG, "$name exited, restarting in ${delay}s")
@@ -549,6 +668,7 @@ class ProotService : Service() {
         @Synchronized
         fun stop() {
             isStopped = true
+            notifyState(ServiceState.STOPPING)
             restartCount = 0
             restartTimer?.cancel()
             restartTimer = null
@@ -565,6 +685,7 @@ class ProotService : Service() {
                 }
                 clients.clear()
             }
+            notifyState(ServiceState.STOPPED)
         }
     }
 }

@@ -16,6 +16,7 @@ import '../../core/services/foreground_service.dart';
 import '../../core/services/installer_service.dart';
 import '../../core/services/progress_tracker.dart';
 import '../../core/services/socket_stream_client.dart';
+import '../../core/services/backend_process_manager.dart';
 import 'napcat_controller.dart';
 import 'napcat_log_parser.dart';
 import 'terminal_tab_manager.dart';
@@ -143,10 +144,8 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   Future<void> _startBackendServices() async {
     progressTracker.setProgress('正在启动后台运行环境...');
 
-    // 启动原生后台守护服务
-    if (!await ForegroundServiceManager.isRunningService()) {
-      await ForegroundServiceManager.startService();
-    }
+    // 启动原生后台守护服务（内部已具备幂等存活保护）
+    await ForegroundServiceManager.startService();
 
     // 前端连接到后端 Socket
     maibotClient.connect();
@@ -172,6 +171,13 @@ class HomeController extends GetxController with WidgetsBindingObserver {
       onData: (event) => napcatShowTerminal.write(event),
       onLine: _handleNapcatLine,
     );
+
+    // 监听 MaiBot 进程状态变更以协助触发 UI 状态更新
+    ever(BackendProcessManager.maibotState, (state) {
+      if (state == ProcessState.running) {
+        _checkAndNavigateToWebview();
+      }
+    });
 
     // 初始化进度跟踪器（terminal 尚未访问，延迟注入）
     progressTracker = ProgressTracker(

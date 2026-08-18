@@ -805,18 +805,6 @@ class InstallerService {
         installerScript.deleteSync();
       }
 
-      // 清理 QQ 运行时单例锁文件
-      await Process.run('${RuntimeEnvir.binPath}/busybox', [
-        'rm',
-        '-rf',
-        '${RuntimeEnvir.tmpPath}/SingletonLock',
-        '${RuntimeEnvir.tmpPath}/SingletonSocket',
-        '${RuntimeEnvir.tmpPath}/SingletonCookie',
-        '${scripts.ubuntuPath}/root/.config/QQ/SingletonLock',
-        '${scripts.ubuntuPath}/root/.config/QQ/SingletonSocket',
-        '${scripts.ubuntuPath}/root/.config/QQ/SingletonCookie',
-      ]);
-
       Log.i('NapCat 与 LinuxQQ 卸载完成，配置已暂存', tag: 'InstallerService');
       return true;
     } catch (e) {

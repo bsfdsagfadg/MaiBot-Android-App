@@ -29,12 +29,12 @@ Future<bool> _runGitTaskWithProgressDialog({
       final res = await task(appendLog);
       isSuccess.value = res.success;
       if (res.success) {
-        appendLog('\n✅ 操作成功完成！正在自动重启 MaiBot 服务以应用更新...\n');
+        appendLog('\n操作已完成，正在重启 MaiBot 服务...\n');
         try {
-          await ForegroundServiceManager.restartContainer();
-          appendLog('🚀 MaiBot 服务已自动重启生效！\n');
+          await ForegroundServiceManager.restartMaiBot();
+          appendLog('MaiBot 服务已重启生效。\n');
         } catch (e) {
-          appendLog('⚠️ 自动重启服务提示: $e\n');
+          appendLog('重启服务提示: $e\n');
         }
       } else {
         appendLog('\n❌ 执行失败 (Exit code: ${res.exitCode})\n${res.stderr}\n');
