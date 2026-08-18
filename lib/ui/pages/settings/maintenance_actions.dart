@@ -345,11 +345,11 @@ class MaintenanceActions {
     } catch (e) {
       Log.e('退出应用停止服务异常: $e', tag: 'MaiBot');
     }
-
+    // 等待停止指令送达并处理
+    await Future.delayed(const Duration(milliseconds: 300));
     await SystemNavigator.pop();
     exit(0);
   }
-
   /// 退出应用（设置页入口）
   static Future<void> exitApp() async {
     await performExit(showConfirmation: true);

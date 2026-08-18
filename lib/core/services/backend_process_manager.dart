@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:global_repository/global_repository.dart';
@@ -63,6 +64,38 @@ class BackendProcessManager {
     });
     Log.d('BackendProcessManager initialized', tag: 'BackendProcessManager');
   }
+  /// 探测后端服务是否已在运行（嗅探 PTY / Web 端口）
+  static Future<bool> isBackendRunning({
+    List<int> probePorts = const [
+      Ports.maibotPtySocket,
+      Ports.napcatPtySocket,
+      Ports.maibotWeb,
+      Ports.napcatWebUi,
+    ],
+    Duration timeout = const Duration(milliseconds: 500),
+  }) async {
+    for (final port in probePorts) {
+      try {
+        final socket = await Socket.connect('127.0.0.1', port, timeout: timeout);
+        await socket.close();
+        return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  /// 检查特定服务目标是否已就绪
+  static Future<bool> isServiceRunning(ServiceTarget target) async {
+    switch (target) {
+      case ServiceTarget.maibot:
+        return await isBackendRunning(probePorts: [Ports.maibotPtySocket, Ports.maibotWeb]);
+      case ServiceTarget.napcat:
+        return await isBackendRunning(probePorts: [Ports.napcatPtySocket, Ports.napcatWebUi]);
+      case ServiceTarget.all:
+        return await isBackendRunning();
+    }
+  }
+
 
   /// 处理从 Socket 接收到的原生状态帧
   static void updateServiceState(String service, String stateStr, {int retry = 0, int pid = -1}) {

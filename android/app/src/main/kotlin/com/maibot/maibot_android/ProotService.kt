@@ -86,9 +86,17 @@ class ProotService : Service() {
             Log.e(TAG, "startForeground error", e)
         }
 
+        val sp = getSharedPreferences("maibot_backend_prefs", Context.MODE_PRIVATE)
+        val action = intent?.action
+        val userStopped = sp.getBoolean("user_stopped", false)
+
+        if (userStopped && action != "CONTROL" && action != "START") {
+            Log.i(TAG, "用户之前已显式退出应用，禁止后台自动唤醒")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         if (intent != null) {
-            val action = intent.action
-            val sp = getSharedPreferences("maibot_backend_prefs", Context.MODE_PRIVATE)
             var binPath = intent.getStringExtra("binPath")
             var homePath = intent.getStringExtra("homePath")
             var tmpPath = intent.getStringExtra("tmpPath")
@@ -120,6 +128,7 @@ class ProotService : Service() {
             val curUbuntu = ubuntuPath ?: "${filesDir.absolutePath}/usr/var/lib/proot-distro/installed-rootfs/ubuntu"
 
             if ("STOP" == action) {
+                sp.edit().putBoolean("user_stopped", true).apply()
                 safelyTerminateAllProcesses(curBin, curTmp, curUbuntu)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -138,6 +147,7 @@ class ProotService : Service() {
 
                 when (ctrlAction) {
                     "START" -> {
+                        sp.edit().putBoolean("user_stopped", false).apply()
                         if (ctrlTarget == "ALL" || ctrlTarget == "MAIBOT") {
                             startMaiBot(curBin, curHome, curTmp, curUbuntu)
                         }
@@ -151,6 +161,7 @@ class ProotService : Service() {
                         } else if (ctrlTarget == "NAPCAT") {
                             napcatProcess?.stop()
                         } else if (ctrlTarget == "ALL") {
+                            sp.edit().putBoolean("user_stopped", true).apply()
                             safelyTerminateAllProcesses(curBin, curTmp, curUbuntu)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -163,6 +174,7 @@ class ProotService : Service() {
                         }
                     }
                     "RESTART" -> {
+                        sp.edit().putBoolean("user_stopped", false).apply()
                         if (ctrlTarget == "MAIBOT") {
                             startMaiBot(curBin, curHome, curTmp, curUbuntu, forceRestart = true)
                         } else if (ctrlTarget == "NAPCAT") {
@@ -176,7 +188,7 @@ class ProotService : Service() {
                         safelyTerminateAllProcesses(curBin, curTmp, curUbuntu)
                     }
                 }
-                return START_REDELIVER_INTENT
+                return START_NOT_STICKY
             }
 
             // 检查 RootFS 是否已就绪，避免在未安装解压时拉起损坏的容器进程
@@ -186,18 +198,12 @@ class ProotService : Service() {
                 return START_NOT_STICKY
             }
 
-            // 检测是否已经存在存活的容器进程，如果是 DartVM 退出/重启后重连，则直接放行，保护底层运行中的容器
-            if (maibotProcess?.isAlive() == true && napcatProcess?.isAlive() == true) {
-                Log.i(TAG, "Native Backend 依然存活，拦截重复的启动请求，保护底层 PRoot 容器免受重置。")
-                return START_REDELIVER_INTENT
-            }
-
+            // 幂等拉起 MaiBot 与 NapCat（内部会判断 isAlive()，已运行的实例不会重启）
             startMaiBot(curBin, curHome, curTmp, curUbuntu)
             startNapCat(curBin, curHome, curTmp, curUbuntu)
         }
-        return START_REDELIVER_INTENT
+        return START_NOT_STICKY
     }
-
     private fun startMaiBot(binPath: String, homePath: String, tmpPath: String, ubuntuPath: String, forceRestart: Boolean = false) {
         if (!forceRestart && maibotProcess?.isAlive() == true) {
             Log.d(TAG, "MaiBot 进程已在运行，跳过启动")
@@ -277,9 +283,9 @@ class ProotService : Service() {
             rm -rf /tmp/Singleton* /tmp/.org.chromium.* /tmp/QQ* /root/.config/QQ/Singleton* /root/.config/QQ/Crashpad* /root/.config/QQ/QQ* /root/.config/QQ/*lock* 2>/dev/null || true
             cd /root
             if [ -f /root/launcher.sh ]; then
-                bash /root/launcher.sh
+                exec bash /root/launcher.sh
             elif [ -d /root/napcat ]; then
-                cd /root/napcat && LD_PRELOAD=./libnapcat_launcher.so qq --no-sandbox
+                cd /root/napcat && exec env LD_PRELOAD=./libnapcat_launcher.so qq --no-sandbox
             fi
         """.trimIndent() + "\n"
 

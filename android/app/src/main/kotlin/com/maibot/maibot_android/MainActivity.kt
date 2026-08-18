@@ -42,6 +42,9 @@ class MainActivity : FragmentActivity() {
         instance = this
         mContext = this
 
+        // 用户主动启动应用，重置显式停止标志
+        val sp = getSharedPreferences("maibot_backend_prefs", Context.MODE_PRIVATE)
+        sp.edit().putBoolean("user_stopped", false).apply()
         // 在 super.onCreate 之前确保 FlutterEngine 已放入 Cache 中，
         // 防止在 Activity 重建（如被 OOMKiller 回收后重新进入）时
         // FragmentManager 自动恢复 FlutterFragment 抛出 IllegalStateException
@@ -102,10 +105,21 @@ class MainActivity : FragmentActivity() {
                     val tmpPath = call.argument<String>("tmpPath")
                     val ubuntuPath = call.argument<String>("ubuntuPath")
 
+                    val sp = mContext.getSharedPreferences("maibot_backend_prefs", Context.MODE_PRIVATE)
+                    if (action.equals("stop", ignoreCase = true) && target.equals("all", ignoreCase = true)) {
+                        sp.edit().putBoolean("user_stopped", true).apply()
+                    } else if (action.equals("start", ignoreCase = true) || action.equals("restart", ignoreCase = true)) {
+                        sp.edit().putBoolean("user_stopped", false).apply()
+                    }
+
                     val intent = Intent(mContext, ProotService::class.java).apply {
-                        this.action = "CONTROL"
-                        putExtra("target", target)
-                        putExtra("action", action)
+                        if (action.equals("stop", ignoreCase = true) && target.equals("all", ignoreCase = true)) {
+                            this.action = "STOP"
+                        } else {
+                            this.action = "CONTROL"
+                            putExtra("target", target)
+                            putExtra("action", action)
+                        }
                         putExtra("binPath", binPath)
                         putExtra("homePath", homePath)
                         putExtra("tmpPath", tmpPath)
@@ -275,14 +289,13 @@ class MainActivity : FragmentActivity() {
 
     fun triggerExitFromFlutter() {
         runOnUiThread {
-            val flutterEngine = FlutterEngineCache.getInstance().get(ENGINE_ID)
-            if (flutterEngine != null) {
-                MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "maibot_channel")
-                    .invokeMethod("exit_app", null)
-            } else {
-                finishAffinity()
-                System.exit(0)
+            val sp = getSharedPreferences("maibot_backend_prefs", Context.MODE_PRIVATE)
+            sp.edit().putBoolean("user_stopped", true).apply()
+            val stopIntent = Intent(this, ProotService::class.java).apply {
+                action = "STOP"
             }
+            startService(stopIntent)
+            finishAffinity()
         }
     }
 

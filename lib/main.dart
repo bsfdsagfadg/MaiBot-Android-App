@@ -35,60 +35,19 @@ Future<void> main() async {
   // 初始化后台进程管理
   BackendProcessManager.init();
 
+  // 初始化核心全局控制器
+  Get.put(ThemeController(), permanent: true);
+  Get.put(HomeController(), permanent: true);
 
-  runApp(
-    Builder(builder: (context) {
-      return ViewMetric(
-        uiWidth: 375,
-        screenWidth: MediaQuery.of(context).size.width,
-        child: const MaiBot(),
-      );
-    }),
-  );
+  runApp(const MaiBot());
 }
 
-class MaiBot extends StatefulWidget {
+class MaiBot extends StatelessWidget {
   const MaiBot({super.key});
 
   @override
-  State<MaiBot> createState() => _MaiBotState();
-}
-
-class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-
-    // 当应用完全退出时，确保清理所有资源
-    if (state == AppLifecycleState.detached) {
-      Log.i('应用正在退出，清理所有资源...', tag: 'MaiBot');
-      try {
-        // 尝试获取并清理 HomeController
-        if (Get.isRegistered<HomeController>()) {
-          Get.delete<HomeController>(force: true);
-        }
-      } catch (e) {
-        Log.e('清理资源时出错: $e', tag: 'MaiBot');
-      }
-    }
-  }
-
-  // This widget is the root of your application.
-  @override
   Widget build(BuildContext context) {
-    final ThemeController themeController = Get.put(ThemeController(), permanent: true);
+    final ThemeController themeController = Get.find<ThemeController>();
 
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
@@ -111,6 +70,13 @@ class _MaiBotState extends State<MaiBot> with WidgetsBindingObserver {
             ],
             initialRoute: AppRoutes.terminal,
             getPages: AppRoutes.routes,
+            builder: (context, child) {
+              return ViewMetric(
+                uiWidth: 375,
+                screenWidth: MediaQuery.of(context).size.width,
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
           );
         });
       },

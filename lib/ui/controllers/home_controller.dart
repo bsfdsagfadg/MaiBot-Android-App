@@ -68,9 +68,9 @@ class HomeController extends GetxController with WidgetsBindingObserver {
 
   // 检查两个条件是否都满足，如果满足则触发跳转
   void _checkAndNavigateToWebview() {
-    // 只有当两个条件都满足且应用在前台时才跳转
+    // 只要本地端口就绪且登录已处理且应用在前台时跳转
     if (_isLocalhostDetected &&
-        napcatController.isQrcodeProcessed &&
+        (napcatController.isQrcodeProcessed || napcatController.napCatWebUiToken.isNotEmpty) &&
         _isAppInForeground &&
         !webviewController.webviewHasOpen) {
       webviewController.navigateToWebview();
@@ -99,6 +99,16 @@ class HomeController extends GetxController with WidgetsBindingObserver {
   // 初始化环境，将动态库中的文件链接到数据目录
   // Init environment and link files from the dynamic library to the data directory
   Future<void> loadMaiBot() async {
+    // 如果检测到后台服务已在运行，直接连接并跳过重复解压与安装
+    if (await BackendProcessManager.isBackendRunning()) {
+      Log.i('后台服务已在运行，跳过安装流水线直接连接', tag: 'MaiBot');
+      _isLocalhostDetected = true;
+      maibotClient.connect();
+      napcatClient.connect();
+      _checkAndNavigateToWebview();
+      return;
+    }
+
     // 初始化环境
     await Directory(RuntimeEnvir.tmpPath).create(recursive: true);
     await Directory(RuntimeEnvir.homePath).create(recursive: true);
@@ -222,9 +232,18 @@ class HomeController extends GetxController with WidgetsBindingObserver {
         }
       }
 
-      // 加载并启动 MaiBot
-      loadMaiBot();
-
+      // 优先检查后台服务是否已在运行
+      final isRunning = await BackendProcessManager.isBackendRunning();
+      if (isRunning) {
+        Log.i('检测到后台服务已在运行，直接连接 Socket 并恢复状态', tag: 'MaiBot');
+        _isLocalhostDetected = true;
+        maibotClient.connect();
+        napcatClient.connect();
+        _checkAndNavigateToWebview();
+      } else {
+        // 加载并启动 MaiBot
+        await loadMaiBot();
+      }
       // 在终端创建完成后初始化固定标签页
       Future.delayed(const Duration(milliseconds: 500), () {
         terminalTabManager.initializeFixedTabs(terminal, napcatShowTerminal);
