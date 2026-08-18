@@ -135,9 +135,12 @@ public class ProotService extends Service {
                     Log.i(TAG, "Native Backend 依然存活，拦截重复的启动请求，保护底层 PRoot 容器免受重置。");
                     return START_REDELIVER_INTENT;
                 }
-                
                 // 仅启动尚未启动或已退出的进程，保障已有存活进程不受干扰
                 if (maibotProcess == null || !maibotProcess.isAlive()) {
+                    if (maibotProcess != null) {
+                        maibotProcess.stop();
+                        maibotProcess = null;
+                    }
                     Log.i(TAG, "启动 MaiBot 服务进程...");
                     String maibotCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" +
                             "export TERM=xterm-256color\n" +
@@ -177,7 +180,12 @@ public class ProotService extends Service {
                 }
                 
                 if (napcatProcess == null || !napcatProcess.isAlive()) {
+                    if (napcatProcess != null) {
+                        napcatProcess.stop();
+                        napcatProcess = null;
+                    }
                     Log.i(TAG, "启动 NapCat 服务进程...");
+                    cleanNapcatLocks(tmpPath, ubuntuPath);
                     String napcatCmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" +
                             "export TERM=xterm-256color\n" +
                             "export COLORTERM=truecolor\n" +
@@ -234,6 +242,27 @@ public class ProotService extends Service {
         }
     }
     
+    private void cleanNapcatLocks(String tmpPath, String ubuntuPath) {
+        try {
+            String[] paths = new String[]{
+                tmpPath + "/SingletonLock",
+                tmpPath + "/SingletonSocket",
+                tmpPath + "/SingletonCookie",
+                tmpPath + "/.X1-lock",
+                ubuntuPath + "/tmp/SingletonLock",
+                ubuntuPath + "/tmp/SingletonSocket",
+                ubuntuPath + "/tmp/SingletonCookie",
+                ubuntuPath + "/root/.config/QQ/SingletonLock",
+                ubuntuPath + "/root/.config/QQ/SingletonSocket",
+                ubuntuPath + "/root/.config/QQ/SingletonCookie"
+            };
+            for (String p : paths) {
+                File f = new File(p);
+                if (f.exists()) f.delete();
+            }
+        } catch (Exception ignored) {}
+    }
+
     private void deleteRecursively(File fileOrDirectory) {
         if (fileOrDirectory.isDirectory()) {
             for (File child : fileOrDirectory.listFiles()) {
@@ -273,58 +302,91 @@ public class ProotService extends Service {
             this.command = command;
         }
 
-        public void start() {
-            if (isStopped) return;
+        private void initServerSocket() {
+            if (serverSocket != null && !serverSocket.isClosed() && serverSocket.isBound()) {
+                return;
+            }
+            if (serverSocket != null) {
+                try { serverSocket.close(); } catch (Exception ignored) {}
+                serverSocket = null;
+            }
             try {
-                if (serverSocket == null) {
+                serverSocket = new ServerSocket();
+                serverSocket.setReuseAddress(true);
+                serverSocket.bind(new java.net.InetSocketAddress("127.0.0.1", port));
+            } catch (IOException e) {
+                Log.w(TAG, name + " 端口 " + port + " 初次绑定失败 (" + e.getMessage() + ")，延迟重试...");
+                try {
+                    Thread.sleep(300);
                     serverSocket = new ServerSocket();
                     serverSocket.setReuseAddress(true);
                     serverSocket.bind(new java.net.InetSocketAddress("127.0.0.1", port));
-                    new Thread(() -> {
-                        while (!isStopped) {
-                            try {
-                                Socket client = serverSocket.accept();
-                                synchronized (clients) {
-                                    clients.add(client);
-                                }
-                                new Thread(() -> {
-                                    try {
-                                        OutputStream out = client.getOutputStream();
-                                        out.write("\u0002__HIST_START__\u0003".getBytes());
-                                        List<byte[]> historySnapshot;
-                                        synchronized (clients) {
-                                            historySnapshot = new ArrayList<>(history);
-                                        }
-                                        for (byte[] chunk : historySnapshot) {
-                                            out.write(chunk);
-                                        }
-                                        out.write("\u0002__HIST_END__\u0003".getBytes());
-                                        
-                                        InputStream in = client.getInputStream();
-                                        byte[] inBuffer = new byte[1024];
-                                        int inRead;
-                                        while (!isStopped && (inRead = in.read(inBuffer)) != -1) {
-                                            if (process != null) {
-                                                OutputStream pStdin = process.getOutputStream();
-                                                if (pStdin != null) {
-                                                    pStdin.write(inBuffer, 0, inRead);
-                                                    pStdin.flush();
-                                                }
-                                            }
-                                        }
-                                    } catch (IOException e) {
-                                        // Client disconnected
-                                    } finally {
-                                        try { client.close(); } catch (IOException e) {}
-                                        synchronized (clients) { clients.remove(client); }
-                                    }
-                                }).start();
-                            } catch (IOException e) {
-                                if (!isStopped) Log.e(TAG, name + " accept error", e);
-                            }
-                        }
-                    }).start();
+                } catch (Exception ex) {
+                    Log.e(TAG, name + " 端口 " + port + " 绑定彻底失败", ex);
+                    return;
                 }
+            }
+
+            final ServerSocket ss = serverSocket;
+            new Thread(() -> {
+                while (!isStopped && ss != null && !ss.isClosed()) {
+                    try {
+                        Socket client = ss.accept();
+                        synchronized (clients) {
+                            clients.add(client);
+                        }
+                        new Thread(() -> {
+                            try {
+                                OutputStream out = client.getOutputStream();
+                                out.write("\u0002__HIST_START__\u0003".getBytes());
+                                List<byte[]> historySnapshot;
+                                synchronized (clients) {
+                                    historySnapshot = new ArrayList<>(history);
+                                }
+                                for (byte[] chunk : historySnapshot) {
+                                    out.write(chunk);
+                                }
+                                out.write("\u0002__HIST_END__\u0003".getBytes());
+                                
+                                InputStream in = client.getInputStream();
+                                byte[] inBuffer = new byte[1024];
+                                int inRead;
+                                while (!isStopped && (inRead = in.read(inBuffer)) != -1) {
+                                    Process p = process;
+                                    if (p != null) {
+                                        OutputStream pStdin = p.getOutputStream();
+                                        if (pStdin != null) {
+                                            pStdin.write(inBuffer, 0, inRead);
+                                            pStdin.flush();
+                                        }
+                                    }
+                                }
+                            } catch (IOException e) {
+                                // Client disconnected
+                            } finally {
+                                try { client.close(); } catch (IOException e) {}
+                                synchronized (clients) { clients.remove(client); }
+                            }
+                        }).start();
+                    } catch (IOException e) {
+                        if (!isStopped) Log.d(TAG, name + " accept loop ended: " + e.getMessage());
+                    }
+                }
+            }, name + "-AcceptThread").start();
+        }
+
+        public synchronized void start() {
+            if (isStopped) return;
+            if (process != null && isAlive()) {
+                Log.d(TAG, name + " 进程依然存活，无需重复启动");
+                return;
+            }
+            if (restartTimer != null) {
+                restartTimer.cancel();
+                restartTimer = null;
+            }
+            try {
+                initServerSocket();
 
                 history.clear();
                 historyLength = 0;
